@@ -1,8 +1,10 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
-import QtQuick.Dialogs 1.0
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import Qt.labs.platform 1.1 as Platform
+import QtQuick.Layouts 6.0
 import Firebird.Emu 1.0
+import Firebird.UIComponents 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 RowLayout {
     property string filePath: ""
@@ -17,12 +19,12 @@ RowLayout {
     Loader {
         id: dialogLoader
         active: false
-        sourceComponent: FileDialog {
+        sourceComponent: Platform.FileDialog {
             folder: Emu.dir(filePath)
             // If save dialogs are not supported, force an open dialog
-            selectExisting: parent.selectExisting || !Emu.saveDialogSupported()
+            fileMode: selectExisting || !Emu.saveDialogSupported() ? Platform.FileDialog.OpenFile : Platform.FileDialog.SaveFile
             onAccepted: {
-                filePath = Emu.toLocalFile(fileUrl);
+                filePath = Emu.toLocalFile(currentFile);
                 forceRefresh++;
             }
         }
@@ -37,7 +39,7 @@ RowLayout {
 
         FBLabel {
             id: filenameLabel
-            elide: "ElideRight"
+            elide: Text.ElideRight
 
             Layout.fillWidth: true
             // Allow the label to shrink below its implicitWidth.
@@ -51,9 +53,9 @@ RowLayout {
 
         FBLabel {
             id: subtextLabel
-            elide: "ElideRight"
+            elide: Text.ElideRight
 
-            font.pixelSize: TextMetrics.normalSize * 0.8
+            font.pixelSize: FBUI.TextMetrics && FBUI.TextMetrics.normalSize ? FBUI.TextMetrics.normalSize * 0.8 : 10
             Layout.fillWidth: true
             visible: text !== ""
         }
@@ -63,16 +65,16 @@ RowLayout {
     // if the open file dialog doesn't allow creation, to open a file creation dialog.
     IconButton {
         visible: showCreateButton || (!selectExisting && !Emu.saveDialogSupported())
-        icon: "qrc:/icons/resources/icons/document-new.png"
+        iconSource: "qrc:/icons/resources/icons/document-new.png"
 
         Loader {
             id: createDialogLoader
             active: false
-            sourceComponent: FileDialog {
+            sourceComponent: Platform.FileDialog {
                 folder: Emu.dir(filePath)
-                selectExisting: false
+                fileMode: Platform.FileDialog.SaveFile
                 onAccepted: {
-                    filePath = Emu.toLocalFile(fileUrl);
+                    filePath = Emu.toLocalFile(currentFile);
                     forceRefresh++;
                 }
             }
@@ -89,7 +91,7 @@ RowLayout {
     }
 
     IconButton {
-        icon: "qrc:/icons/resources/icons/document-edit.png"
+        iconSource: "qrc:/icons/resources/icons/document-edit.png"
         onClicked: {
             dialogLoader.active = true;
             dialogLoader.item.visible = true;

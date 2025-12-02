@@ -55,7 +55,7 @@ void paintFramebuffer(QPainter *p)
 
     if(hdq1w.lcd_contrast == 0)
     {
-        p->fillRect(painterWindowScaled, emulate_cx ? Qt::black : Qt::white);
+        p->fillRect(painterWindowScaled, Qt::transparent);
         p->setPen(emulate_cx ? Qt::white : Qt::black);
         p->drawText(painterWindowScaled, Qt::AlignCenter, QObject::tr("LCD turned off"));
     }

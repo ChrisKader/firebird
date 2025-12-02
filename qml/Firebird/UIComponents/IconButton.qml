@@ -1,5 +1,6 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import Firebird.UIComponents 1.0 as FBUI
 
 /* A push button with a symbol instead of text.
  * ToolButton and <img/> in Label don't size correctly,
@@ -8,13 +9,15 @@ import QtQuick.Controls 1.0
  * and it can also be specified explicitly. */
 
 Button {
-    property alias icon: image.source
+    id: button
+    property string iconSource: ""
 
-    implicitHeight: TextMetrics.normalSize * 2.5
+    implicitHeight: FBUI.TextMetrics && FBUI.TextMetrics.normalSize ? FBUI.TextMetrics.normalSize * 2.5 : 32
     implicitWidth: implicitHeight
 
     Image {
         id: image
+        source: button.iconSource
         height: Math.round(parent.height * 0.6)
         anchors.centerIn: parent
 

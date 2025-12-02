@@ -1,0 +1,9 @@
+{
+  "qt-core.additionalQtPaths": [
+    {
+      "name": "Design",
+      "path": "/Applications/Qt Design Studio.app/Contents/MacOS/Qt Design Studio"
+    }
+  ],
+  "qt-ui.customWidgetsDesignerExePath": "/opt/homebrew/bin/Designer"
+}

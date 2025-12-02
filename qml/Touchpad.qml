@@ -1,14 +1,15 @@
-import QtQuick 2.0
+import QtQuick 6.0
 import Firebird.Emu 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     id: rectangle2
     width: 100
     height: 70
-    color: "#222222"
+    color: FBUI.Theme.surface
     radius: 10
     border.width: 2
-    border.color: "#eeeeee"
+    border.color: FBUI.Theme.border
 
     Rectangle {
         id: rectangle1
@@ -16,9 +17,9 @@ Rectangle {
         y: 18
         width: 35
         height: 35
-        color: "#00000000"
+        color: "transparent"
         radius: 8
-        border.color: "#ffffff"
+        border.color: FBUI.Theme.borderStrong
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
     }
@@ -29,7 +30,8 @@ Rectangle {
         y: 0
         width: 10
         height: 10
-        color: "#b3edf200"
+        color: FBUI.Theme.accent
+        opacity: 0.0
         radius: 10
         visible: false
     }
@@ -56,7 +58,7 @@ Rectangle {
                 {
                     highlight.x = x*width - highlight.width/2;
                     highlight.y = y*height - highlight.height/2;
-                    highlight.color = down ? "#b3edf200" : "#b38080ff";
+                    highlight.opacity = down ? 0.45 : 0.3;
                 }
 
                 highlight.visible = contact || down;
@@ -124,4 +126,3 @@ Rectangle {
         }
     }
 }
-

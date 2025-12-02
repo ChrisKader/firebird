@@ -1,14 +1,21 @@
-import QtQuick 2.0
-import QtQuick.Dialogs 1.1
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import Qt.labs.platform 1.1 as Platform
+import QtQuick.Layouts 6.0
 
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
 Rectangle {
-    color: "white"
+    id: drawerRoot
+    color: paletteActive.window
 
-    implicitWidth: layout.implicitWidth
+    // Give the drawer a reasonable width even when the layout is anchored
+    implicitWidth: Math.max(layout.implicitWidth, 260)
+    readonly property int normalSize: (TextMetrics && TextMetrics.normalSize ? TextMetrics.normalSize : 13)
+
+    SystemPalette {
+        id: paletteActive
+    }
 
     function closeDrawer() {
         listView.closeDrawer();
@@ -84,18 +91,18 @@ Rectangle {
                  title: qsTr("Save")
                  icon: "qrc:/icons/resources/icons/media-floppy.png"
 
-                 MessageDialog {
+                 Platform.MessageDialog {
                      id: saveFailedDialog
+                     buttons: Platform.MessageDialog.Ok
                      title: qsTr("Error")
                      text: qsTr("Failed to save changes!")
-                     icon: StandardIcon.Warning
                  }
 
-                 MessageDialog {
+                 Platform.MessageDialog {
                      id: snapWarnDialog
+                     buttons: Platform.MessageDialog.Ok
                      title: qsTr("Warning")
                      text: qsTr("Flash saved, but no snapshot location configured.\nYou won't be able to resume.")
-                     icon: StandardIcon.Warning
                  }
 
                  onClicked: {
@@ -154,7 +161,7 @@ Rectangle {
                 toggleState: Emu.turboMode
 
                 title: qsTr("Speed: %1 %").arg(Math.round(100*Emu.speed))
-                font.pixelSize: TextMetrics.normalSize
+                font.pixelSize: drawerRoot.normalSize
                 onToggleStateChanged: {
                     Emu.turboMode = toggleState
                     toggleState = Qt.binding(function() { return Emu.turboMode })
@@ -168,10 +175,11 @@ Rectangle {
 
                 title: qsTr("Firebird Emu v" + Emu.version)
 
-                font.pixelSize: TextMetrics.normalSize
+                font.pixelSize: drawerRoot.normalSize
 
-                MessageDialog {
+                Platform.MessageDialog {
                     id: aboutDialog
+                    buttons: Platform.MessageDialog.Ok
                     title: qsTr("About Firebird")
                     text: qsTr("Authors:<br>
                                Fabian Vogt (<a href='https://github.com/Vogtinator'>Vogtinator</a>)<br>

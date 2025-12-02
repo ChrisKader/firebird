@@ -1,16 +1,19 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
-import QtQuick.Dialogs 1.1
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import Qt.labs.platform 1.1 as Platform
+import QtQuick.Layouts 6.0
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
 ColumnLayout {
+    id: transferPage
     spacing: 5
+    readonly property int normalSize: (TextMetrics && TextMetrics.normalSize ? TextMetrics.normalSize : 13)
+    readonly property int title2Size: (TextMetrics && TextMetrics.title2Size ? TextMetrics.title2Size : 18)
 
     FBLabel {
         text: qsTr("File Transfer")
-        font.pixelSize: TextMetrics.title2Size
+        font.pixelSize: transferPage.title2Size
         Layout.topMargin: 5
         Layout.bottomMargin: 5
     }
@@ -19,7 +22,7 @@ ColumnLayout {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
         text: qsTr("If you are unable to use the main window's file transfer using either drag'n'drop or the file explorer, you can send files here.")
-        font.pixelSize: TextMetrics.normalSize
+        font.pixelSize: transferPage.normalSize
         visible: !Emu.isMobile()
     }
 
@@ -27,20 +30,20 @@ ColumnLayout {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
         text: qsTr("Here you can send files into the target folder specified below.")
-        font.pixelSize: TextMetrics.normalSize
+        font.pixelSize: transferPage.normalSize
     }
 
     Loader {
         id: fileDialogLoader
         active: false
-        sourceComponent: FileDialog {
+        sourceComponent: Platform.FileDialog {
             nameFilters: [ qsTr("TNS Documents") +"(*.tns)", qsTr("Operating Systems") + "(*.tno *.tnc *.tco *.tcc *.tlo *.tmo *.tmc *.tco2 *.tcc2 *.tct2)" ]
-            selectMultiple: true
+            fileMode: Platform.FileDialog.OpenFiles
             onAccepted: {
                 transferStatus.text = qsTr("Starting");
                 transferProgress.indeterminate = true;
-                for(let i = 0; i < fileUrls.length; ++i)
-                    Emu.sendFile(fileUrls[i], Emu.usbdir);
+                for(let i = 0; i < currentFiles.length; ++i)
+                    Emu.sendFile(currentFiles[i], Emu.usbdir);
             }
         }
     }
@@ -104,13 +107,13 @@ ColumnLayout {
     ProgressBar {
         id: transferProgress
         Layout.fillWidth: true
-        minimumValue: 0
-        maximumValue: 100
+        from: 0
+        to: 100
     }
 
     FBLabel {
         text: qsTr("Target Directory")
-        font.pixelSize: TextMetrics.title2Size
+        font.pixelSize: transferPage.title2Size
         Layout.topMargin: 5
         Layout.bottomMargin: 5
     }
@@ -119,7 +122,7 @@ ColumnLayout {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
         text: qsTr("When dragging files onto Firebird, it will try to send them to the emulated system.")
-        font.pixelSize: TextMetrics.normalSize
+        font.pixelSize: transferPage.normalSize
     }
 
     RowLayout {

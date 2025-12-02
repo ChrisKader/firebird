@@ -1,11 +1,17 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import Firebird.UIComponents 1.0 as FBUI
 
 ScrollView {
     id: controls
     property alias keypad: keypad
-    horizontalScrollBarPolicy: Qt.ScrollBarAlwaysOff
-    verticalScrollBarPolicy: Qt.ScrollBarAlwaysOff
+    ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+    ScrollBar.vertical.policy: ScrollBar.AlwaysOff
+    clip: true
+
+    background: Rectangle {
+        color: FBUI.Theme.background
+    }
 
     Flickable {
         flickableDirection: Flickable.VerticalFlick

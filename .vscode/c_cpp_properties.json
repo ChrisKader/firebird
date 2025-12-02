@@ -1,0 +1,47 @@
+{
+  "configurations": [
+    {
+      "name": "Mac",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "${workspaceFolder}/build",
+        "/opt/homebrew/lib/QtCore.framework/Headers",
+        "/opt/homebrew/lib/QtGui.framework/Headers",
+        "/opt/homebrew/lib/QtWidgets.framework/Headers",
+        "/opt/homebrew/lib/QtQuickWidgets.framework/Headers",
+        "/opt/homebrew/lib/QtQml.framework/Headers",
+        "/opt/homebrew/lib/QtQmlModels.framework/Headers",
+        "/opt/homebrew/lib/QtQuick.framework/Headers",
+        "/opt/homebrew/lib/QtNetwork.framework/Headers",
+        "/opt/homebrew/lib/QtQml.framework/Headers",
+        "/opt/homebrew/include/QtQmlIntegration",
+        "/opt/homebrew/lib/QtLabsPlatform.framework/Headers",
+        "/opt/homebrew/include",
+      ],
+      "macFrameworkPath": [
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks",
+        "/opt/homebrew/lib"
+      ],
+      "defines": [
+        "QT_NO_DEBUG",
+        "QT_QUICKWIDGETS_LIB",
+        "QT_WIDGETS_LIB",
+        "QT_QUICK_LIB",
+        "QT_OPENGL_LIB",
+        "QT_GUI_LIB",
+        "QT_QMLMETA_LIB",
+        "QT_QMLMODELS_LIB",
+        "QT_QMLWORKERSCRIPT_LIB",
+        "QT_QML_LIB",
+        "QT_QMLINTEGRATION_LIB",
+        "QT_NETWORK_LIB",
+        "QT_CORE_LI"
+      ],
+      "compilerPath": "/usr/bin/clang++",
+      "cStandard": "c17",
+      "cppStandard": "gnu++20",
+      "intelliSenseMode": "macos-clang-arm64"
+    }
+  ],
+  "version": 4
+}

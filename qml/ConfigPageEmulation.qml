@@ -1,15 +1,19 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
-import QtQuick.Layouts 1.0
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.3
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
 ColumnLayout {
+    id: emuPage
     spacing: 5
+    readonly property int normalSize: (TextMetrics && TextMetrics.normalSize ? TextMetrics.normalSize : 13)
+    readonly property int title1Size: (TextMetrics && TextMetrics.title1Size ? TextMetrics.title1Size : 16)
+    readonly property int title2Size: (TextMetrics && TextMetrics.title2Size ? TextMetrics.title2Size : 18)
 
     FBLabel {
         text: qsTr("Startup")
-        font.pixelSize: TextMetrics.title2Size
+        font.pixelSize: emuPage.title2Size
         Layout.topMargin: 5
         Layout.bottomMargin: 5
     }
@@ -25,13 +29,12 @@ ColumnLayout {
                 return qsTr("Choose the Kit selected on startup and after restarting. If the checkbox is active, it will be launched when Firebird starts.")
         }
 
-        font.pixelSize: TextMetrics.normalSize
+        font.pixelSize: emuPage.normalSize
     }
 
     RowLayout {
         // No spacing so that the spin box looks like part of the label
         spacing: 0
-        width: parent.width
         Layout.fillWidth: true
 
         CheckBox {
@@ -57,7 +60,7 @@ ColumnLayout {
 
     FBLabel {
         text: qsTr("Shutdown")
-        font.pixelSize: TextMetrics.title1Size
+        font.pixelSize: emuPage.title1Size
         Layout.topMargin: 10
         Layout.bottomMargin: 5
         visible: Qt.platform.os !== "ios"
@@ -72,7 +75,7 @@ ColumnLayout {
             else
                 return qsTr("On Application end, save the current state to the current snapshot.");
         }
-        font.pixelSize: TextMetrics.normalSize
+        font.pixelSize: emuPage.normalSize
         visible: Qt.platform.os !== "ios"
     }
 
@@ -89,7 +92,7 @@ ColumnLayout {
 
     FBLabel {
         text: qsTr("UI Preferences")
-        font.pixelSize: TextMetrics.title2Size
+        font.pixelSize: emuPage.title2Size
         Layout.topMargin: 10
         Layout.bottomMargin: 5
         visible: Emu.isMobile()
@@ -99,7 +102,7 @@ ColumnLayout {
         Layout.maximumWidth: parent.width
         wrapMode: Text.WordWrap
         text: qsTr("Change the side of the keypad in landscape orientation.")
-        font.pixelSize: TextMetrics.normalSize
+        font.pixelSize: emuPage.normalSize
         visible: Emu.isMobile()
     }
 

@@ -8,6 +8,7 @@
 #include <QDockWidget>
 #include <QShortcut>
 #include <QQmlComponent>
+#include <QUrl>
 
 #include "core/debug.h"
 #include "core/emu.h"
@@ -32,6 +33,185 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    setStyleSheet(QString::fromUtf8(R"(
+    QMainWindow {
+        background-color: #111318;
+    }
+
+    QWidget {
+        background-color: #111318;
+        color: #e5e7f3;
+        selection-background-color: #3b82f6;
+        selection-color: #ffffff;
+    }
+
+    /* Left control frame around LCD + toolbar */
+    QFrame#frame {
+        background-color: #171923;
+        border-radius: 10px;
+        border: 1px solid #272a33;
+    }
+
+    /* Menubar and menus */
+    QMenuBar {
+        background-color: #111318;
+        border-bottom: 1px solid #272a33;
+    }
+
+    QMenuBar::item {
+        padding: 4px 10px;
+        margin: 0px 2px;
+        background: transparent;
+    }
+
+    QMenuBar::item:selected {
+        background: #2b3240;
+    }
+
+    QMenu {
+        background-color: #171923;
+        border: 1px solid #272a33;
+    }
+
+    QMenu::item {
+        padding: 4px 18px 4px 24px;
+    }
+
+    QMenu::item:selected {
+        background-color: #2b3240;
+    }
+
+    /* Toolbars + tool buttons */
+    QToolBar {
+        background: #111318;
+        border: 0px;
+        spacing: 4px;
+    }
+
+    QToolButton {
+        padding: 6px 10px;
+        border-radius: 6px;
+        background: transparent;
+    }
+
+    QToolButton:hover {
+        background-color: #2a2f3a;
+    }
+
+    QToolButton:checked {
+        background-color: #3b4354;
+    }
+
+    QPushButton#buttonSpeed {
+        border: none;
+        border-radius: 6px;
+        padding: 4px 8px;
+        background-color: #222632;
+        color: #dde1ff;
+    }
+
+    QPushButton#buttonSpeed:checked {
+        background-color: #3f8cff;
+        color: white;
+    }
+
+    /* Dock widgets + their title bars */
+    QDockWidget {
+        background: #111318;
+        border: 1px solid #272a33;
+        titlebar-close-icon: url(none);
+        titlebar-normal-icon: url(none);
+    }
+
+    QDockWidget::title {
+        padding: 4px 8px;
+        background: #171923;
+        color: #c2c6e2;
+        border-bottom: 1px solid #272a33;
+    }
+
+    QDockWidget::close-button,
+    QDockWidget::float-button {
+        background: transparent;
+        border-radius: 4px;
+        margin: 2px;
+        padding: 2px;
+    }
+
+    QDockWidget::close-button:hover,
+    QDockWidget::float-button:hover {
+        background: #2b3240;
+    }
+
+    /* Tabs (including the bottom tab bar with File Transfer / Keypad) */
+    QTabWidget::pane {
+        border: 0;
+        background: #111318;
+    }
+
+    QTabBar::tab {
+        padding: 6px 12px;
+        border-radius: 6px;
+        margin: 2px;
+        color: #c2c6e2;
+        background: transparent;
+    }
+
+    QTabBar::tab:selected {
+        background: #2b3240;
+        color: white;
+    }
+
+    QTabBar::tab:!selected:hover {
+        background: #202531;
+    }
+
+    /* Text-ish widgets / tree widgets / list widgets */
+    QPlainTextEdit,
+    QTreeWidget,
+    QListView,
+    QTreeView,
+    QTableView {
+        background-color: #0f1117;
+        color: #d0d4f0;
+        border-radius: 6px;
+        border: 1px solid #272a33;
+    }
+
+    QLineEdit,
+    QComboBox,
+    QSpinBox {
+        background-color: #0f1117;
+        border-radius: 6px;
+        border: 1px solid #272a33;
+        padding: 2px 4px;
+    }
+
+    QLineEdit:focus,
+    QComboBox:focus,
+    QSpinBox:focus {
+        border-color: #3b82f6;
+    }
+
+    /* Progress bar */
+    QProgressBar {
+        border: 1px solid #272a33;
+        border-radius: 6px;
+        text-align: center;
+        background: #0f1117;
+    }
+
+    QProgressBar::chunk {
+        background-color: #3b82f6;
+        border-radius: 6px;
+    }
+
+    /* Status bar */
+    QStatusBar {
+        background: #111318;
+        border-top: 1px solid #272a33;
+    }
+    )"));
     ui->statusBar->addWidget(&status_label);
 
     // Register QtKeypadBridge for the virtual keyboard functionality
@@ -43,6 +223,7 @@ MainWindow::MainWindow(QWidget *parent) :
 
     qml_engine = ui->keypadWidget->engine();
     qml_engine->addImportPath(QStringLiteral("qrc:/qml/qml"));
+    ui->keypadWidget->setSource(QUrl(QStringLiteral("qrc:/qml/qml/ScrollingKeypad.qml")));
 
     // Create config dialog component
     config_component = new QQmlComponent(qml_engine, QUrl(QStringLiteral("qrc:/qml/qml/FBConfigDialog.qml")), this);
@@ -124,7 +305,7 @@ MainWindow::MainWindow(QWidget *parent) :
         languageCode.chop(3); // Chop off file extension
         QLocale locale(languageCode);
         QAction *action = new QAction(locale.nativeLanguageName(), ui->menuLanguage);
-        connect(action, &QAction::triggered, this, [this,languageCode] { this->switchTranslator(languageCode); });
+        connect(action, &QAction::triggered, this, [this,languageCode] { this->switchTranslator(QLocale(languageCode)); });
         ui->menuLanguage->addAction(action);
     }
 

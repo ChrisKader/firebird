@@ -1,5 +1,6 @@
-lessThan(QT_MAJOR_VERSION, 5): error("You need at least Qt 5.9 to build Firebird!")
-equals(QT_MAJOR_VERSION, 5):lessThan(QT_MINOR_VERSION, 9): error("You need at least Qt 5.9 to build Firebird!")
+# lessThan(QT_MAJOR_VERSION, 5): error("You need at least Qt 5.9 to build Firebird!")
+# equals(QT_MAJOR_VERSION, 5):lessThan(QT_MINOR_VERSION, 9): error("You need at least Qt 5.9 to build Firebird!")
+lessThan(QT_MAJOR_VERSION, 6): error("You need at least Qt 6.2 to build Firebird!")
 
 # Version
 DEFINES += FB_VERSION=1.6
@@ -15,9 +16,9 @@ isEmpty(SUPPORT_LINUX) | equals(SUPPORT_LINUX, auto) {
 # Localization
 TRANSLATIONS += i18n/de_DE.ts i18n/fr_FR.ts i18n/pl_PL.ts
 
-QT += core gui widgets quickwidgets
-android: QT += androidextras
-CONFIG += c++11
+QT += core gui widgets quickwidgets quick qml
+# Qt 6 note: androidextras was removed, functionality moved to QtCore
+CONFIG += c++17
 
 TEMPLATE = app
 TARGET = firebird-emu
@@ -39,6 +40,11 @@ unix: !android {
     sendtool.files = core/firebird-send
     INSTALLS += target desktop icon sendtool
 }
+
+QT_QML_GENERATE_QMLLS_INI = ON
+
+# Added in order to allow building on macOS 26 (https://qt-project.atlassian.net/browse/QTBUG-137687)
+# QMAKE_LIBS_OPENGL = -framework OpenGL
 
 QMAKE_CFLAGS += -g -std=gnu11 -Wall -Wextra
 QMAKE_CXXFLAGS += -g -Wall -Wextra -D QT_NO_CAST_FROM_ASCII

@@ -1,6 +1,6 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import QtQuick.Layouts 6.0
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
@@ -52,11 +52,11 @@ ColumnLayout {
                 placeholderText: qsTr("Name")
                 Layout.fillWidth: true
 
-                text: kitList.currentItem.myData.name
+                text: kitList.currentName
                 onTextChanged: {
-                    if(text !== kitList.currentItem.myData.name)
+                    if(text !== kitList.currentName)
                         kitModel.setDataRow(kitList.currentIndex, text, KitModel.NameRole);
-                    text = Qt.binding(function() { return kitList.currentItem.myData.name; });
+                    text = Qt.binding(function() { return kitList.currentName; });
                 }
             }
 
@@ -68,11 +68,11 @@ ColumnLayout {
             FileSelect {
                 id: boot1Edit
                 Layout.fillWidth: true
-                filePath: kitList.currentItem.myData.boot1
+                filePath: kitList.currentBoot1
                 onFilePathChanged: {
-                    if(filePath !== kitList.currentItem.myData.boot1)
+                    if(filePath !== kitList.currentBoot1)
                         kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.Boot1Role);
-                    filePath = Qt.binding(function() { return kitList.currentItem.myData.boot1; });
+                    filePath = Qt.binding(function() { return kitList.currentBoot1; });
                 }
             }
 
@@ -84,11 +84,11 @@ ColumnLayout {
             FileSelect {
                 id: flashEdit
                 Layout.fillWidth: true
-                filePath: kitList.currentItem.myData.flash
+                filePath: kitList.currentFlash
                 onFilePathChanged: {
-                    if(filePath !== kitList.currentItem.myData.flash)
+                    if(filePath !== kitList.currentFlash)
                         kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.FlashRole);
-                    filePath = Qt.binding(function() { return kitList.currentItem.myData.flash; });
+                    filePath = Qt.binding(function() { return kitList.currentFlash; });
                 }
                 showCreateButton: true
                 onCreate: flashDialog.visible = true
@@ -110,11 +110,11 @@ ColumnLayout {
                 id: snapshotEdit
                 Layout.fillWidth: true
                 selectExisting: false
-                filePath: kitList.currentItem.myData.snapshot
+                filePath: kitList.currentSnapshot
                 onFilePathChanged: {
-                    if(filePath !== kitList.currentItem.myData.snapshot)
+                    if(filePath !== kitList.currentSnapshot)
                         kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.SnapshotRole);
-                    filePath = Qt.binding(function() { return kitList.currentItem.myData.snapshot; });
+                    filePath = Qt.binding(function() { return kitList.currentSnapshot; });
                 }
             }
         }

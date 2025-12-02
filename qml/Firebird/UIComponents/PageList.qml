@@ -1,17 +1,14 @@
-import QtQuick 2.0
+import QtQuick 6.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     property alias currentItem: listView.currentItem
     property alias currentIndex: listView.currentIndex
     property alias model: listView.model
 
-    SystemPalette {
-        id: paletteActive
-    }
-
-    color: paletteActive.base
+    color: FBUI.Theme.surface
     border {
-        color: paletteActive.alternateBase
+        color: FBUI.Theme.border
         width: 1
     }
 
@@ -31,7 +28,7 @@ Rectangle {
             highlightMoveDuration: 150
 
             highlight: Rectangle {
-                color: paletteActive.highlight
+                color: FBUI.Theme.accent
                 anchors.horizontalCenter: parent.horizontalCenter
             }
 

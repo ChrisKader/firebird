@@ -1,7 +1,8 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.3
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import QtQuick.Layouts 6.0
 import Firebird.UIComponents 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     property alias icon: image.source
@@ -16,8 +17,7 @@ Rectangle {
 
     opacity: disabled ? 0.5 : 1.0
 
-    implicitHeight: label.contentHeight * 2
-    implicitWidth: spacing + image.width + spacing + label.contentWidth + spacing
+    height: 48
 
     Layout.fillWidth: true
 
@@ -46,7 +46,7 @@ Rectangle {
         }
 
         height: 1
-        color: "black"
+        color: FBUI.Theme.border
     }
 
     Rectangle {
@@ -58,10 +58,10 @@ Rectangle {
         }
 
         height: 1
-        color: "black"
+        color: FBUI.Theme.border
     }
 
-    color: (mouseArea.pressed !== toggleState) && !disabled ? "#CCC" : "#00000000"
+    color: (mouseArea.pressed !== toggleState) && !disabled ? FBUI.Theme.surfaceAlt : "transparent"
     Behavior on color { ColorAnimation { duration: 200; } }
 
     Image {
@@ -79,7 +79,7 @@ Rectangle {
     FBLabel {
         id: label
 
-        color: "black"
+        color: paletteActive.windowText
 
         x: image.x + image.width + spacing
 
@@ -88,7 +88,7 @@ Rectangle {
             bottom: parent.bottom
         }
 
-        font.pixelSize: TextMetrics.title2Size
+        font.pixelSize: (TextMetrics && TextMetrics.title2Size ? TextMetrics.title2Size : 16)
         verticalAlignment: Text.AlignVCenter
     }
 }

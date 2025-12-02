@@ -1,8 +1,8 @@
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
-import QtQuick 2.0
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Layouts 6.0
 
 GridLayout {
     id: mobileui
@@ -61,7 +61,12 @@ GridLayout {
 
         Rectangle {
             id: iosmargin
-            color: keypad.color
+
+            SystemPalette {
+                id: paletteActive
+            }
+
+            color: paletteActive.window
 
             anchors {
                 left: parent.left
@@ -78,7 +83,12 @@ GridLayout {
         Layout.fillHeight: true
         Layout.fillWidth: true
         Layout.columnSpan: 2
-        color: keypad.color
+
+        SystemPalette {
+            id: paletteBottomActive
+        }
+
+        color: paletteBottomActive.window
     }
 
     states: [ State {

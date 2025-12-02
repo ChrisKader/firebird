@@ -1,6 +1,6 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
-import QtQuick.Layouts 1.1
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import QtQuick.Layouts 6.0
 import Firebird.UIComponents 1.0
 
 Item {
@@ -43,7 +43,7 @@ Item {
             text: "Text"
             horizontalAlignment: Text.AlignHCenter
             Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-            font.pixelSize: TextMetrics.normalSize
+            font.pixelSize: (TextMetrics && TextMetrics.normalSize ? TextMetrics.normalSize : 13)
         }
     }
 }

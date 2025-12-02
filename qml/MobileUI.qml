@@ -1,10 +1,10 @@
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
-import QtQuick 2.0
-import QtQuick.Controls 1.2
-import QtQuick.Dialogs 1.1
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import Qt.labs.platform 1.1 as Platform
+import QtQuick.Layouts 6.0
 
 ApplicationWindow {
     id: app
@@ -58,14 +58,13 @@ ApplicationWindow {
         close.accepted = false;
     }
 
-    MessageDialog {
+    Platform.MessageDialog {
         id: suspendFailedDialog
-        standardButtons: StandardButton.Yes | StandardButton.No
-        icon: StandardIcon.Warning
+        buttons: Platform.MessageDialog.Yes | Platform.MessageDialog.No
         title: qsTr("Suspend failed")
         text: qsTr("Suspending the emulation failed. Do you still want to quit Firebird?")
 
-        onYes: {
+        onYesClicked: {
             ignoreSuspendOnClose = true;
             app.close();
         }
@@ -73,7 +72,7 @@ ApplicationWindow {
 
     Connections {
         target: Emu
-        onEmuSuspended: {
+        function onEmuSuspended(success) {
             if(closeAfterSuspend)
             {
                 closeAfterSuspend = false;
@@ -87,14 +86,14 @@ ApplicationWindow {
                     suspendFailedDialog.visible = true;
             }
         }
-        onToastMessage: {
+        function onToastMessage(msg) {
             toast.showMessage(msg);
         }
     }
 
     Connections {
         target: Qt.application
-        onStateChanged: {
+        function onStateChanged() {
             switch (Qt.application.state)
             {
                 case Qt.ApplicationSuspended: // Might be reaped on mobile
@@ -134,8 +133,8 @@ ApplicationWindow {
         boundsBehavior: ListView.StopAtBounds
         pixelAligned: true
 
-        // Keep the pages alive
-        cacheBuffer: width * count
+        // Keep the pages alive without feedback loops
+        cacheBuffer: width * model.length
 
         model: [ "MobileUIConfig.qml", "MobileUIDrawer.qml", "MobileUIFront.qml" ]
 
@@ -192,7 +191,7 @@ ApplicationWindow {
                 listView.pageX[index] = x;
             }
 
-            width: modelData === "MobileUIDrawer.qml" ? loader.item.implicitWidth : app.width
+            width: modelData === "MobileUIDrawer.qml" ? (loader.item ? loader.item.implicitWidth : 250) : app.width
             height: app.height
 
             Rectangle {

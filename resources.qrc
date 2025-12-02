@@ -51,6 +51,7 @@
         <file>qml/ConfigPageEmulation.qml</file>
         <file>qml/ConfigPageFileTransfer.qml</file>
         <file>qml/Firebird/UIComponents/TextMetrics.qml</file>
+        <file>qml/Firebird/UIComponents/Theme.qml</file>
         <file>qml/ScrollingKeypad.qml</file>
         <file>qml/Firebird/UIComponents/Toast.qml</file>
         <file>qml/MobileUIConfig.qml</file>

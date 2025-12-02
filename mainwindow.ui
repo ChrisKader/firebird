@@ -370,11 +370,6 @@
           <property name="resizeMode">
            <enum>QQuickWidget::SizeRootObjectToView</enum>
           </property>
-          <property name="source">
-           <url>
-            <string notr="true">qrc:/qml/qml/ScrollingKeypad.qml</string>
-           </url>
-          </property>
          </widget>
         </item>
        </layout>

@@ -1,4 +1,4 @@
-import QtQuick 2.0
+import QtQuick 6.0
 
 Item {
     property alias model: pageList.model

@@ -1,10 +1,18 @@
-import QtQuick 2.0
+import QtQuick 6.0
 import Firebird.Emu 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
-    property string active_color: "#555"
-    property string back_color: "#223"
-    property string font_color: "#fff"
+    SystemPalette {
+        id: paletteActive
+    }
+
+    readonly property color accent: FBUI.Theme.accent
+    property color active_color: accent
+    property color back_color: FBUI.Theme.surface
+    property color font_color: FBUI.Theme.text
+    property color active_font_color: FBUI.Theme.textOnAccent
+    property color border_color: FBUI.Theme.border
     property alias text: label.text
     property bool active: pressed || mouseArea.containsMouse
     property bool pressed: false
@@ -15,8 +23,8 @@ Rectangle {
     signal clicked()
 
     border.width: active ? 2 : 1
-    border.color: "#888"
-    radius: 4
+    border.color: border_color
+    radius: 6
     color: active ? active_color : back_color
 
     onPressedChanged: {
@@ -43,7 +51,7 @@ Rectangle {
         anchors.fill: parent
         anchors.centerIn: parent
         font.pixelSize: height*0.55
-        color: font_color
+        color: active ? active_font_color : font_color
         font.bold: true
         // Workaround: Text.AutoText doesn't seem to work for properties (?)
         textFormat: text.indexOf(">") == -1 ? Text.PlainText : Text.RichText

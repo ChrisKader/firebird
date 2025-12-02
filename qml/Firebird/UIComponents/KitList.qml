@@ -1,19 +1,22 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
+pragma ComponentBehavior: Bound
+import QtQuick 6.0
+import QtQuick.Controls 6.0
 import Firebird.Emu 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     property alias currentItem: listView.currentItem
     property alias currentIndex: listView.currentIndex
     property alias kitModel: listView.model
 
-    SystemPalette {
-        id: paletteActive
-    }
+    readonly property string currentName: (currentItem && currentItem.name) ? currentItem.name : ""
+    readonly property string currentBoot1: (currentItem && currentItem.boot1) ? currentItem.boot1 : ""
+    readonly property string currentFlash: (currentItem && currentItem.flash) ? currentItem.flash : ""
+    readonly property string currentSnapshot: (currentItem && currentItem.snapshot) ? currentItem.snapshot : ""
 
-    color: paletteActive.base
+    color: FBUI.Theme.surface
     border {
-        color: paletteActive.alternateBase
+        color: FBUI.Theme.border
         width: 1
     }
 
@@ -33,12 +36,17 @@ Rectangle {
             highlightResizeDuration: 0
 
             highlight: Rectangle {
-                color: paletteActive.highlight
+                color: FBUI.Theme.accent
                 anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
             }
 
             delegate: Item {
-                property variant myData: model
+                id: delegateItem
+                required property string name
+                required property string boot1
+                required property string flash
+                required property string snapshot
+                required property int index
 
                 height: item.height + 10
                 width: listView.width - listView.anchors.margins
@@ -46,7 +54,7 @@ Rectangle {
                 MouseArea {
                     anchors.fill: parent
                     onClicked: function() {
-                        parent.ListView.view.currentIndex = index
+                        parent.ListView.view.currentIndex = delegateItem.index
                         parent.forceActiveFocus()
                     }
                 }
@@ -58,7 +66,7 @@ Rectangle {
                         bottom: parent.bottom
                     }
 
-                    color: paletteActive.shadow
+                    color: FBUI.Theme.border
                     height: 1
                 }
 
@@ -67,9 +75,9 @@ Rectangle {
                     width: parent.width - 15
                     anchors.centerIn: parent
 
-                    kitName: name
-                    flashFile: Emu.basename(flash)
-                    stateFile: Emu.basename(snapshot)
+                    kitName: parent.name
+                    flashFile: Emu.basename(parent.flash)
+                    stateFile: Emu.basename(parent.snapshot)
                 }
 
                 FBLink {
@@ -81,9 +89,9 @@ Rectangle {
                     }
 
                     text: qsTr("Remove")
-                    visible: parent.ListView.view.currentIndex === index && parent.ListView.view.count > 1
+                    visible: parent.ListView.view.currentIndex === delegateItem.index && parent.ListView.view.count > 1
                     onClicked: {
-                        kitModel.remove(index)
+                        listView.model.remove(delegateItem.index)
                     }
                 }
 
@@ -98,9 +106,9 @@ Rectangle {
                     }
 
                     text: qsTr("Copy")
-                    visible: parent.ListView.view.currentIndex === index
+                    visible: parent.ListView.view.currentIndex === delegateItem.index
                     onClicked: {
-                        kitModel.copy(index)
+                        listView.model.copy(delegateItem.index)
                     }
                 }
             }
@@ -108,8 +116,9 @@ Rectangle {
             section.property: "type"
             section.criteria: ViewSection.FullString
             section.delegate: Rectangle {
+                required property string section
                 anchors.horizontalCenter: parent.horizontalCenter
-                color: paletteActive.window
+                color: FBUI.Theme.surfaceAlt
                 height: label.implicitHeight + 4
                 width: listView.width - listView.anchors.margins
 
@@ -119,7 +128,7 @@ Rectangle {
                     anchors.fill: parent
                     anchors.leftMargin: 5
                     verticalAlignment: Text.AlignVCenter
-                    text: section
+                    text: parent.section
                 }
 
                 Rectangle {
@@ -129,7 +138,7 @@ Rectangle {
                         bottom: parent.bottom
                     }
 
-                    color: paletteActive.shadow
+                    color: FBUI.Theme.border
                     height: 1
                 }
             }

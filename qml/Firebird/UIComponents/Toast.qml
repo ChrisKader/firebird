@@ -1,15 +1,19 @@
-import QtQuick 2.0
+import QtQuick 6.0
 
 import Firebird.UIComponents 1.0
 
 Rectangle {
-    property int maxWidth: parent.width * 0.9
-    height: message.contentHeight + 8
-    width: message.contentWidth + 10
+    property int maxWidth: parent ? Math.round(parent.width * 0.9) : 320
+    height: (message && message.implicitHeight ? Math.round(message.implicitHeight + 8) : 24)
+    width: (message && message.implicitWidth ? Math.min(maxWidth, Math.round(message.implicitWidth + 10)) : Math.min(maxWidth, 200))
 
-    color: "#dd222222"
-    border.color: "#ccc"
-    border.width: 0
+    SystemPalette {
+        id: paletteActive
+    }
+
+    color: paletteActive.window
+    border.color: paletteActive.mid
+    border.width: 1
 
     opacity: 0
     visible: opacity > 0
@@ -25,13 +29,13 @@ Rectangle {
     FBLabel {
         id: message
         text: "Text"
-        color: "#eee"
-        width: parent.maxWidth
+        color: paletteActive.windowText
+        width: parent ? parent.maxWidth : 320
 
         anchors.centerIn: parent
 
         horizontalAlignment: Text.Center
-        font.pixelSize: TextMetrics.title1Size
+        font.pixelSize: (TextMetrics && TextMetrics.title1Size ? TextMetrics.title1Size : 16)
         wrapMode: Text.WordWrap
 
         Timer {

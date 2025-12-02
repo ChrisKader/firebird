@@ -1,12 +1,10 @@
 pragma Singleton
-import QtQuick 2.0
+import QtQuick 6.0
 
-Item {
-    property int normalSize: defaultFont.font.pixelSize
-    property int title1Size: defaultFont.font.pixelSize * 1.2
-    property int title2Size: defaultFont.font.pixelSize * 1.4
-
-    Text {
-        id: defaultFont
-    }
+QtObject {
+    // Default font sizes for Qt 6
+    // Using typical default of 13pt as baseline
+    readonly property int normalSize: 13
+    readonly property int title1Size: Math.round(normalSize * 1.2)
+    readonly property int title2Size: Math.round(normalSize * 1.4)
 }

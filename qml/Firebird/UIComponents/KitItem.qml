@@ -1,6 +1,5 @@
-import QtQuick 2.0
-import QtQuick.Controls 1.0
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Layouts 6.0
 
 ColumnLayout {
     property alias kitName: label.text

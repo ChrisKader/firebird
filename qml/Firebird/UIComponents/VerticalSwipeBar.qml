@@ -1,11 +1,16 @@
-import QtQuick 2.0
+import QtQuick 6.0
+import Firebird.UIComponents 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     property alias text: label.text
     signal clicked
 
-    implicitWidth: label.contentHeight + 2 * 2
-    color: "transparent"
+    implicitWidth: (label && label.height ? label.height + 4 : 24)
+    width: implicitWidth
+    color: FBUI.Theme.surfaceAlt
+    border.color: FBUI.Theme.border
+    radius: 2
 
     FBLabel {
         id: label
@@ -16,18 +21,7 @@ Rectangle {
     }
 
     MouseArea {
-        property point orig;
         anchors.fill: parent
-
-        onPressed: {
-            orig.x = mouse.x;
-            orig.y = mouse.y;
-        }
-
-        onReleased: {
-            if(Math.abs(orig.x - mouse.x) < 5
-               && Math.abs(orig.y - mouse.y) < 5)
-            parent.clicked();
-        }
+        onClicked: clicked()
     }
 }

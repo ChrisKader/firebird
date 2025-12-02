@@ -1,71 +1,55 @@
-import QtQuick 2.7
-import QtQuick.Layouts 1.0
-import QtQuick.Controls 1.4
-import QtQuick.Controls.Styles 1.4
+import QtQuick 6.0
+import QtQuick.Controls 6.0
+import QtQuick.Layouts 6.0
 
 import Firebird.UIComponents 1.0
 
 Item {
-    Layout.fillHeight: true
-    Layout.fillWidth: true
 
-    TabView {
-        id: tabView
+    property var configModel: ConfigPagesModel {}
+
+    SystemPalette {
+        id: paletteActive
+    }
+
+    ColumnLayout {
         anchors {
             left: parent.left
             right: swipeBar.left
             top: parent.top
-            bottom: autoSaveLabel.top
-            bottomMargin: 2
-        }
-
-        property var model: ConfigPagesModel {}
-
-    /*    style: TabViewStyle {
-            tab: Rectangle {
-                color: styleData.selected ? "darkgrey" :"lightgrey"
-
-                implicitWidth: tabView.width / model.count
-                implicitHeight: title.contentHeight + 10
-
-                FBLabel {
-                    id: title
-                    anchors.fill: parent
-                    text: styleData.title
-                    font.pixelSize: TextMetrics.title1Size
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                    color: styleData.selected ? "white" : "black"
-                }
-            }
-            frame: Rectangle { color: "#eeeeee" }
-        }*/
-
-        Repeater {
-            id: rep
-            model: tabView.model
-
-            Tab {
-                title: qsTranslate("ConfigPagesModel", rep.model.get(index).title)
-                source: file
-            }
-        }
-    }
-
-    FBLabel {
-        id: autoSaveLabel
-
-        anchors {
-            left: parent.left
-            leftMargin: 2
-            right: swipeBar.left
             bottom: parent.bottom
         }
+        spacing: 0
 
-        text: qsTr("Changes are saved automatically")
-        font.italic: true
-        color: "grey"
+        TabBar {
+            id: tabBar
+            Layout.fillWidth: true
+
+            Repeater {
+                model: configModel
+                
+                TabButton {
+                    text: qsTranslate("ConfigPagesModel", model.title)
+                }
+            }
+        }
+
+        Loader {
+            id: pageLoader
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            source: configModel.get(tabBar.currentIndex) ? configModel.get(tabBar.currentIndex).file : ""
+        }
+
+        FBLabel {
+            id: autoSaveLabel
+            Layout.fillWidth: true
+            Layout.margins: 2
+
+            text: qsTr("Changes are saved automatically")
+            font.italic: true
+            color: paletteActive.placeholderText
+        }
     }
 
     VerticalSwipeBar {

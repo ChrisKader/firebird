@@ -1,16 +1,21 @@
-import QtQuick 2.0
-import QtQuick.Layouts 1.1
-import QtQuick.Controls 1.2
-import QtQuick.Dialogs 1.3
+import QtQuick 6.0
+import QtQuick.Layouts 6.0
+import QtQuick.Controls 6.0
+import QtQuick.Window 6.0
+import Qt.labs.platform 1.1 as Platform
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
-Dialog {
+Window {
     id: flashDialog
     title: qsTr("Create Flash Image")
-    // Work around QTBUG-89607: Menu (used by ComboBox) doesn't work in modal windows
-    modality: Qt.platform.pluginName == "cocoa" ? Qt.NonModal : Qt.WindowModal
-    standardButtons: Dialog.Save | Dialog.Cancel
+    modality: Qt.ApplicationModal
+    visible: false
+    minimumWidth: 420
+    minimumHeight: 320
+    SystemPalette { id: paletteActive }
+    color: paletteActive.window
+
     onVisibleChanged: {
         // For some reason the initial size on wayland is too big.
         // Setting it to -1 initially appears to work around that.
@@ -22,9 +27,30 @@ Dialog {
 
     signal flashCreated(string filePath)
 
+    function acceptDialog() {
+        if (!layout.validationText) {
+            fileDialogLoader.active = true;
+            if (fileDialogLoader.item && fileDialogLoader.item.open)
+                fileDialogLoader.item.open();
+        } else {
+            // Reopen if validation failed
+            flashDialog.visible = true;
+        }
+    }
+
+    function rejectDialog() {
+        flashDialog.visible = false;
+    }
+
     GridLayout {
         id: layout
-        width: parent.width
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+            margins: 16
+            bottomMargin: 8 + buttonBox.implicitHeight
+        }
         columns: 2
 
         FBLabel {
@@ -146,8 +172,9 @@ Dialog {
         }
     }
 
-    MessageDialog {
+    Platform.MessageDialog {
         id: failureDialog
+        buttons: Platform.MessageDialog.Ok
         title: qsTr("Flash saving failed")
         text: qsTr("Saving the flash file failed!")
     }
@@ -155,10 +182,10 @@ Dialog {
     Loader {
         id: fileDialogLoader
         active: false
-        sourceComponent: FileDialog {
-            selectExisting: false
+        sourceComponent: Platform.FileDialog {
+            fileMode: Platform.FileDialog.SaveFile
             onAccepted: {
-                var filePath = Emu.toLocalFile(fileUrl);
+                var filePath = Emu.toLocalFile(currentFile);
                 var success = false;
                 if (!modelCombo.cx2Selected)
                     success = Emu.createFlash(filePath, modelCombo.productId, subtypeCombo.featureValue, manufSelect.filePath, boot2Select.filePath, osSelect.filePath, diagsSelect.filePath);
@@ -166,7 +193,7 @@ Dialog {
                     success = Emu.createFlash(filePath, modelCombo.productId, subtypeCombo.featureValue, manufSelect.filePath, bootloaderSelect.filePath, installerSelect.filePath, diagsSelect.filePath);
 
                 if (success) {
-                    flashCreated(filePath);
+                    flashDialog.flashCreated(filePath);
                     flashDialog.visible = false;
                 }
                 else
@@ -175,16 +202,16 @@ Dialog {
         }
     }
 
-    onActionChosen: {
-        if (action.button === Dialog.Save) {
-            // Don't close the dialog now, but only
-            // after successful saving
-            action.accepted = false;
-
-            if (!layout.validationText) {
-                fileDialogLoader.active = true;
-                fileDialogLoader.item.visible = true;
-            }
+    DialogButtonBox {
+        id: buttonBox
+        standardButtons: DialogButtonBox.Save | DialogButtonBox.Cancel
+        anchors {
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+            margins: 8
         }
+        onAccepted: flashDialog.acceptDialog()
+        onRejected: flashDialog.rejectDialog()
     }
 }

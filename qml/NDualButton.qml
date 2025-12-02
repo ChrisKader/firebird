@@ -1,4 +1,5 @@
-import QtQuick 2.0
+import QtQuick 6.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     id: rectangle3
@@ -13,7 +14,7 @@ Rectangle {
 
     width: 50
     height: 30
-    color: "#00000000"
+    color: "transparent"
 
     NButton {
         id: nbutton1
@@ -39,7 +40,7 @@ Rectangle {
         id: rectangle1
         width: 8
         height: 20
-        color: "#222233"
+        color: FBUI.Theme.surface
         radius: 0
         anchors.verticalCenterOffset: 5
         anchors.horizontalCenterOffset: 0
@@ -47,14 +48,14 @@ Rectangle {
         anchors.verticalCenter: parent.verticalCenter
         anchors.horizontalCenter: parent.horizontalCenter
         border.width: 1
-        border.color: "#888"
+        border.color: FBUI.Theme.border
     }
 
     Rectangle {
         id: rectangle2
         width: 8
         height: 18
-        color: "#222233"
+        color: FBUI.Theme.sunken
         radius: 0
         anchors.verticalCenterOffset: 5
         anchors.horizontalCenterOffset: 0
@@ -69,13 +70,14 @@ Rectangle {
         y: -2
         width: 25
         height: 13
-        color: "#68cce0"
+        color: FBUI.Theme.accent
         text: "aa"
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         z: -1
         font.pixelSize: 8
         font.bold: true
+        opacity: 0.9
     }
 
     Text {
@@ -84,13 +86,13 @@ Rectangle {
         y: -2
         width: 25
         height: 13
-        color: "#68cce0"
+        color: FBUI.Theme.accent
         text: "bb"
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.pixelSize: 8
         z: -2
         font.bold: true
+        opacity: 0.9
     }
 }
-

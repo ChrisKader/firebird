@@ -1,13 +1,18 @@
 import Firebird.Emu 1.0
 
-import QtQuick 2.3
-import QtQuick.Layouts 1.0
+import QtQuick 6.0
+import QtQuick.Layouts 6.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     id: rectangle1
     width: 265
     height: 340
-    color: "#444"
+
+    readonly property color accent: FBUI.Theme.accent
+    readonly property color accentMuted: FBUI.Theme.accentMuted
+
+    color: FBUI.Theme.background
 
     ColumnLayout {
         id: columnLayout1
@@ -43,7 +48,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: "#68cce0"
+                color: accent
                 text: "save"
                 horizontalAlignment: Text.AlignHCenter
                 font.pixelSize: 9
@@ -107,7 +112,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: "#68cce0"
+                color: accent
                 text: "+page"
                 horizontalAlignment: Text.AlignHCenter
                 font.pixelSize: 9
@@ -139,7 +144,7 @@ Rectangle {
     Touchpad {
         id: touchpad1
         width: gridLayout1.width
-        border.color: "#abc2c7"
+        border.color: FBUI.Theme.border
         anchors.bottom: rectangle3.bottom
         anchors.bottomMargin: 6
         z: 2
@@ -166,7 +171,7 @@ Rectangle {
 
         NBigButton {
             id: nButton11
-            width: 33
+            Layout.preferredWidth: 33
             text: "shift"
             keymap_id: 85
 
@@ -176,7 +181,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: "#68cce0"
+                color: accent
                 text: "CAPS"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -189,9 +194,8 @@ Rectangle {
 
         NBigButton {
             id: nButton12
-            width: 33
+            Layout.preferredWidth: 33
             text: "var"
-            Layout.preferredWidth: -1
             Layout.fillWidth: false
             border.width: 1
             clip: false
@@ -204,7 +208,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: "#68cce0"
+                color: accent
                 text: "sto→"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -287,7 +291,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: "#68cce0"
+                color: accent
                 text: "capture"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -309,7 +313,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: "#68cce0"
+                color: accent
                 text: "ans"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -324,16 +328,16 @@ Rectangle {
     NBigButton {
         id: nButton7
         width: 33
-        color: "#68cce0"
         text: "ctrl"
         anchors.top: gridLayout1.top
         anchors.topMargin: 0
         keymap_id: 86
         anchors.left: parent.left
         anchors.leftMargin: 5
-        active_color: "#cce"
-        back_color: "#bbf"
-        font_color: "#222"
+        active_color: accent
+        back_color: accentMuted
+        border_color: FBUI.Theme.border
+        font_color: FBUI.Theme.textOnAccent
     }
 
     NBigButton {
@@ -353,7 +357,7 @@ Rectangle {
             y: -11
             width: 33
             height: 11
-            color: "#68cce0"
+            color: accent
             text: "clear"
             horizontalAlignment: Text.AlignHCenter
             font.pixelSize: 9
@@ -378,7 +382,7 @@ Rectangle {
         columnSpacing: 10
         columns: 9
 
-        NAlphaButton { width: 21; text: "EE" ;keymap_id: 30 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "EE" ;keymap_id: 30 }
         NAlphaButton { text: "A" ;keymap_id: 50 }
         NAlphaButton { text: "B" ;keymap_id: 49 }
         NAlphaButton { text: "C" ;keymap_id: 48 }
@@ -386,8 +390,8 @@ Rectangle {
         NAlphaButton { text: "E" ;keymap_id: 45 }
         NAlphaButton { text: "F" ;keymap_id: 44 }
         NAlphaButton { text: "G" ;keymap_id: 39 }
-        NAlphaButton { width: 21; text: "?!▸";keymap_id: 8 }
-        NAlphaButton { width: 21; text: "π▸";keymap_id: 19 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "?!▸";keymap_id: 8 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "π▸";keymap_id: 19 }
         NAlphaButton { text: "H" ;keymap_id: 38 }
         NAlphaButton { text: "I" ;keymap_id: 37 }
         NAlphaButton { text: "J" ;keymap_id: 35 }
@@ -395,7 +399,7 @@ Rectangle {
         NAlphaButton { text: "L" ;keymap_id: 33 }
         NAlphaButton { text: "M" ;keymap_id: 28 }
         NAlphaButton { text: "N" ;keymap_id: 27 }
-        NAlphaButton { width: 21; text: "";keymap_id: 66;
+        NAlphaButton { Layout.preferredWidth: 21; text: "";keymap_id: 66;
             Image {
                 source: "qrc:/keyimages/resources/keyimages/flag.png"
                 anchors.fill: parent
@@ -404,7 +408,7 @@ Rectangle {
                 mipmap: true
             }
         }
-        NAlphaButton { width: 21; text: "," ;keymap_id: 87 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "," ;keymap_id: 87 }
         NAlphaButton { text: "O" ;keymap_id: 26 }
         NAlphaButton { text: "P" ;keymap_id: 24 }
         NAlphaButton { text: "Q" ;keymap_id: 23 }
@@ -412,11 +416,11 @@ Rectangle {
         NAlphaButton { text: "S" ;keymap_id: 17 }
         NAlphaButton { id: nAlphaButtonT; text: "T" ;keymap_id: 16 }
         NAlphaButton { id: nAlphaButtonU; text: "U" ;keymap_id: 15 }
-        NAlphaButton { width: 21; text: "↵";keymap_id: 0 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "↵";keymap_id: 0 }
         Rectangle {
             color: "#00000000"
-            width: 15
-            height: 15
+            Layout.preferredWidth: 15
+            Layout.preferredHeight: 15
         }
         NAlphaButton { text: "V" ;keymap_id: 13 }
         NAlphaButton { text: "W" ;keymap_id: 12 }
@@ -601,7 +605,7 @@ Rectangle {
             y: -12
             width: 50
             height: 11
-            color: "#68cce0"
+            color: accent
             text: "≈"
             font.bold: true
             anchors.bottom: nButton8.top
@@ -615,7 +619,7 @@ Rectangle {
     Rectangle {
         id: rectangle3
         height: 90
-        color: "#111111"
+        color: FBUI.Theme.surface
         anchors.top: parent.top
         anchors.topMargin: 0
         anchors.left: parent.left
@@ -625,4 +629,3 @@ Rectangle {
         z: 1
     }
 }
-
