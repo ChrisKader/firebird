@@ -7,6 +7,10 @@
 
 sched_state sched;
 
+/* Track which sched item is currently being processed to avoid
+ * re-entrant event_clear recursion. */
+static int sched_current_index = -1;
+
 static inline uint32_t muldiv(uint32_t a, uint32_t b, uint32_t c) {
 #if defined(__i386__) || defined(__x86_64__)
     __asm__ ("mull %1; divl %2" : "+a" (a) : "m" (b), "m" (c) : "edx");
@@ -22,6 +26,8 @@ void sched_reset(void) {
     const uint32_t def_rates[] = { 0, 0, 0, 27000000, 12000000, 32768 };
     memcpy(sched.clock_rates, def_rates, sizeof(def_rates));
     memset(sched.items, 0, sizeof sched.items);
+    sched.next_cputick = 0;
+    sched.next_index = -1;
 }
 
 void event_repeat(int index, uint32_t ticks) {
@@ -67,7 +73,9 @@ uint32_t sched_process_pending_events() {
         } else {
             //printf("[%8d/%8d] Event %d\n", cputick, next_cputick, next_index);
             sched.items[sched.next_index].second = -1;
+            sched_current_index = sched.next_index;
             sched.items[sched.next_index].proc(sched.next_index);
+            sched_current_index = -1;
         }
         sched_update_next_event(cputick);
     }
@@ -75,6 +83,16 @@ uint32_t sched_process_pending_events() {
 }
 
 void event_clear(int index) {
+    /* If we are currently inside this event handler, just mark it
+     * inactive; running sched_process_pending_events recursively
+     * would blow the stack. */
+    if (index == sched_current_index) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
     uint32_t cputick = sched_process_pending_events();
 
     sched.items[index].second = -1;

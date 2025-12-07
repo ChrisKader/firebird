@@ -78,6 +78,8 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 			{
 				/* enter sleep, jump to 0 when On pressed. */
 				cpu_events |= EVENT_SLEEP;
+				event_clear(SCHED_TIMERS);
+				event_clear(SCHED_TIMER_FAST);
 				// Without this, the clocks are wrong
 				aladdin_pmu_reset();
 			}

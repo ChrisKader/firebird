@@ -149,7 +149,7 @@ void pmu_write(uint32_t addr, uint32_t value);
 struct cx_timer {
     uint32_t load;
     uint32_t value;
-    uint8_t prescale;
+    uint32_t prescale;
     uint8_t control;
     uint8_t interrupt;
     uint8_t reload;

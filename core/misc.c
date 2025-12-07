@@ -473,6 +473,9 @@ void misc_write(uint32_t addr, uint32_t value) {
 /* 900B0000 */
 struct pmu_state pmu;
 
+static void timer_cx_schedule_fast(void);
+static void timer_cx_schedule_slow(void);
+
 void pmu_reset(void) {
     memset(&pmu, 0, sizeof pmu);
     // No idea what the clock speeds should actually be on reset,
@@ -481,6 +484,8 @@ void pmu_reset(void) {
     sched.clock_rates[CLOCK_CPU] = 90000000;
     sched.clock_rates[CLOCK_AHB] = 45000000;
     sched.clock_rates[CLOCK_APB] = 22500000;
+    timer_cx_schedule_fast();
+    timer_cx_schedule_slow();
 }
 uint32_t pmu_read(uint32_t addr) {
     switch (addr & 0x003F) {
@@ -520,7 +525,10 @@ void pmu_write(uint32_t addr, uint32_t value) {
                         ahbdiv = 2;
                     } else {
                         base = 6000000 * (clocks >> 15 & 0x3F);
-                        if (base == 0) error("invalid clock speed");
+                        if (base == 0) {
+                            warn("Ignoring PMU clock change with base 0");
+                            return;
+                        }
                     }
                 }
                 uint32_t new_rates[3];
@@ -531,6 +539,8 @@ void pmu_write(uint32_t addr, uint32_t value) {
                 //warn("Changed clock speeds: %u %u %u", new_rates[0], new_rates[1], new_rates[2]);
                 pmu.clocks = clocks;
                 int_set(INT_POWER, 1); // CX boot1 expects an interrupt
+                timer_cx_schedule_fast();
+                timer_cx_schedule_slow();
             }
             return;
         case 0x10: pmu.on_irq_enabled = value; return;
@@ -544,6 +554,47 @@ void pmu_write(uint32_t addr, uint32_t value) {
 /* 90010000, 900C0000(?), 900D0000 */
 static timer_cx_state timer_cx;
 static void timer_cx_event(int index);
+static void timer_cx_fast_event(int index);
+static uint32_t timer_cx_fast_scheduled_ticks = 1;
+static uint32_t timer_cx_slow_scheduled_cpu_ticks = 1;
+static uint8_t timer_cx_clock_select[3];
+
+static uint32_t timer_cx_clock_rate(int which) {
+    if (which < 0 || which >= 3)
+        return 0;
+
+    /* CX II timers: observed to run off APB for timer0, but timer1/2 behave
+     * like the slow timers (32 kHz) on real hardware, matching previous
+     * emulation. */
+    if (emulate_cx2) {
+        if (which == 0)
+            return sched.clock_rates[CLOCK_APB];
+        return sched.clock_rates[CLOCK_32K];
+    }
+
+    /* CX: fast timer is configurable; other timers default to 32 kHz
+     * (selector bit1 set after reset). */
+    uint8_t sel = timer_cx_clock_select[which];
+    if (sel & 0x2)
+        return sched.clock_rates[CLOCK_32K];
+    if (sel & 0x1)
+        return 10000000;
+    return 33000000;
+}
+
+static uint32_t timer_cx_ticks_to_cpu(uint32_t timer_ticks, uint32_t timer_rate) {
+    if (timer_rate == 0 || timer_ticks == UINT32_MAX)
+        return UINT32_MAX;
+
+    uint64_t cpu_rate = sched.clock_rates[CLOCK_CPU];
+    uint64_t cpu_ticks = (uint64_t)timer_ticks * cpu_rate;
+    cpu_ticks = (cpu_ticks + timer_rate - 1) / timer_rate; // ceil to avoid early firing
+    if (cpu_ticks == 0)
+        cpu_ticks = 1;
+    if (cpu_ticks > UINT32_MAX)
+        return UINT32_MAX;
+    return (uint32_t)cpu_ticks;
+}
 
 void timer_cx_int_check(int which) {
     int_set(INT_TIMER0+which, (timer_cx.timer[which][0].interrupt & timer_cx.timer[which][0].control >> 5)
@@ -562,7 +613,7 @@ uint32_t timer_cx_read(uint32_t addr) {
         case 0x0018: case 0x0038: return t->load;
         case 0x001C: case 0x003C: return 0; //?
         // The OS reads from 0x80 and writes it into 0x30 ???
-        case 0x0080: return 0;
+        case 0x0080: return timer_cx_clock_select[which];
         case 0x0FE0: return 0x04;
         case 0x0FE4: return 0x18;
         case 0x0FE8: return 0x14;
@@ -574,74 +625,277 @@ uint32_t timer_cx_read(uint32_t addr) {
     }
     return bad_read_word(addr);
 }
+static inline uint32_t timer_cx_ticks_to_next(const struct cx_timer *t) {
+    if (!(t->control & 0x80))
+        return UINT32_MAX;
+
+    const uint32_t shift = (t->control & 0xC);
+    const uint32_t period = 1u << shift;
+    const uint32_t mask = period - 1;
+    uint32_t remainder = t->prescale & mask;
+    uint32_t ticks = period - remainder;
+    if (ticks == 0)
+        ticks = period;
+    return ticks;
+}
+
+static void timer_cx_advance_ticks(int which, uint32_t ticks) {
+    if (which < 0 || which >= 3)
+        return;
+
+    for (int i = 0; i < 2; i++) {
+        struct cx_timer *t = &timer_cx.timer[which][i];
+        const uint32_t shift = (t->control & 0xC);
+        const uint32_t period = 1u << shift;
+        const uint32_t mask = period - 1;
+
+        uint32_t old_prescale = t->prescale;
+        uint32_t steps;
+
+        if (shift == 0) {
+            steps = ticks;
+            t->prescale = 0; // period is 1, so remainder is always 0
+        } else {
+            uint32_t new_prescale = old_prescale + ticks;
+            steps = (new_prescale >> shift) - (old_prescale >> shift);
+            t->prescale = new_prescale & mask;
+        }
+
+        if (!(t->control & 0x80) || steps == 0)
+            continue;
+
+        while (steps--) {
+            uint32_t oldvalue = (t->control & 2) ? t->value : t->value & 0xFFFF;
+            uint32_t value = oldvalue;
+            if (t->reload) {
+                t->reload = 0;
+                value = t->load;
+            } else {
+                if (value == 0) {
+                    if (!(t->control & 1)) {
+                        value--;
+                        if (t->control & 0x40)
+                            value = t->load;
+                    }
+                } else {
+                    value--;
+                }
+            }
+            t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | (value & 0xFFFF);
+            if (oldvalue != 0 && value == 0) {
+                t->interrupt = 1;
+                timer_cx_int_check(which);
+            }
+        }
+    }
+}
+
+static uint32_t timer_cx_fast_next_ticks(void) {
+    uint32_t next0 = timer_cx_ticks_to_next(&timer_cx.timer[0][0]);
+    uint32_t next1 = timer_cx_ticks_to_next(&timer_cx.timer[0][1]);
+    uint32_t next = next0 < next1 ? next0 : next1;
+    return next;
+}
+
+static void timer_cx_schedule_fast(void) {
+    struct sched_item *item = &sched.items[SCHED_TIMER_FAST];
+    item->clock = CLOCK_CPU;
+
+    uint32_t timer_rate = timer_cx_clock_rate(0);
+    if (sched.clock_rates[CLOCK_CPU] == 0 || timer_rate == 0) {
+        item->second = -1;
+        item->tick = 0;
+        item->cputick = 0;
+        return;
+    }
+    uint32_t next = timer_cx_fast_next_ticks();
+    if (next == UINT32_MAX) {
+        item->second = -1;
+        item->tick = 0;
+        item->cputick = 0;
+        return;
+    }
+    uint32_t cpu_ticks = timer_cx_ticks_to_cpu(next, timer_rate);
+    if (cpu_ticks == UINT32_MAX) {
+        item->second = -1;
+        item->tick = 0;
+        item->cputick = 0;
+        return;
+    }
+    timer_cx_fast_scheduled_ticks = next;
+    event_set(SCHED_TIMER_FAST, cpu_ticks);
+}
+
 void timer_cx_write(uint32_t addr, uint32_t value) {
     int which = (addr >> 16) % 5;
     struct cx_timer *t = &timer_cx.timer[which][addr >> 5 & 1];
     switch (addr & 0xFFFF) {
         case 0x0000: case 0x0020: t->reload = 1; /* fallthrough */
-        case 0x0018: case 0x0038: t->load = value; return;
-        case 0x0004: case 0x0024: return;
+        case 0x0018: case 0x0038: t->load = value; goto schedule;
+        case 0x0004: case 0x0024: goto schedule;
         case 0x0008: case 0x0028:
             t->control = value;
-            if(which == 0 && (value & 0x80))
-                error("Fast timer not implemented");
             timer_cx_int_check(which);
-        return;
-        case 0x000C: case 0x002C: t->interrupt = 0; timer_cx_int_check(which); return;
+        goto schedule;
+        case 0x000C: case 0x002C: t->interrupt = 0; timer_cx_int_check(which); goto schedule;
 
-        case 0x0080: return; // ???
+        case 0x0080:
+            timer_cx_clock_select[which] = value;
+            goto schedule; // Clock source select
     }
     bad_write_word(addr, value);
+    return;
+schedule:
+    if (which == 0)
+        timer_cx_schedule_fast();
+    else
+        timer_cx_schedule_slow();
 }
-void timer_cx_advance(int which) {
-    int i;
-    for (i = 0; i < 2; i++) {
-        struct cx_timer *t = &timer_cx.timer[which][i];
-        t->prescale++;
-        if (!(t->control & 0x80))
+
+static uint32_t timer_cx_slow_next_cpu_ticks(void) {
+    uint32_t best = UINT32_MAX;
+    if (sched.clock_rates[CLOCK_CPU] == 0)
+        return UINT32_MAX;
+
+    for (int which = 1; which <= 2; which++) {
+        uint32_t timer_rate = timer_cx_clock_rate(which);
+        if (timer_rate == 0)
             continue;
-        uint32_t oldvalue = (t->control & 2) ? t->value : t->value & 0xFFFF;
-        uint32_t value = oldvalue;
-        if (t->reload) {
-            t->reload = 0;
-            value = t->load;
-        } else if (!(t->prescale & ((1 << (t->control & 0xC)) - 1))) {
-            if (value == 0) {
-                if (!(t->control & 1)) {
-                    value--;
-                    if (t->control & 0x40)
-                        value = t->load;
-                }
-            } else {
-                value--;
-            }
-        }
-        t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | (value & 0xFFFF);
-        if (oldvalue != 0 && value == 0) {
-            t->interrupt = 1;
-            timer_cx_int_check(which);
-        }
+
+        uint32_t next0 = timer_cx_ticks_to_next(&timer_cx.timer[which][0]);
+        uint32_t next1 = timer_cx_ticks_to_next(&timer_cx.timer[which][1]);
+        uint32_t next = next0 < next1 ? next0 : next1;
+        uint32_t cpu_ticks = timer_cx_ticks_to_cpu(next, timer_rate);
+        if (cpu_ticks == UINT32_MAX)
+            continue;
+
+        if (cpu_ticks < best)
+            best = cpu_ticks;
     }
+    return best;
 }
+
+static void timer_cx_schedule_slow(void) {
+    struct sched_item *item = &sched.items[SCHED_TIMERS];
+    item->clock = CLOCK_CPU;
+
+    if (sched.clock_rates[CLOCK_CPU] == 0) {
+        item->second = -1;
+        item->tick = 0;
+        item->cputick = 0;
+        return;
+    }
+
+    uint32_t cpu_ticks = timer_cx_slow_next_cpu_ticks();
+    if (cpu_ticks == UINT32_MAX) {
+        item->second = -1;
+        item->tick = 0;
+        item->cputick = 0;
+        return;
+    }
+
+    timer_cx_slow_scheduled_cpu_ticks = cpu_ticks ? cpu_ticks : 1;
+    event_set(SCHED_TIMERS, timer_cx_slow_scheduled_cpu_ticks);
+}
+
 static void timer_cx_event(int index) {
-    // TODO: should use seperate schedule item for each timer,
-    //       only fired on significant events
-    event_repeat(index, 1);
-    // fast timer not implemented here...
-    timer_cx_advance(1);
-    timer_cx_advance(2);
+    if (cpu_events & EVENT_SLEEP) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
+    uint32_t cpu_rate = sched.clock_rates[CLOCK_CPU];
+    if (cpu_rate == 0) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
+    uint32_t cpu_ticks = timer_cx_slow_scheduled_cpu_ticks ? timer_cx_slow_scheduled_cpu_ticks : 1;
+    for (int which = 1; which <= 2; which++) {
+        uint32_t timer_rate = timer_cx_clock_rate(which);
+        if (timer_rate == 0)
+            continue;
+
+        uint64_t timer_ticks = (uint64_t)cpu_ticks * timer_rate / cpu_rate;
+        if (timer_ticks == 0)
+            timer_ticks = 1;
+        if (timer_ticks > UINT32_MAX)
+            timer_ticks = UINT32_MAX;
+        timer_cx_advance_ticks(which, (uint32_t)timer_ticks);
+    }
+
+    uint32_t next_cpu = timer_cx_slow_next_cpu_ticks();
+    if (next_cpu == UINT32_MAX) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
+    timer_cx_slow_scheduled_cpu_ticks = next_cpu ? next_cpu : 1;
+    event_repeat(index, timer_cx_slow_scheduled_cpu_ticks);
+}
+static void timer_cx_fast_event(int index) {
+    if (cpu_events & EVENT_SLEEP) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
+    uint32_t timer_rate = timer_cx_clock_rate(0);
+    if (timer_rate == 0) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
+    uint32_t ticks = timer_cx_fast_scheduled_ticks ? timer_cx_fast_scheduled_ticks : 1;
+    timer_cx_advance_ticks(0, ticks);
+
+    uint32_t next = timer_cx_fast_next_ticks();
+    if (next == UINT32_MAX) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+
+    timer_cx_fast_scheduled_ticks = next;
+    uint32_t cpu_ticks = timer_cx_ticks_to_cpu(next, timer_rate);
+    if (cpu_ticks == UINT32_MAX) {
+        sched.items[index].second = -1;
+        sched.items[index].tick = 0;
+        sched.items[index].cputick = 0;
+        return;
+    }
+    event_repeat(index, cpu_ticks);
 }
 void timer_cx_reset() {
     memset(timer_cx.timer, 0, sizeof(timer_cx.timer));
+    memset(timer_cx_clock_select, 0, sizeof(timer_cx_clock_select));
     int which, i;
     for (which = 0; which < 3; which++) {
         for (i = 0; i < 2; i++) {
             timer_cx.timer[which][i].value = 0xFFFFFFFF;
             timer_cx.timer[which][i].control = 0x20;
         }
+        if (which > 0)
+            timer_cx_clock_select[which] = 0x2; // default slow timers to 32 kHz
     }
-    sched.items[SCHED_TIMERS].clock = CLOCK_32K;
+    sched.items[SCHED_TIMERS].clock = CLOCK_CPU;
     sched.items[SCHED_TIMERS].proc = timer_cx_event;
+    sched.items[SCHED_TIMER_FAST].clock = CLOCK_CPU;
+    sched.items[SCHED_TIMER_FAST].proc = timer_cx_fast_event;
+    timer_cx_fast_scheduled_ticks = 1;
+    timer_cx_slow_scheduled_cpu_ticks = 1;
+    timer_cx_schedule_fast();
+    timer_cx_schedule_slow();
 }
 
 /* 900F0000 */
@@ -911,7 +1165,7 @@ bool misc_suspend(emu_snapshot *snapshot)
 
 bool misc_resume(const emu_snapshot *snapshot)
 {
-    return snapshot_read(snapshot, &memctl_cx, sizeof(memctl_cx))
+    bool ok = snapshot_read(snapshot, &memctl_cx, sizeof(memctl_cx))
             && snapshot_read(snapshot, &gpio, sizeof(gpio))
             && snapshot_read(snapshot, &timer, sizeof(timer))
             && snapshot_read(snapshot, &fastboot, sizeof(fastboot))
@@ -922,4 +1176,9 @@ bool misc_resume(const emu_snapshot *snapshot)
             && snapshot_read(snapshot, &hdq1w, sizeof(hdq1w))
             && snapshot_read(snapshot, &led, sizeof(led))
             && snapshot_read(snapshot, &adc, sizeof(adc));
+    if (ok) {
+        timer_cx_schedule_fast();
+        timer_cx_schedule_slow();
+    }
+    return ok;
 }

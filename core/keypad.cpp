@@ -36,6 +36,8 @@ void keypad_on_pressed() {
 
     if(cpu_events & EVENT_SLEEP) {
         assert(emulate_cx2);
+        cpu_events &= ~EVENT_SLEEP;
+        timer_cx_reset();
         cpu_reset();
     }
 }

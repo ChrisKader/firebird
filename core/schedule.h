@@ -15,6 +15,7 @@ enum sched_item_index {
         SCHED_LCD,
         SCHED_TIMERS,
         SCHED_WATCHDOG,
+        SCHED_TIMER_FAST,
         SCHED_NUM_ITEMS
 };
 
