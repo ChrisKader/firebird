@@ -16,7 +16,7 @@
         "/opt/homebrew/lib/QtQml.framework/Headers",
         "/opt/homebrew/include/QtQmlIntegration",
         "/opt/homebrew/lib/QtLabsPlatform.framework/Headers",
-        "/opt/homebrew/include",
+        "/opt/homebrew/include"
       ],
       "macFrameworkPath": [
         "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks",

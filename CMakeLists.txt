@@ -1,0 +1,342 @@
+cmake_minimum_required(VERSION 3.16)
+project(firebird-emu VERSION 1.0 LANGUAGES C CXX)
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
+set(CMAKE_AUTOUIC ON)
+
+find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick QuickWidgets Widgets)
+
+qt_standard_project_setup()
+
+qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
+    consolelineedit.cpp consolelineedit.h
+    core/arm_interpreter.cpp
+    core/armcode_bin.h
+    core/armsnippets.h
+    core/armsnippets_loader.c
+    core/asmcode.c core/asmcode.h
+    core/bitfield.h
+    core/casplus.c core/casplus.h
+    core/coproc.cpp
+    core/cpu.cpp core/cpu.h
+    core/cpudefs.h
+    core/cx2.cpp core/cx2.h
+    core/debug.cpp core/debug.h
+    core/des.c core/des.h
+    core/disasm.c core/disasm.h
+    core/emu.cpp core/emu.h
+    core/fieldparser.cpp core/fieldparser.h
+    core/flash.cpp core/flash.h
+    core/gdbstub.c core/gdbstub.h
+    core/gif.cpp core/gif.h
+    core/interrupt.c core/interrupt.h
+    core/keypad.cpp core/keypad.h
+    core/lcd.c core/lcd.h
+    core/link.c core/link.h
+    core/mem.c core/mem.h
+    core/misc.c core/misc.h
+    core/mmu.c core/mmu.h
+    core/os/os.h
+    core/schedule.c core/schedule.h
+    core/serial.c
+    core/sha256.c core/sha256.h
+    core/thumb_interpreter.cpp
+    core/translate.h
+    core/usb.c core/usb.h
+    core/usb_cx2.cpp core/usb_cx2.h
+    core/usblink.c core/usblink.h
+    core/usblink_cx2.cpp core/usblink_cx2.h
+    core/usblink_queue.cpp core/usblink_queue.h
+    dockwidget.cpp dockwidget.h
+    emuthread.cpp emuthread.h
+    fbaboutdialog.cpp fbaboutdialog.h
+    keymap.h
+    kitmodel.cpp kitmodel.h
+    lcdwidget.cpp lcdwidget.h
+    main.cpp
+    mainwindow.cpp mainwindow.h mainwindow.ui
+    qmlbridge.cpp qmlbridge.h
+    qtframebuffer.cpp qtframebuffer.h
+    qtkeypadbridge.cpp qtkeypadbridge.h
+    usblinktreewidget.cpp usblinktreewidget.h
+)
+qt_add_qml_module(firebird-emu
+    URI firebird_emu
+    VERSION ${PROJECT_VERSION}
+    QML_FILES
+        qml/Keypad.qml
+        qml/NAlphaButton.qml
+        qml/NBigButton.qml
+        qml/NButton.qml
+        qml/NNumButton.qml
+        qml/Touchpad.qml
+        qml/NDualButton.qml
+        qml/MobileUI.qml
+        qml/SidebarButton.qml
+        qml/ConfigPagesModel.qml
+        qml/Firebird/UIComponents/PageDelegate.qml
+        qml/Firebird/UIComponents/PageList.qml
+        qml/FBConfigDialog.qml
+        qml/ConfigPageDebug.qml
+        qml/Firebird/UIComponents/ConfigPages.qml
+        qml/ConfigPageKits.qml
+        qml/Firebird/UIComponents/KitItem.qml
+        qml/Firebird/UIComponents/KitList.qml
+        qml/Firebird/UIComponents/FBLabel.qml
+        qml/Firebird/UIComponents/FileSelect.qml
+        qml/Firebird/UIComponents/FBLink.qml
+        qml/ConfigPageEmulation.qml
+        qml/ConfigPageFileTransfer.qml
+        qml/Firebird/UIComponents/TextMetrics.qml
+        qml/Firebird/UIComponents/Theme.qml
+        qml/ScrollingKeypad.qml
+        qml/Firebird/UIComponents/Toast.qml
+        qml/MobileUIConfig.qml
+        qml/MobileUIFront.qml
+        qml/MobileUIDrawer.qml
+        qml/DrawerButton.qml
+        qml/Firebird/UIComponents/VerticalSwipeBar.qml
+        qml/FlashDialog.qml
+        qml/Firebird/UIComponents/IconButton.qml
+    RESOURCES
+        qml/Firebird/UIComponents/qmldir
+    RESOURCE_PREFIX /qml
+    NO_RESOURCE_TARGET_PATH
+)
+
+target_compile_definitions(firebird-emu PRIVATE
+    
+    FB_VERSION=1.6
+)
+
+target_link_libraries(firebird-emu PRIVATE
+    Qt::Core
+    Qt::Gui
+    Qt::Qml
+    Qt::Quick
+    Qt::QuickWidgets
+    Qt::Widgets
+    z
+)
+
+target_compile_options(firebird-emu PRIVATE
+    -Wall
+    -Wextra
+    -g
+)
+
+target_compile_definitions(firebird-emu PRIVATE
+    QT_NO_CAST_FROM_ASCII
+)
+
+# Resources:
+set(resources_resource_files
+    "resources/icons/Actions-media-playback-pause-icon.png"
+    "resources/icons/Actions-network-connect-icon.png"
+    "resources/icons/Actions-network-disconnect-icon.png"
+    "resources/icons/application-exit.png"
+    "resources/icons/camera-photo.png"
+    "resources/icons/document-edit.png"
+    "resources/icons/document-new.png"
+    "resources/icons/document.png"
+    "resources/icons/drive-removable-media-usb.png"
+    "resources/icons/edit-bomb.png"
+    "resources/icons/flash-create.png"
+    "resources/icons/kmplayer.png"
+    "resources/icons/media-flash.png"
+    "resources/icons/media-floppy.png"
+    "resources/icons/preferences-desktop-keyboard.png"
+    "resources/icons/preferences-other.png"
+    "resources/icons/smartphone.png"
+    "resources/icons/system-reboot.png"
+    "resources/icons/system-suspend-hibernate.png"
+    "resources/icons/system-suspend.png"
+    "resources/icons/tools-report-bug.png"
+    "resources/icons/utilities-terminal.png"
+    "resources/icons/video-display.png"
+    "resources/org.firebird-emus.firebird-emu.png"
+)
+
+qt_add_resources(firebird-emu "resources"
+    PREFIX
+        "/icons"
+    FILES
+        ${resources_resource_files}
+)
+set(resources2_resource_files
+    "i18n/de_DE.qm"
+    "i18n/fr_FR.qm"
+    "i18n/pl_PL.qm"
+)
+
+qt_add_resources(firebird-emu "resources2"
+    PREFIX
+        "/i18n"
+    FILES
+        ${resources2_resource_files}
+)
+set(resources3_resource_files
+    "resources/keyimages/catalog.png"
+    "resources/keyimages/context_menu.png"
+    "resources/keyimages/contrast_minus.png"
+    "resources/keyimages/contrast_plus.png"
+    "resources/keyimages/flag.png"
+    "resources/keyimages/questionmark.png"
+    "resources/keyimages/templates.png"
+)
+
+qt_add_resources(firebird-emu "resources3"
+    PREFIX
+        "/keyimages"
+    FILES
+        ${resources3_resource_files}
+)
+set_source_files_properties("resources/fonts/MaterialIconsRound-Regular.otf"
+    PROPERTIES QT_RESOURCE_ALIAS "MaterialIconsRound-Regular.otf"
+)
+set_source_files_properties("resources/fonts/MaterialSymbolsRounded.ttf"
+    PROPERTIES QT_RESOURCE_ALIAS "MaterialSymbolsRounded.ttf"
+)
+set_source_files_properties("resources/fonts/MaterialSymbolsRounded.woff2"
+    PROPERTIES QT_RESOURCE_ALIAS "MaterialSymbolsRounded.woff2"
+)
+set(resources4_resource_files
+    "resources/fonts/MaterialIconsRound-Regular.otf"
+    "resources/fonts/MaterialSymbolsRounded.ttf"
+    "resources/fonts/MaterialSymbolsRounded.woff2"
+)
+
+qt_add_resources(firebird-emu "resources4"
+    PREFIX
+        "/fonts"
+    FILES
+        ${resources4_resource_files}
+)
+
+if(UNIX)
+    target_sources(firebird-emu PUBLIC
+        core/os/os-linux.c
+    )
+endif()
+
+if(WIN32)
+    target_sources(firebird-emu PUBLIC
+        core/os/os-win32.c
+    )
+
+    target_link_libraries(firebird-emu PRIVATE
+        winmm
+        ws2_32
+    )
+
+    target_compile_options(firebird-emu PRIVATE
+        -mno-ms-bitfields
+    )
+endif()
+
+if(ANDROID)
+    target_sources(firebird-emu PUBLIC
+        core/os/os-android.cpp
+    )
+endif()
+
+if(ANDROID OR IOS)
+    target_compile_definitions(firebird-emu PRIVATE
+        MOBILE_UI
+    )
+endif()
+
+if(IOS)
+    target_compile_definitions(firebird-emu PRIVATE
+        IS_IOS_BUILD
+    )
+
+    target_compile_options(firebird-emu
+        -mno-thumb
+    )
+endif()
+
+if(TRANSLATION_ENABLED___equals___ON)
+    target_sources(firebird-emu PUBLIC
+        "core/translate_"
+    )
+endif()
+
+if(NOT TRANSLATION_ENABLED___equals___ON)
+    target_compile_definitions(firebird-emu PRIVATE
+        NO_TRANSLATION
+    )
+endif()
+
+if(SUPPORT_LINUX___equals___ON)
+    target_compile_definitions(firebird-emu PRIVATE
+        SUPPORT_LINUX
+    )
+endif()
+
+if(FB_ARCH___contains___arm AND NOT ANDROID)
+    target_compile_options(firebird-emu
+        -march=armv7-a
+        -marm
+    )
+endif()
+
+if(lupdate_only)
+    target_sources(firebird-emu PUBLIC
+        qml/ConfigPageDebug.qml
+        qml/ConfigPageEmulation.qml
+        qml/ConfigPageFileTransfer.qml
+        qml/ConfigPageKits.qml
+        qml/ConfigPagesModel.qml
+        qml/FBConfigDialog.qml
+        qml/Firebird/Emu/Emu.qml
+        qml/Firebird/Emu/EmuScreen.qml
+        qml/Firebird/UIComponents/ConfigPages.qml
+        qml/Firebird/UIComponents/FBLabel.qml
+        qml/Firebird/UIComponents/FileSelect.qml
+        qml/Firebird/UIComponents/PageDelegate.qml
+        qml/Firebird/UIComponents/PageList.qml
+        qml/FlashDialog.qml
+        qml/Keypad.qml
+        qml/MobileControl2.qml
+        qml/MobileUI.qml
+        qml/NAlphaButton.qml
+        qml/NBigButton.qml
+        qml/NButton.qml
+        qml/NDualButton.qml
+        qml/NNumButton.qml
+        qml/SidebarButton.qml
+        qml/Touchpad.qml
+    )
+endif()
+
+if(just_show_up_in_qt_creator)
+    target_sources(firebird-emu PUBLIC
+        core/asmcode.c
+        core/asmcode_aarch64.S
+        core/asmcode_arm.S
+        core/asmcode_x86.S
+        core/asmcode_x86_64.S
+        core/os/os-emscripten.c
+        core/translate_aarch64.cpp
+        core/translate_arm.cpp
+        core/translate_x86.c
+        core/translate_x86_64.c
+        emscripten/main.cpp
+        headless/main.cpp
+    )
+endif()
+
+install(TARGETS firebird-emu
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+qt_generate_deploy_qml_app_script(
+    TARGET firebird-emu
+    FILENAME_VARIABLE deploy_script
+    NO_UNSUPPORTED_PLATFORM_ERROR
+    DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
+    MACOS_BUNDLE_POST_BUILD
+)
+install(SCRIPT ${deploy_script})

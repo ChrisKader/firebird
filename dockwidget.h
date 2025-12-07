@@ -2,6 +2,8 @@
 #define DOCKWIDGET_H
 
 #include <QDockWidget>
+#include <QLabel>
+#include <QToolButton>
 
 /* This class augments QDockWidget with the function
  * to hide the titlebar of non-floating docks. */
@@ -20,12 +22,19 @@ public:
 
     void hideTitlebar(bool b);
 
-protected slots:
+private slots:
     void refreshTitlebar();
+    void updateCustomTitle(const QString &title);
+
+protected slots:
+    void buildCustomTitlebar();
 
 protected:
     bool hide_titlebar_if_possible = false;
-    QWidget empty_titlebar;
+    QWidget *custom_titlebar = nullptr;
+    QLabel *title_label = nullptr;
+    QToolButton *float_button = nullptr;
+    QToolButton *close_button = nullptr;
 };
 
 #endif // DOCKWIDGET_H

@@ -4,11 +4,40 @@
 #include <QMessageBox>
 #include <QGraphicsItem>
 #include <QDropEvent>
+#include <QDragEnterEvent>
+#include <QFrame>
+#include <QMenuBar>
+#include <QLabel>
 #include <QMimeData>
 #include <QDockWidget>
+#include <QHBoxLayout>
 #include <QShortcut>
+#include <QTimer>
+#include <QKeySequence>
 #include <QQmlComponent>
+#include <QToolBar>
+#include <QWidgetAction>
+#include <QIcon>
+#include <QToolButton>
+#include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QRegularExpression>
+#include <QHeaderView>
+#include <QColor>
+
+#include <QApplication>
+#include <QPalette>
+#include <QAbstractItemView>
+#include <QEvent>
+#include <QMouseEvent>
+#include <QPainterPath>
+#include <QRegion>
+#include <QResizeEvent>
 #include <QUrl>
+#include <QFontDatabase>
+#include <QCloseEvent>
+#include <QDir>
+#include <QFileInfo>
 
 #include "core/debug.h"
 #include "core/emu.h"
@@ -26,192 +55,320 @@
 
 MainWindow *main_window;
 // Change this if you change the UI
-static const constexpr int WindowStateVersion = 0;
+static const constexpr int WindowStateVersion = 1;
 
-MainWindow::MainWindow(QWidget *parent) :
-    QMainWindow(parent),
-    ui(new Ui::MainWindow)
+namespace
 {
+struct WidgetTheme
+{
+    QColor window{QStringLiteral("#181818")};
+    QColor surface{QStringLiteral("#1e1e1e")};
+    QColor surfaceAlt{QStringLiteral("#202020")};
+    QColor dock{QStringLiteral("#252526")};
+    QColor border{QStringLiteral("#333333")};
+    QColor accent{QStringLiteral("#007acc")};
+    QColor text{QStringLiteral("#d4d4d4")};
+    QColor textMuted{QStringLiteral("#858585")};
+    QColor selection{QStringLiteral("#264f78")};
+    QColor statusBg{QStringLiteral("#202020")};
+};
+
+const WidgetTheme widget_theme{};
+
+void applyPaletteColors(QPalette &pal, const WidgetTheme &theme)
+{
+    pal.setColor(QPalette::Window, theme.window);
+    pal.setColor(QPalette::WindowText, theme.text);
+    pal.setColor(QPalette::Base, theme.surface);
+    pal.setColor(QPalette::AlternateBase, theme.surfaceAlt);
+    pal.setColor(QPalette::Text, theme.text);
+    pal.setColor(QPalette::Button, theme.surfaceAlt);
+    pal.setColor(QPalette::ButtonText, theme.text);
+    pal.setColor(QPalette::Highlight, theme.accent);
+    pal.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#ffffff")));
+    pal.setColor(QPalette::ToolTipBase, theme.dock);
+    pal.setColor(QPalette::ToolTipText, theme.text);
+    pal.setColor(QPalette::PlaceholderText, theme.textMuted);
+}
+
+void setWidgetBackground(QWidget *w, const QColor &color, const QColor &text = QColor())
+{
+    if (!w)
+        return;
+    QPalette p = w->palette();
+    p.setColor(QPalette::Window, color);
+    p.setColor(QPalette::Base, color);
+    if (text.isValid())
+    {
+        p.setColor(QPalette::WindowText, text);
+        p.setColor(QPalette::Text, text);
+        p.setColor(QPalette::ButtonText, text);
+    }
+    w->setAutoFillBackground(true);
+    w->setPalette(p);
+}
+} // namespace
+
+void MainWindow::mousePressEvent(QMouseEvent *event)
+{
+#ifdef Q_OS_MAC
+    // Allow dragging the window when clicking in the header area
+    // (adjust the height as needed – currently top 40 px)
+    if (event->button() == Qt::LeftButton && event->position().y() < 40)
+    {
+        m_dragStartPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
+        event->accept();
+        return;
+    }
+#endif
+    QMainWindow::mousePressEvent(event);
+}
+
+void MainWindow::mouseMoveEvent(QMouseEvent *event)
+{
+#ifdef Q_OS_MAC
+    if (event->buttons() & Qt::LeftButton && !m_dragStartPos.isNull())
+    {
+        move(event->globalPosition().toPoint() - m_dragStartPos);
+        event->accept();
+        return;
+    }
+#endif
+    QMainWindow::mouseMoveEvent(event);
+}
+
+void MainWindow::resizeEvent(QResizeEvent *event)
+{
+    QMainWindow::resizeEvent(event);
+#ifdef Q_OS_MAC
+    // Apply rounded corners to the frameless window on macOS
+    const int radius = 12;
+    QPainterPath path;
+    path.addRoundedRect(QRectF(0, 0, width(), height()), radius, radius);
+    setMask(QRegion(path.toFillPolygon().toPolygon()));
+#endif
+}
+
+MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
+                                          ui(new Ui::MainWindow)
+{
+#ifdef Q_OS_MAC
+    // Remove native title bar and frame so we can draw our own
+    setWindowFlag(Qt::FramelessWindowHint, true);
+    setAttribute(Qt::WA_TranslucentBackground, false);
+#endif
+
     ui->setupUi(this);
-    setStyleSheet(QString::fromUtf8(R"(
-    QMainWindow {
-        background-color: #111318;
+    stack_table = ui->stackTable;
+
+    // Make the central content fill the full area between header and status bar
+    if (ui->mainLayout)
+    {
+        ui->mainLayout->setContentsMargins(0, 0, 0, 0);
+        ui->mainLayout->setSpacing(0);
     }
 
-    QWidget {
-        background-color: #111318;
-        color: #e5e7f3;
-        selection-background-color: #3b82f6;
-        selection-color: #ffffff;
+    // Load a Material-style icon font with a fallback to the TTF variant if the OTF fails.
+    auto loadIconFont = [](const QString &path) -> QFont
+    {
+        const int fontId = QFontDatabase::addApplicationFont(path);
+        if (fontId < 0)
+        {
+            qWarning() << "Failed to load icon font from" << path;
+            return {};
+        }
+
+        const QStringList families = QFontDatabase::applicationFontFamilies(fontId);
+        if (families.isEmpty())
+        {
+            qWarning() << "Icon font has no families after load:" << path;
+            return {};
+        }
+
+        QFont font(families.first());
+        font.setPixelSize(18);
+        qDebug() << "Loaded icon font" << path << "family" << families.first();
+        return font;
+    };
+
+    QFont materialIconFont = loadIconFont(QStringLiteral(":/fonts/MaterialIconsRound-Regular.otf"));
+    if (materialIconFont.family().isEmpty())
+        materialIconFont = loadIconFont(QStringLiteral(":/fonts/MaterialSymbolsRounded.ttf"));
+
+    auto applyMaterialBugIcon = [materialIconFont](QToolButton *button)
+    {
+        if (!button || materialIconFont.family().isEmpty())
+            return;
+        button->setFont(materialIconFont);
+        button->setText(QString(QChar(0xE868))); // "bug_report"
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    };
+
+    auto applyMaterialGlyph = [materialIconFont](QToolButton *button, ushort codepoint, const QString &toolTip = QString())
+    {
+        if (!button || materialIconFont.family().isEmpty())
+            return;
+        button->setIcon(QIcon());
+        button->setFont(materialIconFont);
+        button->setText(QString(QChar(codepoint)));
+        button->setToolButtonStyle(Qt::ToolButtonTextOnly);
+        if (!toolTip.isEmpty())
+            button->setToolTip(toolTip);
+    };
+
+    // Add a compact "Debugger" toggle button into the custom header bar,
+    // similar to VS Code's header controls.
+    if (ui->headerBar)
+    {
+        if (auto *headerLayout = qobject_cast<QHBoxLayout *>(ui->headerBar->layout()))
+        {
+            /* QWidget *debugButtons = new QWidget(ui->headerBar);
+            debugButtons->setObjectName(QStringLiteral("headerDebugButtons"));
+            auto *dbgLayout = new QHBoxLayout(debugButtons);
+            dbgLayout->setContentsMargins(0, 0, 0, 0);
+            dbgLayout->setSpacing(4);
+
+            auto *debugButton = new QToolButton(debugButtons);
+            debugButton->setObjectName(QStringLiteral("headerDebuggerButton"));
+            debugButton->setAutoRaise(true);
+            debugButton->setToolTip(tr("Enter debugger"));
+            debugButton->setDefaultAction(ui->actionDebugger);
+            // Use a flat Material-style glyph if the icon font is available
+            if (!materialIconFont.family().isEmpty()) {
+                debugButton->setFont(materialIconFont);
+                debugButton->setText(QString::fromStdString("\uE868")); // "bug_report"
+                debugButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
+                debugButton->setAutoRaise(true);
+            }
+            dbgLayout->addWidget(debugButton); */
+        }
     }
 
-    /* Left control frame around LCD + toolbar */
-    QFrame#frame {
-        background-color: #171923;
-        border-radius: 10px;
-        border: 1px solid #272a33;
+    // Wire debugger toolbar button inside the Debugger dock (vertical bar).
+    if (ui->tabDebugger)
+    {
+        if (auto *bar = ui->tabDebugger->findChild<QWidget *>(QStringLiteral("debuggerButtonBar")))
+        {
+            if (auto *toggle = bar->findChild<QToolButton *>(QStringLiteral("debuggerToggleButton")))
+            {
+                debugger_toggle_button = toggle;
+                toggle->setCheckable(true);
+                applyMaterialBugIcon(toggle); // Ensure the action text doesn't get elided to "..."
+                toggle->setEnabled(ui->actionDebugger->isEnabled());
+                connect(ui->actionDebugger, &QAction::changed, toggle, [this, toggle, applyMaterialBugIcon]()
+                        {
+                    applyMaterialBugIcon(toggle);
+                    toggle->setEnabled(ui->actionDebugger->isEnabled()); });
+                connect(toggle, &QToolButton::clicked, this, [this]()
+                        {
+                    if (!debugger_active) {
+                        ui->actionDebugger->trigger();
+                    } else {
+                        debugStr(QStringLiteral("> c\n"));
+                        emit debuggerCommand(QStringLiteral("c"));
+                        setDebuggerActive(false);
+                    } });
+            }
+        }
     }
 
-    /* Menubar and menus */
-    QMenuBar {
-        background-color: #111318;
-        border-bottom: 1px solid #272a33;
+    // Apply Material glyphs to main control buttons if the font is available.
+    applyMaterialGlyph(ui->buttonPlayPause, 0xE037, tr("Start"));
+    applyMaterialGlyph(ui->buttonReset, 0xE5D5, tr("Reset"));
+    applyMaterialGlyph(ui->buttonScreenshot, 0xE412, tr("Screenshot"));
+    applyMaterialGlyph(ui->buttonUSB, 0xE1E0, tr("Connect USB"));
+
+    // Unified play/pause/start toggle.
+    updatePlayPauseButtonFn = [this, applyMaterialGlyph]()
+    {
+        const bool running = ui->actionPause->isEnabled();
+        const bool paused = ui->actionPause->isChecked();
+        const bool playing = running && !paused;
+        ushort glyph = 0xE037; // play
+        QString tip = tr("Start");
+        if (running)
+        {
+            if (paused)
+            {
+                glyph = 0xE037;
+                tip = tr("Resume");
+            }
+            else
+            {
+                glyph = 0xE034;
+                tip = tr("Pause");
+            }
+        }
+        else
+        {
+            tip = ui->actionRestart->text().isEmpty() ? tr("Start") : ui->actionRestart->text().remove(QLatin1Char('&'));
+        }
+        applyMaterialGlyph(ui->buttonPlayPause, glyph, tip);
+        ui->buttonPlayPause->setChecked(playing);
+        ui->buttonPlayPause->setEnabled(ui->actionRestart->isEnabled() || running);
+    };
+    updatePlayPauseButtonFn();
+    connect(ui->actionPause, &QAction::toggled, this, [this]()
+            { if (updatePlayPauseButtonFn) updatePlayPauseButtonFn(); });
+    connect(ui->actionPause, &QAction::changed, this, [this]()
+            { if (updatePlayPauseButtonFn) updatePlayPauseButtonFn(); });
+    connect(ui->actionRestart, &QAction::changed, this, [this]()
+            { if (updatePlayPauseButtonFn) updatePlayPauseButtonFn(); });
+    connect(ui->buttonPlayPause, &QToolButton::clicked, this, [this]()
+            {
+        const bool running = ui->actionPause->isEnabled();
+        if (!running) {
+            ui->actionRestart->trigger();
+        } else {
+            ui->actionPause->trigger();
+        } });
+    connect(&emu_thread, &EmuThread::paused, this, [this](bool)
+            { if (updatePlayPauseButtonFn) updatePlayPauseButtonFn(); });
+
+    // Create an inner QMainWindow that will host all docks and the LCD frame.
+    // This lets the custom header bar sit above everything else (similar to VS Code),
+    // while docks live around the central emulator surface without overlapping the header.
+    content_window = new QMainWindow(this);
+    content_window->setObjectName(QStringLiteral("contentWindow"));
+    content_window->setDockOptions(QMainWindow::AllowTabbedDocks |
+                                   QMainWindow::AllowNestedDocks |
+                                   QMainWindow::AnimatedDocks);
+
+    // Move the existing frame (LCD + controls) into the inner main window as its central widget.
+    ui->mainLayout->removeWidget(ui->frame);
+    ui->frame->setParent(content_window);
+    content_window->setCentralWidget(ui->frame);
+    ui->mainLayout->addWidget(content_window);
+
+    // Turn the header bar into a fixed toolbar that lives above the dock/central area,
+    // similar to VS Code's in-window title / command bar.
+    if (ui->headerBar)
+    {
+        // Detach from the central layout so QMainWindow can manage it as a toolbar
+        ui->mainLayout->removeWidget(ui->headerBar);
+        ui->headerBar->setParent(nullptr);
+
+        auto *headerToolBar = new QToolBar(this);
+        headerToolBar->setObjectName(QStringLiteral("headerToolBar"));
+        headerToolBar->setMovable(false);
+        headerToolBar->setFloatable(false);
+        headerToolBar->setAllowedAreas(Qt::TopToolBarArea);
+        headerToolBar->setIconSize(QSize(16, 16));
+        headerToolBar->setContentsMargins(0, 0, 0, 0);
+
+        auto *headerAction = new QWidgetAction(headerToolBar);
+        headerAction->setDefaultWidget(ui->headerBar);
+        headerToolBar->addAction(headerAction);
+
+        addToolBar(Qt::TopToolBarArea, headerToolBar);
     }
 
-    QMenuBar::item {
-        padding: 4px 10px;
-        margin: 0px 2px;
-        background: transparent;
-    }
+    // The outer MainWindow no longer hosts docks directly; keep it frameless/themed only.
+    setDockOptions(QMainWindow::DockOptions());
+    setUnifiedTitleAndToolBarOnMac(false);
 
-    QMenuBar::item:selected {
-        background: #2b3240;
-    }
+    applyWidgetTheme();
 
-    QMenu {
-        background-color: #171923;
-        border: 1px solid #272a33;
-    }
-
-    QMenu::item {
-        padding: 4px 18px 4px 24px;
-    }
-
-    QMenu::item:selected {
-        background-color: #2b3240;
-    }
-
-    /* Toolbars + tool buttons */
-    QToolBar {
-        background: #111318;
-        border: 0px;
-        spacing: 4px;
-    }
-
-    QToolButton {
-        padding: 6px 10px;
-        border-radius: 6px;
-        background: transparent;
-    }
-
-    QToolButton:hover {
-        background-color: #2a2f3a;
-    }
-
-    QToolButton:checked {
-        background-color: #3b4354;
-    }
-
-    QPushButton#buttonSpeed {
-        border: none;
-        border-radius: 6px;
-        padding: 4px 8px;
-        background-color: #222632;
-        color: #dde1ff;
-    }
-
-    QPushButton#buttonSpeed:checked {
-        background-color: #3f8cff;
-        color: white;
-    }
-
-    /* Dock widgets + their title bars */
-    QDockWidget {
-        background: #111318;
-        border: 1px solid #272a33;
-        titlebar-close-icon: url(none);
-        titlebar-normal-icon: url(none);
-    }
-
-    QDockWidget::title {
-        padding: 4px 8px;
-        background: #171923;
-        color: #c2c6e2;
-        border-bottom: 1px solid #272a33;
-    }
-
-    QDockWidget::close-button,
-    QDockWidget::float-button {
-        background: transparent;
-        border-radius: 4px;
-        margin: 2px;
-        padding: 2px;
-    }
-
-    QDockWidget::close-button:hover,
-    QDockWidget::float-button:hover {
-        background: #2b3240;
-    }
-
-    /* Tabs (including the bottom tab bar with File Transfer / Keypad) */
-    QTabWidget::pane {
-        border: 0;
-        background: #111318;
-    }
-
-    QTabBar::tab {
-        padding: 6px 12px;
-        border-radius: 6px;
-        margin: 2px;
-        color: #c2c6e2;
-        background: transparent;
-    }
-
-    QTabBar::tab:selected {
-        background: #2b3240;
-        color: white;
-    }
-
-    QTabBar::tab:!selected:hover {
-        background: #202531;
-    }
-
-    /* Text-ish widgets / tree widgets / list widgets */
-    QPlainTextEdit,
-    QTreeWidget,
-    QListView,
-    QTreeView,
-    QTableView {
-        background-color: #0f1117;
-        color: #d0d4f0;
-        border-radius: 6px;
-        border: 1px solid #272a33;
-    }
-
-    QLineEdit,
-    QComboBox,
-    QSpinBox {
-        background-color: #0f1117;
-        border-radius: 6px;
-        border: 1px solid #272a33;
-        padding: 2px 4px;
-    }
-
-    QLineEdit:focus,
-    QComboBox:focus,
-    QSpinBox:focus {
-        border-color: #3b82f6;
-    }
-
-    /* Progress bar */
-    QProgressBar {
-        border: 1px solid #272a33;
-        border-radius: 6px;
-        text-align: center;
-        background: #0f1117;
-    }
-
-    QProgressBar::chunk {
-        background-color: #3b82f6;
-        border-radius: 6px;
-    }
-
-    /* Status bar */
-    QStatusBar {
-        background: #111318;
-        border-top: 1px solid #272a33;
-    }
-    )"));
     ui->statusBar->addWidget(&status_label);
 
     // Register QtKeypadBridge for the virtual keyboard functionality
@@ -227,49 +384,50 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // Create config dialog component
     config_component = new QQmlComponent(qml_engine, QUrl(QStringLiteral("qrc:/qml/qml/FBConfigDialog.qml")), this);
-    if(!config_component->isReady())
+    if (!config_component->isReady())
         qCritical() << "Could not create QML config dialog:" << config_component->errorString();
 
     // Create flash dialog UI component
     flash_dialog_component = new QQmlComponent(qml_engine, QUrl(QStringLiteral("qrc:/qml/qml/FlashDialog.qml")), this);
-    if(!flash_dialog_component->isReady())
+    if (!flash_dialog_component->isReady())
         qCritical() << "Could not create flash dialog component:" << flash_dialog_component->errorString();
 
     // Create mobile UI component
     mobileui_component = new QQmlComponent(qml_engine, QUrl(QStringLiteral("qrc:/qml/qml/MobileUI.qml")), this);
-    if(!mobileui_component->isReady())
+    if (!mobileui_component->isReady())
         qCritical() << "Could not create mobile UI component:" << mobileui_component->errorString();
 
-    if(!the_qml_bridge)
+    if (!the_qml_bridge)
         throw std::runtime_error("Can't continue without QMLBridge");
 
-    //Emu -> GUI (QueuedConnection as they're different threads)
+    connect(ui->buttonWindowClose, &QToolButton::clicked, this, &QWidget::close);
+    connect(ui->buttonWindowMinimize, &QToolButton::clicked, this, &QWidget::showMinimized);
+    connect(ui->buttonWindowMaximize, &QToolButton::clicked, this, &QWidget::showMaximized);
+
+    // Emu -> GUI (QueuedConnection as they're different threads)
     connect(&emu_thread, SIGNAL(serialChar(char)), this, SLOT(serialChar(char)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(debugStr(QString)), this, SLOT(debugStr(QString)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(isBusy(bool)), this, SLOT(isBusy(bool)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(statusMsg(QString)), this, SLOT(showStatusMsg(QString)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(debugInputRequested(bool)), this, SLOT(debugInputRequested(bool)), Qt::QueuedConnection);
 
-    //GUI -> Emu (no QueuedConnection possible, watch out!)
+    // GUI -> Emu (no QueuedConnection possible, watch out!)
     connect(this, SIGNAL(debuggerCommand(QString)), &emu_thread, SLOT(debuggerInput(QString)));
 
-    //Menu "Emulator"
+    // Menu "Emulator"
     connect(ui->buttonReset, SIGNAL(clicked(bool)), &emu_thread, SLOT(reset()));
     connect(ui->actionReset, SIGNAL(triggered()), &emu_thread, SLOT(reset()));
     connect(ui->actionRestart, SIGNAL(triggered()), this, SLOT(restart()));
     connect(ui->actionDebugger, SIGNAL(triggered()), &emu_thread, SLOT(enterDebugger()));
     connect(ui->actionConfiguration, SIGNAL(triggered()), this, SLOT(openConfiguration()));
-    connect(ui->buttonPause, SIGNAL(clicked(bool)), &emu_thread, SLOT(setPaused(bool)));
-    connect(ui->buttonPause, SIGNAL(clicked(bool)), ui->actionPause, SLOT(setChecked(bool)));
     connect(ui->actionPause, SIGNAL(toggled(bool)), &emu_thread, SLOT(setPaused(bool)));
-    connect(ui->actionPause, SIGNAL(toggled(bool)), ui->buttonPause, SLOT(setChecked(bool)));
     connect(ui->buttonSpeed, SIGNAL(clicked(bool)), &emu_thread, SLOT(setTurboMode(bool)));
 
     QShortcut *shortcut = new QShortcut(QKeySequence(Qt::Key_F11), this);
     shortcut->setAutoRepeat(false);
     connect(shortcut, SIGNAL(activated()), &emu_thread, SLOT(toggleTurbo()));
 
-    //Menu "Tools"
+    // Menu "Tools"
     connect(ui->buttonScreenshot, SIGNAL(clicked()), this, SLOT(screenshot()));
     connect(ui->actionScreenshot, SIGNAL(triggered()), this, SLOT(screenshot()));
     connect(ui->actionRecord_GIF, SIGNAL(triggered()), this, SLOT(recordGIF()));
@@ -283,36 +441,37 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->actionConnect->setShortcut(QKeySequence(Qt::Key_F10));
     ui->actionConnect->setAutoRepeat(false);
 
-    //Menu "State"
+    // Menu "State"
     connect(ui->actionResume, SIGNAL(triggered()), this, SLOT(resume()));
     connect(ui->actionSuspend, SIGNAL(triggered()), this, SLOT(suspend()));
     connect(ui->actionResume_from_file, SIGNAL(triggered()), this, SLOT(resumeFromFile()));
     connect(ui->actionSuspend_to_file, SIGNAL(triggered()), this, SLOT(suspendToFile()));
 
-    //Menu "Flash"
+    // Menu "Flash"
     connect(ui->actionSave, SIGNAL(triggered()), this, SLOT(saveFlash()));
     connect(ui->actionCreate_flash, SIGNAL(triggered()), this, SLOT(createFlash()));
 
-    //Menu "About"
+    // Menu "About"
     connect(ui->actionAbout_Firebird, SIGNAL(triggered(bool)), this, SLOT(showAbout()));
     connect(ui->actionAbout_Qt, SIGNAL(triggered(bool)), qApp, SLOT(aboutQt()));
 
     // Lang switch
     QStringList translations = QDir(QStringLiteral(":/i18n/i18n/")).entryList();
     translations << QStringLiteral("en_US.qm"); // Equal to no translation
-    for(auto &languageCode : translations)
+    for (auto &languageCode : translations)
     {
         languageCode.chop(3); // Chop off file extension
         QLocale locale(languageCode);
         QAction *action = new QAction(locale.nativeLanguageName(), ui->menuLanguage);
-        connect(action, &QAction::triggered, this, [this,languageCode] { this->switchTranslator(QLocale(languageCode)); });
+        connect(action, &QAction::triggered, this, [this, languageCode]
+                { this->switchTranslator(QLocale(languageCode)); });
         ui->menuLanguage->addAction(action);
     }
 
-    //Debugging
+    // Debugging
     connect(ui->lineEdit, SIGNAL(returnPressed()), this, SLOT(debugCommand()));
 
-    //File transfer
+    // File transfer
     connect(ui->refreshButton, SIGNAL(clicked(bool)), ui->usblinkTree, SLOT(reloadFilebrowser()));
     connect(ui->usblinkTree, SIGNAL(downloadProgress(int)), this, SLOT(usblinkDownload(int)), Qt::QueuedConnection);
     connect(ui->usblinkTree, SIGNAL(uploadProgress(int)), this, SLOT(changeProgress(int)), Qt::QueuedConnection);
@@ -321,21 +480,34 @@ MainWindow::MainWindow(QWidget *parent) :
     // QMLBridge
     KitModel *model = the_qml_bridge->getKitModel();
     connect(model, SIGNAL(anythingChanged()), this, SLOT(kitAnythingChanged()));
-    connect(model, SIGNAL(dataChanged(QModelIndex,QModelIndex,QVector<int>)), this, SLOT(kitDataChanged(QModelIndex,QModelIndex,QVector<int>)));
-    connect(the_qml_bridge, SIGNAL(currentKitChanged(const Kit&)), this, SLOT(currentKitChanged(const Kit &)));
+    connect(model, SIGNAL(dataChanged(QModelIndex, QModelIndex, QVector<int>)), this, SLOT(kitDataChanged(QModelIndex, QModelIndex, QVector<int>)));
+    connect(the_qml_bridge, SIGNAL(currentKitChanged(const Kit &)), this, SLOT(currentKitChanged(const Kit &)));
 
-    //Set up monospace fonts
+    // Set up monospace fonts
     QFont monospace = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     monospace.setStyleHint(QFont::Monospace);
     ui->debugConsole->setFont(monospace);
     ui->serialConsole->setFont(monospace);
+    if (stack_table)
+    {
+        stack_table->setFont(monospace);
+        stack_table->setColumnCount(2);
+        stack_table->setHorizontalHeaderLabels({tr("Address"), tr("Instruction")});
+        stack_table->horizontalHeader()->setStretchLastSection(true);
+        stack_table->horizontalHeader()->setHighlightSections(false);
+        stack_table->verticalHeader()->setVisible(false);
+        stack_table->setSelectionMode(QAbstractItemView::NoSelection);
+        stack_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
+        stack_table->setAlternatingRowColors(true);
+        stack_table->setFocusPolicy(Qt::NoFocus);
+    }
 
-    //Without this line, Qt prints warning messages...
+    // Without this line, Qt prints warning messages...
     qRegisterMetaType<QVector<int>>();
 
 #ifdef Q_OS_ANDROID
-    //On android the settings file is deleted everytime you update or uninstall,
-    //so choose a better, safer, location
+    // On android the settings file is deleted everytime you update or uninstall,
+    // so choose a better, safer, location
     QString path = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
     settings = new QSettings(path + QStringLiteral("/nspire_emu_thread.ini"), QSettings::IniFormat);
 #else
@@ -343,20 +515,20 @@ MainWindow::MainWindow(QWidget *parent) :
 #endif
 
     QString prefLang = settings->value(QStringLiteral("preferred_lang"), QStringLiteral("none")).toString();
-    if(prefLang != QStringLiteral("none"))
+    if (prefLang != QStringLiteral("none"))
         switchTranslator(QLocale(prefLang));
-    else if(appTranslator.load(QLocale::system(), QStringLiteral(":/i18n/i18n/")))
+    else if (appTranslator.load(QLocale::system(), QStringLiteral(":/i18n/i18n/")))
         qApp->installTranslator(&appTranslator);
 
     updateUIActionState(false);
 
-    //Load settings
+    // Load settings
     convertTabsToDocks();
     retranslateDocks();
     setExtLCD(settings->value(QStringLiteral("extLCDVisible")).toBool());
     lcd.restoreGeometry(settings->value(QStringLiteral("extLCDGeometry")).toByteArray());
     restoreGeometry(settings->value(QStringLiteral("windowGeometry")).toByteArray());
-    restoreState(settings->value(QStringLiteral("windowState")).toByteArray(), WindowStateVersion);
+    content_window->restoreState(settings->value(QStringLiteral("windowState")).toByteArray(), WindowStateVersion);
 
     refillKitMenus();
 
@@ -365,19 +537,18 @@ MainWindow::MainWindow(QWidget *parent) :
     // Select default Kit
     bool defaultKitFound = the_qml_bridge->useDefaultKit();
 
-    if(the_qml_bridge->getKitModel()->allKitsEmpty())
+    if (the_qml_bridge->getKitModel()->allKitsEmpty())
     {
         // Do not show the window before MainWindow gets shown,
         // otherwise it won't be in focus.
         QTimer::singleShot(0, this, SIGNAL(openConfiguration()));
 
-        switchUIMode(false);
-        show();
+        switchUIMode(true);
 
         return;
     }
 
-    if(settings->value(QStringLiteral("lastUIMode"), 0).toUInt() == 1)
+    if (settings->value(QStringLiteral("lastUIMode"), 1).toUInt() == 1)
         switchUIMode(true);
     else
     {
@@ -385,25 +556,25 @@ MainWindow::MainWindow(QWidget *parent) :
         show();
     }
 
-    if(!the_qml_bridge->getAutostart())
+    if (!the_qml_bridge->getAutostart())
     {
         showStatusMsg(tr("Start the emulation via Emulation->Start."));
         return;
     }
 
     // Autostart handling
-    if(!defaultKitFound)
+    if (!defaultKitFound)
         showStatusMsg(tr("Default Kit not found"));
     else
     {
         bool resumed = false;
-        if(!the_qml_bridge->getSnapshotPath().isEmpty())
+        if (!the_qml_bridge->getSnapshotPath().isEmpty())
             resumed = resume();
 
-        if(!resumed)
+        if (!resumed)
         {
             // Boot up normally
-            if(!emu_thread.boot1.isEmpty() && !emu_thread.flash.isEmpty())
+            if (!emu_thread.boot1.isEmpty() && !emu_thread.flash.isEmpty())
                 restart();
             else
                 showStatusMsg(tr("Start the emulation via Emulation->Start."));
@@ -411,15 +582,95 @@ MainWindow::MainWindow(QWidget *parent) :
     }
 }
 
+void MainWindow::applyWidgetTheme()
+{
+    const WidgetTheme &theme = widget_theme;
+
+    QPalette pal = qApp->palette();
+    applyPaletteColors(pal, theme);
+    qApp->setPalette(pal);
+    setPalette(pal);
+
+    setWidgetBackground(this, theme.window, theme.text);
+    setWidgetBackground(content_window, theme.window, theme.text);
+    setWidgetBackground(ui->frame, theme.surface, theme.text);
+
+    if (auto *frame = qobject_cast<QFrame *>(ui->frame))
+    {
+        frame->setFrameShape(QFrame::StyledPanel);
+        frame->setFrameShadow(QFrame::Plain);
+        frame->setLineWidth(1);
+        frame->setMidLineWidth(0);
+    }
+
+    if (ui->menubar)
+    {
+        QPalette menuPal = ui->menubar->palette();
+        applyPaletteColors(menuPal, theme);
+        ui->menubar->setPalette(menuPal);
+    }
+
+    if (ui->statusBar)
+    {
+        QPalette statusPal = ui->statusBar->palette();
+        statusPal.setColor(QPalette::Window, theme.statusBg);
+        statusPal.setColor(QPalette::WindowText, theme.textMuted);
+        statusPal.setColor(QPalette::Text, theme.textMuted);
+        statusPal.setColor(QPalette::ButtonText, theme.textMuted);
+        ui->statusBar->setAutoFillBackground(true);
+        ui->statusBar->setPalette(statusPal);
+    }
+
+    const auto docks = findChildren<DockWidget *>();
+    for (DockWidget *dock : docks)
+    {
+        setWidgetBackground(dock, theme.dock, theme.text);
+        if (auto *title = dock->findChild<QWidget *>(QStringLiteral("dockTitleBar")))
+        {
+            setWidgetBackground(title, QColor(QStringLiteral("#1b1b1c")), theme.text);
+        }
+        if (auto *label = dock->findChild<QLabel *>(QStringLiteral("dockTitleLabel")))
+        {
+            QPalette labelPal = label->palette();
+            labelPal.setColor(QPalette::WindowText, theme.text);
+            labelPal.setColor(QPalette::Text, theme.text);
+            label->setPalette(labelPal);
+        }
+    }
+
+    if (ui->tabDebugger)
+        setWidgetBackground(ui->tabDebugger, theme.surface, theme.text);
+    if (ui->tabSerial)
+        setWidgetBackground(ui->tabSerial, theme.surface, theme.text);
+    if (ui->tabFiles)
+        setWidgetBackground(ui->tabFiles, theme.surface, theme.text);
+
+    const auto itemViews = findChildren<QAbstractItemView *>();
+    for (QAbstractItemView *view : itemViews)
+    {
+        QPalette viewPal = view->palette();
+        viewPal.setColor(QPalette::Base, theme.surface);
+        viewPal.setColor(QPalette::AlternateBase, theme.surfaceAlt);
+        viewPal.setColor(QPalette::Text, theme.text);
+        viewPal.setColor(QPalette::Highlight, theme.selection);
+        viewPal.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#ffffff")));
+        view->setPalette(viewPal);
+        view->setAutoFillBackground(true);
+    }
+
+    if (stack_table)
+        stack_table->setAlternatingRowColors(true);
+}
+
 MainWindow::~MainWindow()
 {
-    if(config_dialog)
+    if (config_dialog)
         config_dialog->deleteLater();
 
-    if(flash_dialog)
+    if (flash_dialog)
         flash_dialog->deleteLater();
 
-    if(mobileui_component)
+    if (mobileui_component)
         mobileui_component->deleteLater();
 
     // Save external LCD geometry
@@ -427,19 +678,18 @@ MainWindow::~MainWindow()
     settings->setValue(QStringLiteral("extLCDVisible"), lcd.isVisible());
 
     // Save MainWindow state and geometry
-    settings->setValue(QStringLiteral("windowState"), saveState(WindowStateVersion));
+    settings->setValue(QStringLiteral("windowState"), content_window->saveState(WindowStateVersion));
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
 
     delete settings;
     delete ui;
 }
 
-void MainWindow::switchTranslator(const QLocale& locale)
+void MainWindow::switchTranslator(const QLocale &locale)
 {
     qApp->removeTranslator(&appTranslator);
     // For English, nothing to load after removing the translator.
-    if (locale.name() == QStringLiteral("en_US")
-        || (appTranslator.load(locale, QStringLiteral(":/i18n/i18n/")) && qApp->installTranslator(&appTranslator)))
+    if (locale.name() == QStringLiteral("en_US") || (appTranslator.load(locale, QStringLiteral(":/i18n/i18n/")) && qApp->installTranslator(&appTranslator)))
     {
         settings->setValue(QStringLiteral("preferred_lang"), locale.name());
     }
@@ -447,7 +697,7 @@ void MainWindow::switchTranslator(const QLocale& locale)
         QMessageBox::warning(this, tr("Language change"), tr("No translation available for this language :("));
 }
 
-void MainWindow::changeEvent(QEvent* event)
+void MainWindow::changeEvent(QEvent *event)
 {
     const auto eventType = event->type();
     if (eventType == QEvent::LanguageChange)
@@ -464,11 +714,11 @@ void MainWindow::changeEvent(QEvent* event)
 
 void MainWindow::dropEvent(QDropEvent *e)
 {
-    const QMimeData* mime_data = e->mimeData();
-    if(!mime_data->hasUrls())
+    const QMimeData *mime_data = e->mimeData();
+    if (!mime_data->hasUrls())
         return;
 
-    for(auto &&url : mime_data->urls())
+    for (auto &&url : mime_data->urls())
     {
         auto local = QDir::toNativeSeparators(url.toLocalFile());
         auto remote = the_qml_bridge->getUSBDir() + QLatin1Char('/') + QFileInfo(local).fileName();
@@ -478,19 +728,19 @@ void MainWindow::dropEvent(QDropEvent *e)
 
 void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 {
-    if(e->mimeData()->hasUrls() == false)
+    if (e->mimeData()->hasUrls() == false)
         return e->ignore();
 
-    for(QUrl &url : e->mimeData()->urls())
+    for (QUrl &url : e->mimeData()->urls())
     {
-        static const QStringList valid_suffixes = { QStringLiteral("tns"),
-                                              QStringLiteral("tno"), QStringLiteral("tnc"),
-                                              QStringLiteral("tco"), QStringLiteral("tcc"),
-                                              QStringLiteral("tco2"), QStringLiteral("tcc2"),
-                                              QStringLiteral("tct2") };
+        static const QStringList valid_suffixes = {QStringLiteral("tns"),
+                                                   QStringLiteral("tno"), QStringLiteral("tnc"),
+                                                   QStringLiteral("tco"), QStringLiteral("tcc"),
+                                                   QStringLiteral("tco2"), QStringLiteral("tcc2"),
+                                                   QStringLiteral("tct2")};
 
         QFileInfo file(url.fileName());
-        if(!valid_suffixes.contains(file.suffix().toLower()))
+        if (!valid_suffixes.contains(file.suffix().toLower()))
             return e->ignore();
     }
 
@@ -503,37 +753,38 @@ void MainWindow::serialChar(const char c)
 
     static char previous = 0;
 
-    switch(c)
+    switch (c)
     {
-        case 0:
+    case 0:
 
-        case '\r':
-            previous = c;
-            break;
+    case '\r':
+        previous = c;
+        break;
 
-        case '\b':
-            ui->serialConsole->textCursor().deletePreviousChar();
-            break;
+    case '\b':
+        ui->serialConsole->textCursor().deletePreviousChar();
+        break;
 
-        default:
-            if(previous == '\r' && c != '\n')
-            {
-                ui->serialConsole->moveCursor(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
-                ui->serialConsole->moveCursor(QTextCursor::End, QTextCursor::KeepAnchor);
-                ui->serialConsole->textCursor().removeSelectedText();
-                previous = 0;
-            }
-            ui->serialConsole->insertPlainText(QChar::fromLatin1(c));
+    default:
+        if (previous == '\r' && c != '\n')
+        {
+            ui->serialConsole->moveCursor(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
+            ui->serialConsole->moveCursor(QTextCursor::End, QTextCursor::KeepAnchor);
+            ui->serialConsole->textCursor().removeSelectedText();
+            previous = 0;
+        }
+        ui->serialConsole->insertPlainText(QChar::fromLatin1(c));
     }
 }
 
 void MainWindow::debugInputRequested(bool b)
 {
+    setDebuggerActive(b);
     switchUIMode(false);
 
     ui->lineEdit->setEnabled(b);
 
-    if(b)
+    if (b)
     {
         raiseDebugger();
         ui->lineEdit->setFocus();
@@ -553,18 +804,107 @@ void MainWindow::debugCommand()
     ui->lineEdit->clear();
 }
 
+void MainWindow::requestDisassembly()
+{
+    disasm_entries.clear();
+    refreshDisassemblyTable();
+    emit debuggerCommand(QStringLiteral("u"));
+}
+
+bool MainWindow::appendDisassemblyLine(const QString &line)
+{
+    // Be permissive: accept lines like "00011c8c: e3510000    cmp r3,00000000" (with tabs/spaces)
+    QString cleaned = line.trimmed();
+    if (cleaned.startsWith(QLatin1Char('>')))
+        cleaned.remove(0, 1);
+    int colon = cleaned.indexOf(QLatin1Char(':'));
+    if (colon <= 0)
+        return false;
+
+    QString addr = cleaned.left(colon).trimmed();
+    QString text = cleaned.mid(colon + 1).trimmed();
+
+    bool ok = false;
+    addr.toUInt(&ok, 16);
+    if (!ok)
+        return false;
+
+    DisasmEntry entry;
+    entry.address = addr.toUpper();
+    entry.text = text;
+    if (entry.text.contains(QStringLiteral("<<")))
+    {
+        entry.is_current = true;
+        entry.text.replace(QStringLiteral("<<"), QStringLiteral(" "));
+        entry.text = entry.text.trimmed();
+    }
+
+    if (disasm_entries.size() > 200)
+        disasm_entries.removeFirst();
+    disasm_entries.push_back(entry);
+    refreshDisassemblyTable();
+    return true;
+}
+
+void MainWindow::refreshDisassemblyTable()
+{
+    if (!stack_table)
+        return;
+
+    stack_table->setUpdatesEnabled(false);
+    stack_table->setRowCount(disasm_entries.size());
+    stack_table->setColumnCount(2);
+    stack_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    stack_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
+
+    int row = 0;
+    for (const auto &entry : disasm_entries)
+    {
+        auto *addrItem = new QTableWidgetItem(entry.address);
+        auto *textItem = new QTableWidgetItem(entry.text);
+        addrItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+        textItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+        addrItem->setForeground(QColor(QStringLiteral("#d4d4d4")));
+        textItem->setForeground(QColor(QStringLiteral("#d4d4d4")));
+        stack_table->setItem(row, 0, addrItem);
+        stack_table->setItem(row, 1, textItem);
+        if (entry.is_current)
+        {
+            const QColor highlight(QStringLiteral("#1f6b3a"));
+            addrItem->setBackground(highlight);
+            textItem->setBackground(highlight);
+            addrItem->setForeground(Qt::white);
+            textItem->setForeground(Qt::white);
+        }
+        ++row;
+    }
+    stack_table->resizeColumnsToContents();
+    stack_table->setUpdatesEnabled(true);
+}
+
+void MainWindow::setDebuggerActive(bool active)
+{
+    debugger_active = active;
+    if (debugger_toggle_button)
+    {
+        debugger_toggle_button->setCheckable(true);
+        debugger_toggle_button->setChecked(active);
+        debugger_toggle_button->setToolTip(active ? tr("Continue (send 'c')") : tr("Enter debugger"));
+    }
+}
+
 void MainWindow::usblinkDownload(int progress)
 {
     usblinkProgress(progress);
 
-    if(progress < 0)
+    if (progress < 0)
         QMessageBox::warning(this, tr("Download failed"), tr("Could not download file."));
 }
 
 void MainWindow::usblinkProgress(int progress)
 {
-    if(progress < 0 || progress > 100)
-        progress = 0; //No error handling here
+    if (progress < 0 || progress > 100)
+        progress = 0; // No error handling here
 
     emit usblink_progress_changed(progress);
 }
@@ -573,23 +913,23 @@ void MainWindow::usblink_progress_callback(int progress, void *)
 {
     // TODO: Don't do a full refresh
     // Also refresh on error, in case of multiple transfers
-    if((progress == 100 || progress < 0) && usblink_queue_size() == 1)
+    if ((progress == 100 || progress < 0) && usblink_queue_size() == 1)
         main_window->ui->usblinkTree->wantToReload(); // Reload the file explorer after uploads finished
 
-    if(progress < 0 || progress > 100)
-        progress = 0; //No error handling here
+    if (progress < 0 || progress > 100)
+        progress = 0; // No error handling here
 
     emit main_window->usblink_progress_changed(progress);
 }
 
 void MainWindow::switchUIMode(bool mobile_ui)
 {
-    if(!mobileui_dialog && mobile_ui)
+    if (!mobileui_dialog && mobile_ui)
         mobileui_dialog = mobileui_component->create();
 
-    if(mobileui_dialog)
+    if (mobileui_dialog)
         mobileui_dialog->setProperty("visible", mobile_ui);
-    else if(mobile_ui)
+    else if (mobile_ui)
     {
         qWarning() << "Could not create mobile UI!";
         return; // Do not switch the UI mode as the mobile UI could not be created
@@ -605,12 +945,12 @@ void MainWindow::setActive(bool b)
 {
     // There is no UniqueQueuedConnection, so we need to avoid duplicate connections
     // manually
-    if(b == is_active)
+    if (b == is_active)
         return;
 
     is_active = b;
 
-    if(b)
+    if (b)
     {
         connect(&emu_thread, SIGNAL(speedChanged(double)), this, SLOT(showSpeed(double)), Qt::QueuedConnection);
         connect(&emu_thread, SIGNAL(turboModeChanged(bool)), ui->buttonSpeed, SLOT(setChecked(bool)), Qt::QueuedConnection);
@@ -638,7 +978,7 @@ void MainWindow::setActive(bool b)
         disconnect(&emu_thread, SIGNAL(stopped()), this, SLOT(stopped()));
 
         // Close the config dialog
-        if(config_dialog)
+        if (config_dialog)
             config_dialog->setProperty("visible", false);
     }
 
@@ -652,7 +992,7 @@ void MainWindow::suspendToPath(QString path)
 
 bool MainWindow::resumeFromPath(QString path)
 {
-    if(!emu_thread.resume(path))
+    if (!emu_thread.resume(path))
     {
         QMessageBox::warning(this, tr("Could not resume"), tr("Try to restart this app."));
         return false;
@@ -671,6 +1011,8 @@ void MainWindow::updateUIActionState(bool emulation_running)
     ui->actionReset->setEnabled(emulation_running);
     ui->actionPause->setEnabled(emulation_running);
     ui->actionRestart->setText(emulation_running ? tr("Re&start") : tr("&Start"));
+    ui->actionRestart->setToolTip(emulation_running ? tr("Restart") : tr("Start"));
+    ui->buttonPlayPause->setToolTip(emulation_running ? tr("Restart") : tr("Start"));
 
     ui->actionScreenshot->setEnabled(emulation_running);
     ui->actionRecord_GIF->setEnabled(emulation_running);
@@ -688,12 +1030,11 @@ void MainWindow::updateUIActionState(bool emulation_running)
 
 void MainWindow::raiseDebugger()
 {
-    if(dock_debugger)
+    if (dock_debugger)
     {
         dock_debugger->setVisible(true);
         dock_debugger->raise();
     }
-    ui->tabWidget->setCurrentWidget(ui->tabDebugger);
 }
 
 void MainWindow::convertTabsToDocks()
@@ -711,33 +1052,126 @@ void MainWindow::convertTabsToDocks()
 
     docks_menu->addSeparator();
 
-    //Convert the tabs into QDockWidgets
-    DockWidget *last_dock = nullptr;
-    while(ui->tabWidget->count())
+    // Convert the hidden tab pages into movable/floatable dock widgets around the central panel.
+    struct TabDockPair
     {
-        DockWidget *dw = new DockWidget(ui->tabWidget->tabText(0), this);
+        QWidget *tab = nullptr;
+        DockWidget *dock = nullptr;
+    };
+
+    QVector<TabDockPair> dock_pairs;
+    while (ui->tabWidget->count())
+    {
+        QWidget *tab = ui->tabWidget->widget(0);
+        const QString tab_title = ui->tabWidget->tabText(0);
+        const QIcon tab_icon = ui->tabWidget->tabIcon(0);
+        ui->tabWidget->removeTab(0);
+
+        DockWidget *dw = new DockWidget(tab_title, content_window);
         dw->hideTitlebar(true); // Create with hidden titlebar to not resize the window on startup
-        dw->setWindowIcon(ui->tabWidget->tabIcon(0));
+        dw->setWindowIcon(tab_icon);
         // This is used for storing window state, so must not be translated at this point
-        dw->setObjectName(ui->tabWidget->tabText(0));
+        dw->setObjectName(tab_title);
+        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+        dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
         // Fill "Docks" menu
         QAction *action = dw->toggleViewAction();
         action->setIcon(dw->windowIcon());
         docks_menu->addAction(action);
 
-        QWidget *tab = ui->tabWidget->widget(0);
-        if(tab == ui->tabDebugger)
+        if (tab == ui->tabDebugger)
             dock_debugger = dw;
 
         dw->setWidget(tab);
 
-        addDockWidget(Qt::RightDockWidgetArea, dw);
-        if(last_dock != nullptr)
-            tabifyDockWidget(last_dock, dw);
-
-        last_dock = dw;
+        dock_pairs.append({tab, dw});
     }
+
+    DockWidget *dock_files = nullptr;
+    DockWidget *dock_serial = nullptr;
+    DockWidget *dock_keypad = nullptr;
+    DockWidget *dock_debug_anchor = nullptr;
+
+    // Default layout: file transfer on the left, debugger/serial stacked on the right, keypad along the bottom.
+    for (const auto &pair : dock_pairs)
+    {
+        QWidget *tab = pair.tab;
+        DockWidget *dw = pair.dock;
+
+        if (tab == ui->tabDebugger)
+        {
+            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
+            dock_debug_anchor = dw;
+        }
+        else if (tab == ui->tabSerial)
+        {
+            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
+            dock_serial = dw;
+            if (dock_debug_anchor && dock_debug_anchor != dw)
+                content_window->tabifyDockWidget(dock_debug_anchor, dw);
+            else if (!dock_debug_anchor)
+                dock_debug_anchor = dw;
+        }
+        else if (tab == ui->tabFiles)
+        {
+            content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+            dock_files = dw;
+        }
+        else if (tab == ui->tab)
+        {
+            content_window->addDockWidget(Qt::BottomDockWidgetArea, dw);
+            dock_keypad = dw;
+        }
+        else
+        {
+            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
+            if (dock_debug_anchor && dock_debug_anchor != dw)
+                content_window->tabifyDockWidget(dock_debug_anchor, dw);
+            if (!dock_debug_anchor)
+                dock_debug_anchor = dw;
+        }
+    }
+
+    if (dock_debugger && dock_serial && dock_debugger != dock_serial)
+        content_window->tabifyDockWidget(dock_debugger, dock_serial);
+
+    if (dock_files && dock_keypad)
+        content_window->tabifyDockWidget(dock_files, dock_keypad);
+    else if (dock_files && dock_serial)
+        content_window->tabifyDockWidget(dock_files, dock_serial);
+
+    // Hint Qt about corner preferences so the left/bottom docks stay grouped, keeping the LCD central.
+    content_window->setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
+    content_window->setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
+    content_window->setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
+    content_window->setCorner(Qt::BottomRightCorner, Qt::RightDockWidgetArea);
+
+    // Bias initial space to keep the LCD focal and leave reasonable dock columns.
+    QList<QDockWidget *> horiz_targets;
+    QList<int> horiz_sizes;
+    if (dock_files)
+    {
+        horiz_targets << dock_files;
+        horiz_sizes << 260;
+    }
+    if (dock_debugger)
+    {
+        horiz_targets << dock_debugger;
+        horiz_sizes << 320;
+    }
+    if (!horiz_targets.isEmpty())
+        content_window->resizeDocks(horiz_targets, horiz_sizes, Qt::Horizontal);
+
+    QList<QDockWidget *> vert_targets;
+    QList<int> vert_sizes;
+    if (dock_keypad)
+    {
+        vert_targets << dock_keypad;
+        vert_sizes << 240;
+    }
+    if (!vert_targets.isEmpty())
+        content_window->resizeDocks(vert_targets, vert_sizes, Qt::Vertical);
 
     setUIEditMode(editmode_toggle->isChecked());
 
@@ -748,15 +1182,16 @@ void MainWindow::retranslateDocks()
 {
     // The docks are not handled by mainwindow.ui but got created by
     // convertTabsToDocks() above, so translation needs to be done manually.
-    const auto dockChildren = findChildren<DockWidget*>();
-    for(DockWidget *dw : dockChildren) {
-        if(dw->widget() == ui->tab)
+    const auto dockChildren = content_window->findChildren<DockWidget *>();
+    for (DockWidget *dw : dockChildren)
+    {
+        if (dw->widget() == ui->tab)
             dw->setWindowTitle(tr("Keypad"));
-        else if(dw->widget() == ui->tabFiles)
+        else if (dw->widget() == ui->tabFiles)
             dw->setWindowTitle(tr("File Transfer"));
-        else if(dw->widget() == ui->tabSerial)
+        else if (dw->widget() == ui->tabSerial)
             dw->setWindowTitle(tr("Serial Monitor"));
-        else if(dw->widget() == ui->tabDebugger)
+        else if (dw->widget() == ui->tabDebugger)
             dw->setWindowTitle(tr("Debugger"));
     }
 }
@@ -771,10 +1206,10 @@ void MainWindow::screenshot()
     QImage image = renderFramebuffer();
 
     QString filename = QFileDialog::getSaveFileName(this, tr("Save Screenshot"), QString(), tr("PNG images (*.png)"));
-    if(filename.isEmpty())
+    if (filename.isEmpty())
         return;
 
-    if(!image.save(filename, "PNG"))
+    if (!image.save(filename, "PNG"))
         QMessageBox::critical(this, tr("Screenshot failed"), tr("Failed to save screenshot!"));
 }
 
@@ -782,7 +1217,7 @@ void MainWindow::recordGIF()
 {
     static QString path;
 
-    if(path.isEmpty())
+    if (path.isEmpty())
     {
         // TODO: Use QTemporaryFile?
         path = QDir::tempPath() + QDir::separator() + QStringLiteral("firebird_tmp.gif");
@@ -791,10 +1226,10 @@ void MainWindow::recordGIF()
     }
     else
     {
-        if(gif_stop_recording())
+        if (gif_stop_recording())
         {
             QString filename = QFileDialog::getSaveFileName(this, tr("Save Recording"), QString(), tr("GIF images (*.gif)"));
-            if(filename.isEmpty())
+            if (filename.isEmpty())
                 QFile(path).remove();
             else
             {
@@ -813,7 +1248,7 @@ void MainWindow::recordGIF()
 
 void MainWindow::connectUSB()
 {
-    if(usblink_connected)
+    if (usblink_connected)
         usblink_queue_reset();
     else
         usblink_connect();
@@ -825,13 +1260,13 @@ void MainWindow::usblinkChanged(bool state)
 {
     ui->actionConnect->setText(state ? tr("Disconnect USB") : tr("Connect USB"));
     ui->actionConnect->setChecked(state);
-    ui->buttonUSB->setText(state ? tr("Disconnect USB") : tr("Connect USB"));
+    ui->buttonUSB->setToolTip(state ? tr("Disconnect USB") : tr("Connect USB"));
     ui->buttonUSB->setChecked(state);
 }
 
 void MainWindow::setExtLCD(bool state)
 {
-    if(state)
+    if (state)
         lcd.show();
     else
         lcd.hide();
@@ -842,13 +1277,13 @@ void MainWindow::setExtLCD(bool state)
 bool MainWindow::resume()
 {
     /* If there's no kit set, use the default kit */
-    if(the_qml_bridge->getCurrentKitId() == -1)
+    if (the_qml_bridge->getCurrentKitId() == -1)
         the_qml_bridge->useDefaultKit();
 
     applyQMLBridgeSettings();
 
     auto snapshot_path = the_qml_bridge->getSnapshotPath();
-    if(!snapshot_path.isEmpty())
+    if (!snapshot_path.isEmpty())
         return resumeFromPath(snapshot_path);
     else
     {
@@ -860,7 +1295,7 @@ bool MainWindow::resume()
 void MainWindow::suspend()
 {
     auto snapshot_path = the_qml_bridge->getSnapshotPath();
-    if(!snapshot_path.isEmpty())
+    if (!snapshot_path.isEmpty())
         suspendToPath(snapshot_path);
     else
         QMessageBox::warning(this, tr("Can't suspend"), tr("The current kit does not have a snapshot file configured"));
@@ -869,14 +1304,14 @@ void MainWindow::suspend()
 void MainWindow::resumeFromFile()
 {
     QString snapshot = QFileDialog::getOpenFileName(this, tr("Select snapshot to resume from"));
-    if(!snapshot.isEmpty())
+    if (!snapshot.isEmpty())
         resumeFromPath(snapshot);
 }
 
 void MainWindow::suspendToFile()
 {
     QString snapshot = QFileDialog::getSaveFileName(this, tr("Select snapshot to suspend to"));
-    if(!snapshot.isEmpty())
+    if (!snapshot.isEmpty())
         suspendToPath(snapshot);
 }
 
@@ -887,10 +1322,10 @@ void MainWindow::saveFlash()
 
 void MainWindow::createFlash()
 {
-    if(!flash_dialog)
+    if (!flash_dialog)
         flash_dialog = flash_dialog_component->create();
 
-    if(!flash_dialog)
+    if (!flash_dialog)
         qWarning() << "Could not create flash dialog!";
     else
         flash_dialog->setProperty("visible", QVariant(true));
@@ -900,8 +1335,8 @@ void MainWindow::setUIEditMode(bool e)
 {
     settings->setValue(QStringLiteral("uiEditModeEnabled"), e);
 
-    const auto dockChildren = findChildren<DockWidget*>();
-    for(DockWidget *dw : dockChildren)
+    const auto dockChildren = content_window->findChildren<DockWidget *>();
+    for (DockWidget *dw : dockChildren)
         dw->hideTitlebar(!e);
 }
 
@@ -912,7 +1347,7 @@ void MainWindow::showAbout()
 
 void MainWindow::isBusy(bool busy)
 {
-    if(busy)
+    if (busy)
         QApplication::setOverrideCursor(QCursor(Qt::WaitCursor));
     else
         QApplication::restoreOverrideCursor();
@@ -922,7 +1357,7 @@ void MainWindow::started(bool success)
 {
     updateUIActionState(success);
 
-    if(success)
+    if (success)
         showStatusMsg(tr("Emulation started"));
     else
         QMessageBox::warning(this, tr("Could not start the emulation"), tr("Starting the emulation failed.\nAre the paths to boot1 and flash correct?"));
@@ -932,7 +1367,7 @@ void MainWindow::resumed(bool success)
 {
     updateUIActionState(success);
 
-    if(success)
+    if (success)
         showStatusMsg(tr("Emulation resumed from snapshot"));
     else
         QMessageBox::warning(this, tr("Could not resume"), tr("Resuming failed.\nTry to fix the issue and try again."));
@@ -940,14 +1375,14 @@ void MainWindow::resumed(bool success)
 
 void MainWindow::suspended(bool success)
 {
-    if(success)
+    if (success)
         showStatusMsg(tr("Snapshot saved"));
     else
         QMessageBox::warning(this, tr("Could not suspend"), tr("Suspending failed.\nTry to fix the issue and try again."));
 
-    if(close_after_suspend)
+    if (close_after_suspend)
     {
-        if(!success)
+        if (!success)
             close_after_suspend = false; // May try again
         else
             this->close();
@@ -962,14 +1397,14 @@ void MainWindow::stopped()
 
 void MainWindow::closeEvent(QCloseEvent *e)
 {
-    if(config_dialog)
+    if (config_dialog)
         config_dialog->setProperty("visible", false);
 
-    if(flash_dialog)
+    if (flash_dialog)
         flash_dialog->setProperty("visible", false);
 
-    if(!close_after_suspend &&
-            settings->value(QStringLiteral("suspendOnClose")).toBool() && emu_thread.isRunning() && exiting == false)
+    if (!close_after_suspend &&
+        settings->value(QStringLiteral("suspendOnClose")).toBool() && emu_thread.isRunning() && exiting == false)
     {
         close_after_suspend = true;
         qDebug("Suspending...");
@@ -978,7 +1413,7 @@ void MainWindow::closeEvent(QCloseEvent *e)
         return;
     }
 
-    if(emu_thread.isRunning() && !emu_thread.stop())
+    if (emu_thread.isRunning() && !emu_thread.stop())
         qDebug("Terminating emulator thread failed.");
 
     QMainWindow::closeEvent(e);
@@ -991,7 +1426,7 @@ void MainWindow::showStatusMsg(QString str)
 
 void MainWindow::kitDataChanged(QModelIndex, QModelIndex, QVector<int> roles)
 {
-    if(roles.contains(KitModel::NameRole))
+    if (roles.contains(KitModel::NameRole))
     {
         refillKitMenus();
 
@@ -1002,13 +1437,13 @@ void MainWindow::kitDataChanged(QModelIndex, QModelIndex, QVector<int> roles)
 
 void MainWindow::kitAnythingChanged()
 {
-    if(the_qml_bridge->getKitModel()->rowCount() != ui->menuRestart_with_Kit->actions().size())
+    if (the_qml_bridge->getKitModel()->rowCount() != ui->menuRestart_with_Kit->actions().size())
         refillKitMenus();
 }
 
 void MainWindow::currentKitChanged(const Kit &kit)
 {
-    (void) kit;
+    (void)kit;
     updateWindowTitle();
 }
 
@@ -1018,7 +1453,7 @@ void MainWindow::refillKitMenus()
     ui->menuBoot_Diags_with_Kit->clear();
 
     auto &&kit_model = the_qml_bridge->getKitModel();
-    for(auto &&kit : kit_model->getKits())
+    for (auto &&kit : kit_model->getKits())
     {
         QAction *action = ui->menuRestart_with_Kit->addAction(kit.name);
         action->setData(kit.id);
@@ -1027,14 +1462,14 @@ void MainWindow::refillKitMenus()
         action = ui->menuBoot_Diags_with_Kit->addAction(kit.name);
         action->setData(kit.id);
         connect(action, SIGNAL(triggered()), this, SLOT(startKitDiags()));
-	}
+    }
 }
 
 void MainWindow::updateWindowTitle()
 {
     // Need to update window title if kit is active
     int kitIndex = the_qml_bridge->kitIndexForID(the_qml_bridge->getCurrentKitId());
-    if(kitIndex >= 0)
+    if (kitIndex >= 0)
     {
         auto name = the_qml_bridge->getKitModel()->getKits()[kitIndex].name;
         setWindowTitle(tr("Firebird Emu - %1").arg(name));
@@ -1055,25 +1490,25 @@ void MainWindow::applyQMLBridgeSettings()
 void MainWindow::restart()
 {
     /* If there's no kit set, use the default kit */
-    if(the_qml_bridge->getCurrentKitId() == -1)
+    if (the_qml_bridge->getCurrentKitId() == -1)
         the_qml_bridge->useDefaultKit();
 
     applyQMLBridgeSettings();
 
-    if(emu_thread.boot1.isEmpty())
+    if (emu_thread.boot1.isEmpty())
     {
         QMessageBox::critical(this, tr("No boot1 set"), tr("Before you can start the emulation, you have to select a proper boot1 file."));
         return;
     }
 
-    if(emu_thread.flash.isEmpty())
+    if (emu_thread.flash.isEmpty())
     {
         QMessageBox::critical(this, tr("No flash image loaded"), tr("Before you can start the emulation, you have to load a proper flash file.\n"
-                                                                            "You can create one via Flash->Create Flash in the menu."));
+                                                                    "You can create one via Flash->Create Flash in the menu."));
         return;
     }
 
-    if(emu_thread.stop())
+    if (emu_thread.stop())
         emu_thread.start();
     else
         QMessageBox::warning(this, tr("Restart needed"), tr("Failed to restart emulator. Close and reopen this app.\n"));
@@ -1081,10 +1516,10 @@ void MainWindow::restart()
 
 void MainWindow::openConfiguration()
 {
-    if(!config_dialog)
+    if (!config_dialog)
         config_dialog = config_component->create();
 
-    if(!config_dialog)
+    if (!config_dialog)
         qWarning() << "Could not create config dialog!";
     else
         config_dialog->setProperty("visible", QVariant(true));
@@ -1092,8 +1527,8 @@ void MainWindow::openConfiguration()
 
 void MainWindow::startKit()
 {
-    auto action = qobject_cast<QAction*>(sender());
-    if(!action)
+    auto action = qobject_cast<QAction *>(sender());
+    if (!action)
     {
         qWarning() << "Received signal from invalid sender";
         return;
@@ -1107,8 +1542,8 @@ void MainWindow::startKit()
 
 void MainWindow::startKitDiags()
 {
-    auto action = qobject_cast<QAction*>(sender());
-    if(!action)
+    auto action = qobject_cast<QAction *>(sender());
+    if (!action)
     {
         qWarning() << "Received signal from invalid sender";
         return;
@@ -1123,7 +1558,7 @@ void MainWindow::startKitDiags()
 void MainWindow::xmodemSend()
 {
     QString filename = QFileDialog::getOpenFileName(this, tr("Select file to send"));
-    if(filename.isEmpty())
+    if (filename.isEmpty())
         return;
 
     std::string path = filename.toStdString();
@@ -1137,9 +1572,9 @@ void MainWindow::switchToMobileUI()
 
 bool QQuickWidgetLessBroken::event(QEvent *event)
 {
-    if(event->type() == QEvent::Leave)
+    if (event->type() == QEvent::Leave)
     {
-        QMouseEvent ev(QMouseEvent::MouseMove, QPointF(0, 0), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
+        QMouseEvent ev(QEvent::MouseMove, QPointF(0, 0), QPointF(0, 0), QPointF(0, 0), Qt::NoButton, Qt::NoButton, Qt::NoModifier);
         QQuickWidget::event(&ev);
     }
 

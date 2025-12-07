@@ -5,6 +5,9 @@
 #include <QSettings>
 #include <QLabel>
 #include <QQuickWidget>
+#include <QStringList>
+#include <QList>
+#include <functional>
 
 #include "emuthread.h"
 #include "fbaboutdialog.h"
@@ -13,6 +16,7 @@
 
 namespace Ui {
 class MainWindow;
+
 }
 
 /* QQuickWidget does not care about QEvent::Leave,
@@ -20,7 +24,9 @@ class MainWindow;
  * the mouse leaves the widget without triggering a move outside
  * the MouseArea. Work around it by translating QEvent::Leave
  * to a MouseMove to (0/0). */
-
+class QResizeEvent;
+class QToolButton;
+class QTableWidget;
 class QQuickWidgetLessBroken : public QQuickWidget
 {
     Q_OBJECT
@@ -44,7 +50,7 @@ public:
 public slots:
     //Miscellaneous
     void changeEvent(QEvent* event) override;
-    void closeEvent(QCloseEvent *) override;
+    void closeEvent(QCloseEvent *e) override;
     void showStatusMsg(QString str);
     void kitDataChanged(QModelIndex, QModelIndex, QVector<int> roles);
     void kitAnythingChanged();
@@ -139,8 +145,22 @@ private:
     // so the settings have to be read from there
     // and emu_thread configured appropriately.
     void applyQMLBridgeSettings();
+    void setDebuggerActive(bool active);
+    void requestDisassembly();
+    bool appendDisassemblyLine(const QString &line);
+    void refreshDisassemblyTable();
+    void applyWidgetTheme();
+
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
+    void resizeEvent(QResizeEvent *event) override;
+
+private:
+    QPoint m_dragStartPos;
 
     Ui::MainWindow *ui = nullptr;
+    QMainWindow *content_window = nullptr;
 
     QTranslator appTranslator;
 
@@ -182,6 +202,18 @@ private:
 
     // Whether this MainWindow is in charge of communicating with EmuThread
     bool is_active = false;
+
+    // Debugger toggle state/button
+    bool debugger_active = false;
+    QToolButton *debugger_toggle_button = nullptr;
+    struct DisasmEntry {
+        QString address;
+        QString text;
+        bool is_current = false;
+    };
+    QList<DisasmEntry> disasm_entries;
+    QTableWidget *stack_table = nullptr;
+    std::function<void()> updatePlayPauseButtonFn;
 };
 
 // Used as global instance by EmuThread and friends
