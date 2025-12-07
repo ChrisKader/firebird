@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 6.0
 import QtQuick.Layouts 6.0
 import QtQuick.Controls 6.0
@@ -30,8 +32,11 @@ Window {
     function acceptDialog() {
         if (!layout.validationText) {
             fileDialogLoader.active = true;
-            if (fileDialogLoader.item && fileDialogLoader.item.open)
-                fileDialogLoader.item.open();
+            // qmllint disable missing-property
+            var dlg = fileDialogLoader.item;
+            if (dlg && typeof dlg["open"] === "function")
+                dlg["open"]();
+            // qmllint enable missing-property
         } else {
             // Reopen if validation failed
             flashDialog.visible = true;

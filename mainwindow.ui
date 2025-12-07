@@ -411,11 +411,6 @@
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
-          <property name="font">
-           <font>
-            <family>Droid Sans Mono</family>
-           </font>
-          </property>
           <property name="undoRedoEnabled">
            <bool>false</bool>
           </property>
@@ -471,11 +466,6 @@
        <widget class="ConsoleLineEdit" name="lineEdit">
         <property name="enabled">
          <bool>false</bool>
-        </property>
-        <property name="font">
-         <font>
-          <family>Droid Sans Mono</family>
-         </font>
         </property>
        </widget>
       </item>

@@ -1,10 +1,12 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 6.0
-import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
 import Firebird.UIComponents 1.0
 import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
+    id: root
     property alias icon: image.source
     property alias title: label.text
     property alias borderTopVisible: borderTop.visible
@@ -17,6 +19,10 @@ Rectangle {
 
     opacity: disabled ? 0.5 : 1.0
 
+    SystemPalette {
+        id: paletteActive
+    }
+
     height: 48
 
     Layout.fillWidth: true
@@ -27,13 +33,13 @@ Rectangle {
         id: mouseArea
         anchors.fill: parent
         onClicked: {
-            if(disabled)
+            if(root.disabled)
                 return;
 
-            parent.clicked()
+            root.clicked()
 
-            if(toggle)
-                toggleState = !toggleState;
+            if(root.toggle)
+                root.toggleState = !root.toggleState;
         }
     }
 
@@ -61,13 +67,13 @@ Rectangle {
         color: FBUI.Theme.border
     }
 
-    color: (mouseArea.pressed !== toggleState) && !disabled ? FBUI.Theme.surfaceAlt : "transparent"
+    color: (mouseArea.pressed !== root.toggleState) && !root.disabled ? FBUI.Theme.surfaceAlt : "transparent"
     Behavior on color { ColorAnimation { duration: 200; } }
 
     Image {
         id: image
 
-        x: spacing
+        x: root.spacing
 
         height: parent.height * 0.8
 
@@ -81,7 +87,7 @@ Rectangle {
 
         color: paletteActive.windowText
 
-        x: image.x + image.width + spacing
+        x: image.x + image.width + root.spacing
 
         anchors {
             top: parent.top

@@ -98,6 +98,7 @@ qt_add_qml_module(firebird-emu
         qml/Firebird/UIComponents/VerticalSwipeBar.qml
         qml/FlashDialog.qml
         qml/Firebird/UIComponents/IconButton.qml
+        qml/KitRoles.js
     RESOURCES
         qml/Firebird/UIComponents/qmldir
     RESOURCE_PREFIX /qml

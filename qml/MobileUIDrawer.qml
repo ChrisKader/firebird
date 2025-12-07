@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 6.0
 import Qt.labs.platform 1.1 as Platform
 import QtQuick.Layouts 6.0
@@ -7,6 +9,7 @@ import Firebird.UIComponents 1.0
 
 Rectangle {
     id: drawerRoot
+    property var listView
     color: paletteActive.window
 
     // Give the drawer a reasonable width even when the layout is anchored
@@ -18,7 +21,8 @@ Rectangle {
     }
 
     function closeDrawer() {
-        listView.closeDrawer();
+        if (listView && typeof listView.closeDrawer === "function")
+            listView.closeDrawer();
     }
 
     ColumnLayout {
@@ -52,7 +56,7 @@ Rectangle {
                  onClicked: {
                      Emu.useDefaultKit();
                      Emu.restart();
-                     closeDrawer();
+                     drawerRoot.closeDrawer();
                  }
              }
 
@@ -66,7 +70,7 @@ Rectangle {
 
                  onClicked: {
                      Emu.reset();
-                     closeDrawer();
+                     drawerRoot.closeDrawer();
                  }
              }
 
@@ -79,7 +83,7 @@ Rectangle {
                  onClicked: {
                      Emu.useDefaultKit();
                      Emu.resume()
-                     closeDrawer();
+                     drawerRoot.closeDrawer();
                  }
              }
 
@@ -115,11 +119,11 @@ Rectangle {
                      {
                          if(snap_path)
                              Emu.suspend();
-                         else
-                             snapWarnDialog.visible = true;
-                     }
+                     else
+                         snapWarnDialog.visible = true;
+                 }
 
-                     closeDrawer();
+                     drawerRoot.closeDrawer();
                 }
             }
 
@@ -143,7 +147,10 @@ Rectangle {
                 title: qsTr("Configuration")
                 icon: "qrc:/icons/resources/icons/preferences-other.png"
 
-                onClicked: listView.openConfiguration();
+                onClicked: {
+                    if (drawerRoot.listView && typeof drawerRoot.listView.openConfiguration === "function")
+                        drawerRoot.listView.openConfiguration();
+                }
             }
         }
 
@@ -181,7 +188,7 @@ Rectangle {
                     id: aboutDialog
                     buttons: Platform.MessageDialog.Ok
                     title: qsTr("About Firebird")
-                    text: qsTr("Authors:<br>
+                    text: qsTr(`Authors:<br>
                                Fabian Vogt (<a href='https://github.com/Vogtinator'>Vogtinator</a>)<br>
                                Adrien Bertrand (<a href='https://github.com/adriweb'>Adriweb</a>)<br>
                                Antonio Vasquez (<a href='https://github.com/antoniovazquezblanco'>antoniovazquezblanco</a>)<br>
@@ -189,7 +196,7 @@ Rectangle {
                                Denis Avashurov (<a href='https://github.com/denisps'>denisps</a>)<br>
                                Based on nspire_emu v0.70 by Goplat<br><br>
                                This work is licensed under the GPLv3.<br>
-                               To view a copy of this license, visit <a href='https://www.gnu.org/licenses/gpl-3.0.html'>https://www.gnu.org/licenses/gpl-3.0.html</a>")
+                               To view a copy of this license, visit <a href='https://www.gnu.org/licenses/gpl-3.0.html'>https://www.gnu.org/licenses/gpl-3.0.html</a>`)
                 }
 
                 onClicked: {

@@ -3,6 +3,7 @@ import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.3
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
+import "KitRoles.js" as KitRoles
 
 ColumnLayout {
     id: emuPage
@@ -52,7 +53,7 @@ ColumnLayout {
             model: Emu.kits
             currentIndex: Emu.kitIndexForID(Emu.defaultKit)
             onCurrentIndexChanged: {
-                Emu.defaultKit = model.getDataRow(currentIndex, KitModel.IDRole);
+                Emu.defaultKit = model.getDataRow(currentIndex, KitRoles.IDRole);
                 currentIndex = Qt.binding(function() { return Emu.kitIndexForID(Emu.defaultKit); });
             }
         }

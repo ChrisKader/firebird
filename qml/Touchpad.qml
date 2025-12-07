@@ -56,8 +56,8 @@ Rectangle {
             function onTouchpadStateChanged(x, y, contact, down) {
                 if(contact || down)
                 {
-                    highlight.x = x*width - highlight.width/2;
-                    highlight.y = y*height - highlight.height/2;
+                    highlight.x = x*rectangle2.width - highlight.width/2;
+                    highlight.y = y*rectangle2.height - highlight.height/2;
                     highlight.opacity = down ? 0.45 : 0.3;
                 }
 
@@ -118,7 +118,7 @@ Rectangle {
             submitState();
         }
 
-        onPressed: {
+        onPressed: function(mouse) {
             origX = mouse.x;
             origY = mouse.y;
             isDown = false;

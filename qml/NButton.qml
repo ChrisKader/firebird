@@ -1,8 +1,10 @@
+// qmllint disable import
 import QtQuick 6.0
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
+    id: root
     SystemPalette {
         id: paletteActive
     }
@@ -34,14 +36,14 @@ Rectangle {
         if(!pressed)
             fixed = false;
 
-        Emu.setButtonState(keymap_id, pressed);
+        Emu.setButtonState(root.keymap_id, root.pressed);
     }
 
     Connections {
         target: Emu
         function onButtonStateChanged(id, state) {
-            if(id === keymap_id)
-                pressed = state;
+            if(id === root.keymap_id)
+                root.pressed = state;
         }
     }
 
@@ -51,7 +53,7 @@ Rectangle {
         anchors.fill: parent
         anchors.centerIn: parent
         font.pixelSize: height*0.55
-        color: active ? active_font_color : font_color
+        color: root.active ? root.active_font_color : root.font_color
         font.bold: true
         // Workaround: Text.AutoText doesn't seem to work for properties (?)
         textFormat: text.indexOf(">") == -1 ? Text.PlainText : Text.RichText
@@ -103,26 +105,26 @@ Rectangle {
 
         hoverEnabled: !Emu.isMobile()
 
-        onPressed: {
+        onPressed: function(mouse) {
             mouse.accepted = true;
 
-            if(mouse.button == Qt.LeftButton)
+            if(mouse.button === Qt.LeftButton)
             {
-                if(!fixed)
+                if(!root.fixed)
                     parent.pressed = true;
             }
-            else if(fixed === parent.pressed) // Right button
+            else if(root.fixed === parent.pressed) // Right button
             {
-                fixed = !fixed;
+                root.fixed = !root.fixed;
                 parent.pressed = !parent.pressed;
             }
         }
 
-        onReleased: {
+        onReleased: function(mouse) {
             mouse.accepted = true;
 
-            if(mouse.button == Qt.LeftButton
-                    && !fixed)
+            if(mouse.button === Qt.LeftButton
+                    && !root.fixed)
                 parent.pressed = false;
         }
     }

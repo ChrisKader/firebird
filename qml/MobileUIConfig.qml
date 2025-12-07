@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
@@ -5,6 +7,9 @@ import QtQuick.Layouts 6.0
 import Firebird.UIComponents 1.0
 
 Item {
+
+    id: root
+    property var listView
 
     property var configModel: ConfigPagesModel {}
 
@@ -26,10 +31,11 @@ Item {
             Layout.fillWidth: true
 
             Repeater {
-                model: configModel
-                
+                model: root.configModel
+
                 TabButton {
-                    text: qsTranslate("ConfigPagesModel", model.title)
+                    required property var modelData
+                    text: qsTranslate("ConfigPagesModel", modelData.title)
                 }
             }
         }
@@ -38,7 +44,7 @@ Item {
             id: pageLoader
             Layout.fillWidth: true
             Layout.fillHeight: true
-            source: configModel.get(tabBar.currentIndex) ? configModel.get(tabBar.currentIndex).file : ""
+            source: root.configModel.get(tabBar.currentIndex) ? root.configModel.get(tabBar.currentIndex).file : ""
         }
 
         FBLabel {
@@ -62,7 +68,8 @@ Item {
         }
 
         onClicked: {
-            listView.openDrawer();
+            if (root.listView)
+                root.listView.openDrawer();
         }
     }
 }

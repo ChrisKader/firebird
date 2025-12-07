@@ -1,10 +1,12 @@
+pragma ComponentBehavior: Bound
+
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
 import QtQuick 6.0
 import QtQuick.Controls 6.0
+import QtQml 2.15
 import Qt.labs.platform 1.1 as Platform
-import QtQuick.Layouts 6.0
 
 ApplicationWindow {
     id: app
@@ -65,7 +67,7 @@ ApplicationWindow {
         text: qsTr("Suspending the emulation failed. Do you still want to quit Firebird?")
 
         onYesClicked: {
-            ignoreSuspendOnClose = true;
+            app.ignoreSuspendOnClose = true;
             app.close();
         }
     }
@@ -73,13 +75,13 @@ ApplicationWindow {
     Connections {
         target: Emu
         function onEmuSuspended(success) {
-            if(closeAfterSuspend)
+            if(app.closeAfterSuspend)
             {
-                closeAfterSuspend = false;
+                app.closeAfterSuspend = false;
 
                 if(success)
                 {
-                    ignoreSuspendOnClose = true;
+                    app.ignoreSuspendOnClose = true;
                     app.close();
                 }
                 else
@@ -94,6 +96,7 @@ ApplicationWindow {
     Connections {
         target: Qt.application
         function onStateChanged() {
+            // qmllint disable missing-property
             switch (Qt.application.state)
             {
                 case Qt.ApplicationSuspended: // Might be reaped on mobile
@@ -109,6 +112,7 @@ ApplicationWindow {
                         Emu.setPaused(false);
                 break;
             }
+            // qmllint enable missing-property
         }
     }
 
@@ -180,6 +184,9 @@ ApplicationWindow {
         }
 
         delegate: Item {
+            id: delegateItem
+            required property int index
+            required property var modelData
             // The pages are expensive, keep them
             ListView.delayRemove: true
 
@@ -191,7 +198,7 @@ ApplicationWindow {
                 listView.pageX[index] = x;
             }
 
-            width: modelData === "MobileUIDrawer.qml" ? (loader.item ? loader.item.implicitWidth : 250) : app.width
+            width: modelData === "MobileUIDrawer.qml" ? 250 : app.width
             height: app.height
 
             Rectangle {
@@ -210,7 +217,7 @@ ApplicationWindow {
                     enabled: parent.visible
 
                     onReleased: {
-                        listView.animateToIndex(index)
+                        listView.animateToIndex(delegateItem.index)
                     }
                 }
             }
@@ -220,9 +227,8 @@ ApplicationWindow {
                 z: 0
                 focus: Math.round(parent.x) == Math.round(listView.contentX);
                 anchors.fill: parent
-                source: modelData
+                source: delegateItem.modelData
             }
         }
     }
 }
-

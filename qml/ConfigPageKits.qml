@@ -3,11 +3,14 @@ import QtQuick.Controls 6.0
 import QtQuick.Layouts 6.0
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
+import "KitRoles.js" as KitRoles
+
+pragma ComponentBehavior: Bound
 
 ColumnLayout {
+    id: kitsPage
     property var kitModel
-    Component.onCompleted: kitModel = Emu.kits
-
+    Component.onCompleted: kitsPage.kitModel = Emu.kits
     spacing: 5
 
     KitList {
@@ -20,7 +23,7 @@ ColumnLayout {
         Layout.leftMargin: 1
         Layout.topMargin: 5
 
-        kitModel: parent.kitModel
+        kitModel: kitsPage.kitModel
     }
 
     GroupBox {
@@ -55,7 +58,7 @@ ColumnLayout {
                 text: kitList.currentName
                 onTextChanged: {
                     if(text !== kitList.currentName)
-                        kitModel.setDataRow(kitList.currentIndex, text, KitModel.NameRole);
+                        kitsPage.kitModel.setDataRow(kitList.currentIndex, text, KitRoles.NameRole);
                     text = Qt.binding(function() { return kitList.currentName; });
                 }
             }
@@ -71,7 +74,7 @@ ColumnLayout {
                 filePath: kitList.currentBoot1
                 onFilePathChanged: {
                     if(filePath !== kitList.currentBoot1)
-                        kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.Boot1Role);
+                        kitsPage.kitModel.setDataRow(kitList.currentIndex, filePath, KitRoles.Boot1Role);
                     filePath = Qt.binding(function() { return kitList.currentBoot1; });
                 }
             }
@@ -87,7 +90,7 @@ ColumnLayout {
                 filePath: kitList.currentFlash
                 onFilePathChanged: {
                     if(filePath !== kitList.currentFlash)
-                        kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.FlashRole);
+                        kitsPage.kitModel.setDataRow(kitList.currentIndex, filePath, KitRoles.FlashRole);
                     filePath = Qt.binding(function() { return kitList.currentFlash; });
                 }
                 showCreateButton: true
@@ -96,8 +99,8 @@ ColumnLayout {
 
             FlashDialog {
                 id: flashDialog
-                onFlashCreated: {
-                    kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.FlashRole);
+                onFlashCreated: function(createdPath) {
+                    kitsPage.kitModel.setDataRow(kitList.currentIndex, createdPath, KitRoles.FlashRole);
                 }
             }
 
@@ -113,7 +116,7 @@ ColumnLayout {
                 filePath: kitList.currentSnapshot
                 onFilePathChanged: {
                     if(filePath !== kitList.currentSnapshot)
-                        kitModel.setDataRow(kitList.currentIndex, filePath, KitModel.SnapshotRole);
+                        kitsPage.kitModel.setDataRow(kitList.currentIndex, filePath, KitRoles.SnapshotRole);
                     filePath = Qt.binding(function() { return kitList.currentSnapshot; });
                 }
             }
