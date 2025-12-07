@@ -4,6 +4,7 @@
 #include <QDockWidget>
 #include <QLabel>
 #include <QToolButton>
+#include <QFont>
 
 /* This class augments QDockWidget with the function
  * to hide the titlebar of non-floating docks. */
@@ -21,8 +22,9 @@ public:
     ~DockWidget() {}
 
     void hideTitlebar(bool b);
+    void applyButtonStyle(const QFont &iconFont);
 
-private slots:
+public slots:
     void refreshTitlebar();
     void updateCustomTitle(const QString &title);
 

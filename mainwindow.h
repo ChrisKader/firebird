@@ -59,6 +59,7 @@ public slots:
     //Drag & Drop
     void dropEvent(QDropEvent* event) override;
     void dragEnterEvent(QDragEnterEvent *ev) override;
+    void mouseReleaseEvent(QMouseEvent *event) override;
 
     //Menu "Emulator"
     void restart();
@@ -166,6 +167,9 @@ private:
 
     // Used to show a status message permanently
     QLabel status_label;
+    QLabel *status_bar_speed_label = nullptr;
+    QWidget *status_bar_tray = nullptr;
+    QToolButton *status_dark_button = nullptr;
 
     QSettings *settings = nullptr;
 
@@ -180,6 +184,7 @@ private:
 
     // The QML engine shared by the keypad, config dialog and mobile UI
     QQmlEngine *qml_engine = nullptr;
+    QFont material_icon_font;
 
     // The config dialog component, used to create the config_dialog
     QQmlComponent *config_component = nullptr;

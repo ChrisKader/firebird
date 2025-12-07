@@ -5,6 +5,6 @@ NBigButton {
     width: 33
     back_color: FBUI.Theme.surfaceAlt
     active_color: FBUI.Theme.accent
-    font_color: FBUI.Theme.textOnAccent
+    font_color: FBUI.Theme.text
     border_color: FBUI.Theme.border
 }

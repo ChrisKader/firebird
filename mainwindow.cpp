@@ -61,19 +61,53 @@ namespace
 {
 struct WidgetTheme
 {
-    QColor window{QStringLiteral("#181818")};
-    QColor surface{QStringLiteral("#1e1e1e")};
-    QColor surfaceAlt{QStringLiteral("#202020")};
-    QColor dock{QStringLiteral("#252526")};
-    QColor border{QStringLiteral("#333333")};
-    QColor accent{QStringLiteral("#007acc")};
-    QColor text{QStringLiteral("#d4d4d4")};
-    QColor textMuted{QStringLiteral("#858585")};
-    QColor selection{QStringLiteral("#264f78")};
-    QColor statusBg{QStringLiteral("#202020")};
+    QColor window;
+    QColor surface;
+    QColor surfaceAlt;
+    QColor dock;
+    QColor dockTitle;
+    QColor border;
+    QColor accent;
+    QColor text;
+    QColor textMuted;
+    QColor selection;
+    QColor selectionText;
+    QColor statusBg;
 };
 
-const WidgetTheme widget_theme{};
+const WidgetTheme &currentWidgetTheme()
+{
+    static const WidgetTheme dark_theme{
+        QColor(QStringLiteral("#181818")),
+        QColor(QStringLiteral("#1e1e1e")),
+        QColor(QStringLiteral("#202020")),
+        QColor(QStringLiteral("#252526")),
+        QColor(QStringLiteral("#1b1b1c")),
+        QColor(QStringLiteral("#333333")),
+        QColor(QStringLiteral("#007acc")),
+        QColor(QStringLiteral("#d4d4d4")),
+        QColor(QStringLiteral("#858585")),
+        QColor(QStringLiteral("#264f78")),
+        QColor(QStringLiteral("#ffffff")),
+        QColor(QStringLiteral("#202020"))};
+
+    static const WidgetTheme light_theme{
+        QColor(QStringLiteral("#f5f5f5")),
+        QColor(QStringLiteral("#ffffff")),
+        QColor(QStringLiteral("#ededed")),
+        QColor(QStringLiteral("#f2f2f2")),
+        QColor(QStringLiteral("#e6e6e6")),
+        QColor(QStringLiteral("#c4c4c4")),
+        QColor(QStringLiteral("#0066b8")),
+        QColor(QStringLiteral("#1f1f1f")),
+        QColor(QStringLiteral("#5e5e5e")),
+        QColor(QStringLiteral("#cce6ff")),
+        QColor(QStringLiteral("#1a1a1a")),
+        QColor(QStringLiteral("#e9e9e9"))};
+
+    const bool use_dark = !the_qml_bridge ? true : the_qml_bridge->getDarkTheme();
+    return use_dark ? dark_theme : light_theme;
+}
 
 void applyPaletteColors(QPalette &pal, const WidgetTheme &theme)
 {
@@ -84,8 +118,8 @@ void applyPaletteColors(QPalette &pal, const WidgetTheme &theme)
     pal.setColor(QPalette::Text, theme.text);
     pal.setColor(QPalette::Button, theme.surfaceAlt);
     pal.setColor(QPalette::ButtonText, theme.text);
-    pal.setColor(QPalette::Highlight, theme.accent);
-    pal.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#ffffff")));
+    pal.setColor(QPalette::Highlight, theme.selection);
+    pal.setColor(QPalette::HighlightedText, theme.selectionText);
     pal.setColor(QPalette::ToolTipBase, theme.dock);
     pal.setColor(QPalette::ToolTipText, theme.text);
     pal.setColor(QPalette::PlaceholderText, theme.textMuted);
@@ -120,6 +154,11 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
         event->accept();
         return;
     }
+    else if (event->button() == Qt::LeftButton)
+    {
+        // Reset any stale drag state when clicking elsewhere
+        m_dragStartPos = QPoint();
+    }
 #endif
     QMainWindow::mousePressEvent(event);
 }
@@ -135,6 +174,15 @@ void MainWindow::mouseMoveEvent(QMouseEvent *event)
     }
 #endif
     QMainWindow::mouseMoveEvent(event);
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent *event)
+{
+#ifdef Q_OS_MAC
+    if (event->button() == Qt::LeftButton)
+        m_dragStartPos = QPoint();
+#endif
+    QMainWindow::mouseReleaseEvent(event);
 }
 
 void MainWindow::resizeEvent(QResizeEvent *event)
@@ -194,6 +242,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     QFont materialIconFont = loadIconFont(QStringLiteral(":/fonts/MaterialIconsRound-Regular.otf"));
     if (materialIconFont.family().isEmpty())
         materialIconFont = loadIconFont(QStringLiteral(":/fonts/MaterialSymbolsRounded.ttf"));
+    material_icon_font = materialIconFont;
 
     auto applyMaterialBugIcon = [materialIconFont](QToolButton *button)
     {
@@ -216,33 +265,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
             button->setToolTip(toolTip);
     };
 
-    // Add a compact "Debugger" toggle button into the custom header bar,
-    // similar to VS Code's header controls.
-    if (ui->headerBar)
+    auto applyMaterialGlyphPush = [materialIconFont](QPushButton *button, ushort codepoint, const QString &toolTip = QString())
     {
-        if (auto *headerLayout = qobject_cast<QHBoxLayout *>(ui->headerBar->layout()))
-        {
-            /* QWidget *debugButtons = new QWidget(ui->headerBar);
-            debugButtons->setObjectName(QStringLiteral("headerDebugButtons"));
-            auto *dbgLayout = new QHBoxLayout(debugButtons);
-            dbgLayout->setContentsMargins(0, 0, 0, 0);
-            dbgLayout->setSpacing(4);
+        if (!button || materialIconFont.family().isEmpty())
+            return;
+        button->setIcon(QIcon());
+        button->setFont(materialIconFont);
+        button->setText(QString(QChar(codepoint)));
+        if (!toolTip.isEmpty())
+            button->setToolTip(toolTip);
+    };
 
-            auto *debugButton = new QToolButton(debugButtons);
-            debugButton->setObjectName(QStringLiteral("headerDebuggerButton"));
-            debugButton->setAutoRaise(true);
-            debugButton->setToolTip(tr("Enter debugger"));
-            debugButton->setDefaultAction(ui->actionDebugger);
-            // Use a flat Material-style glyph if the icon font is available
-            if (!materialIconFont.family().isEmpty()) {
-                debugButton->setFont(materialIconFont);
-                debugButton->setText(QString::fromStdString("\uE868")); // "bug_report"
-                debugButton->setToolButtonStyle(Qt::ToolButtonTextOnly);
-                debugButton->setAutoRaise(true);
-            }
-            dbgLayout->addWidget(debugButton); */
-        }
-    }
+    auto applyThemeGlyph = [applyMaterialGlyph](QToolButton *button, bool darkEnabled)
+    {
+        // Material Symbols codepoints for dark_mode / light_mode
+        const ushort glyph = darkEnabled ? 0xE51C : 0xE518;
+        applyMaterialGlyph(button, glyph, darkEnabled ? QObject::tr("Switch to light mode") : QObject::tr("Switch to dark mode"));
+    };
+
+    // Add a compact "Debugger" toggle button into the custom header bar,
+    // similar to VS Code's header controls. (Currently disabled)
 
     // Wire debugger toolbar button inside the Debugger dock (vertical bar).
     if (ui->tabDebugger)
@@ -277,6 +319,19 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     applyMaterialGlyph(ui->buttonReset, 0xE5D5, tr("Reset"));
     applyMaterialGlyph(ui->buttonScreenshot, 0xE412, tr("Screenshot"));
     applyMaterialGlyph(ui->buttonUSB, 0xE1E0, tr("Connect USB"));
+    if (ui->horizontalLayout_7)
+        ui->horizontalLayout_7->setAlignment(Qt::AlignHCenter);
+    QSize controlSize = ui->buttonPlayPause->sizeHint();
+    controlSize.setWidth(qMax(controlSize.width(), ui->buttonReset->sizeHint().width()));
+    controlSize.setWidth(qMax(controlSize.width(), ui->buttonScreenshot->sizeHint().width()));
+    controlSize.setWidth(qMax(controlSize.width(), ui->buttonUSB->sizeHint().width()));
+    controlSize.setHeight(qMax(controlSize.height(), ui->buttonReset->sizeHint().height()));
+    controlSize.setHeight(qMax(controlSize.height(), ui->buttonScreenshot->sizeHint().height()));
+    controlSize.setHeight(qMax(controlSize.height(), ui->buttonUSB->sizeHint().height()));
+    ui->buttonSpeed->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+    ui->buttonSpeed->setFixedSize(controlSize);
+    applyMaterialGlyphPush(ui->buttonSpeed, 0xE9E4, tr("Toggle turbo mode"));
+    ui->buttonSpeed->setCheckable(true);
 
     // Unified play/pause/start toggle.
     updatePlayPauseButtonFn = [this, applyMaterialGlyph]()
@@ -369,7 +424,40 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     applyWidgetTheme();
 
-    ui->statusBar->addWidget(&status_label);
+    if (ui->statusBar)
+    {
+    status_bar_tray = new QWidget(ui->statusBar);
+    auto *statusLayout = new QHBoxLayout(status_bar_tray);
+    statusLayout->setContentsMargins(6, 0, 6, 0);
+    statusLayout->setSpacing(6);
+
+    status_label.setContentsMargins(0, 0, 0, 0);
+    statusLayout->addWidget(&status_label, 0, Qt::AlignVCenter);
+
+    statusLayout->addStretch(1);
+
+    status_bar_speed_label = new QLabel(status_bar_tray);
+    status_bar_speed_label->setObjectName(QStringLiteral("statusSpeedLabel"));
+    status_bar_speed_label->setContentsMargins(0, 0, 0, 0);
+    status_bar_speed_label->setMinimumWidth(90);
+    status_bar_speed_label->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
+    status_bar_speed_label->setText(tr("Speed: -- %"));
+    statusLayout->addWidget(status_bar_speed_label, 0, Qt::AlignVCenter);
+
+    status_dark_button = new QToolButton(status_bar_tray);
+    status_dark_button->setObjectName(QStringLiteral("statusDarkModeButton"));
+    status_dark_button->setCheckable(false);
+    status_dark_button->setAutoRaise(true);
+    status_dark_button->setFocusPolicy(Qt::NoFocus);
+    status_dark_button->setContentsMargins(0, 0, 0, 0);
+    status_dark_button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Preferred);
+    const int sbHeight = ui->statusBar->sizeHint().height();
+    status_dark_button->setFixedHeight(sbHeight - 2);
+    status_dark_button->setMinimumWidth(sbHeight - 2);
+    statusLayout->addWidget(status_dark_button, 0, Qt::AlignVCenter);
+
+    ui->statusBar->addPermanentWidget(status_bar_tray, 1);
+    }
 
     // Register QtKeypadBridge for the virtual keyboard functionality
     ui->keypadWidget->installEventFilter(&qt_keypad_bridge);
@@ -399,6 +487,56 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     if (!the_qml_bridge)
         throw std::runtime_error("Can't continue without QMLBridge");
+
+    QAction *darkAction = findChild<QAction *>(QStringLiteral("actionDarkMode"));
+    if (!darkAction && ui->menuTools)
+    {
+        darkAction = new QAction(tr("Dark mode"), this);
+        darkAction->setObjectName(QStringLiteral("actionDarkMode"));
+        darkAction->setCheckable(true);
+        if (ui->menuLanguage)
+            ui->menuTools->insertAction(ui->menuLanguage->menuAction(), darkAction);
+        else
+            ui->menuTools->addAction(darkAction);
+    }
+    const bool darkModeEnabled = the_qml_bridge->getDarkTheme();
+    if (darkAction)
+    {
+        darkAction->setChecked(darkModeEnabled);
+        connect(darkAction, &QAction::toggled, this, [](bool darkEnabled)
+                { the_qml_bridge->setDarkTheme(darkEnabled); });
+    }
+
+    if (status_dark_button)
+    {
+        applyThemeGlyph(status_dark_button, darkModeEnabled);
+        status_dark_button->setStyleSheet(QStringLiteral(
+            "QToolButton { border: 0px; background: transparent; padding: 0 6px; outline: 0px; }"
+            "QToolButton:hover { background: transparent; }"
+            "QToolButton:pressed { background: transparent; }"
+            "QToolButton:focus { outline: 0px; }"));
+        connect(status_dark_button, &QToolButton::clicked, this, [darkAction]()
+                {
+            const bool next = !the_qml_bridge->getDarkTheme();
+            if (darkAction)
+                darkAction->setChecked(next);
+            else if (the_qml_bridge)
+                the_qml_bridge->setDarkTheme(next); });
+    }
+
+    connect(the_qml_bridge, &QMLBridge::darkThemeChanged, this, [this, darkAction]()
+            {
+        const bool dark = the_qml_bridge->getDarkTheme();
+        if (darkAction && darkAction->isChecked() != dark)
+            darkAction->setChecked(dark);
+        applyWidgetTheme(); });
+    if (status_dark_button)
+    {
+        connect(the_qml_bridge, &QMLBridge::darkThemeChanged, status_dark_button, [this, applyThemeGlyph]()
+                {
+            const bool dark = the_qml_bridge->getDarkTheme();
+            applyThemeGlyph(status_dark_button, dark); });
+    }
 
     connect(ui->buttonWindowClose, &QToolButton::clicked, this, &QWidget::close);
     connect(ui->buttonWindowMinimize, &QToolButton::clicked, this, &QWidget::showMinimized);
@@ -534,6 +672,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     ui->lcdView->setFocus();
 
+    // Ensure dock buttons/theme are refreshed after docks are created.
+    applyWidgetTheme();
+
     // Select default Kit
     bool defaultKitFound = the_qml_bridge->useDefaultKit();
 
@@ -584,7 +725,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
 void MainWindow::applyWidgetTheme()
 {
-    const WidgetTheme &theme = widget_theme;
+    const WidgetTheme &theme = currentWidgetTheme();
 
     QPalette pal = qApp->palette();
     applyPaletteColors(pal, theme);
@@ -594,6 +735,7 @@ void MainWindow::applyWidgetTheme()
     setWidgetBackground(this, theme.window, theme.text);
     setWidgetBackground(content_window, theme.window, theme.text);
     setWidgetBackground(ui->frame, theme.surface, theme.text);
+    setWidgetBackground(ui->headerBar, theme.surfaceAlt, theme.text);
 
     if (auto *frame = qobject_cast<QFrame *>(ui->frame))
     {
@@ -601,6 +743,19 @@ void MainWindow::applyWidgetTheme()
         frame->setFrameShadow(QFrame::Plain);
         frame->setLineWidth(1);
         frame->setMidLineWidth(0);
+        frame->setStyleSheet(QStringLiteral(
+            "QFrame#frame {"
+            " border: none;"
+            " }"));
+    }
+
+    if (ui->lcdView)
+    {
+        ui->lcdView->setStyleSheet(QStringLiteral(
+            "QWidget#lcdView {"
+            " border: 1px solid %1;"
+            " background: %2;"
+            " }").arg(theme.border.name(), theme.surface.name()));
     }
 
     if (ui->menubar)
@@ -608,6 +763,15 @@ void MainWindow::applyWidgetTheme()
         QPalette menuPal = ui->menubar->palette();
         applyPaletteColors(menuPal, theme);
         ui->menubar->setPalette(menuPal);
+    }
+
+    const auto toolbars = findChildren<QToolBar *>();
+    for (QToolBar *toolbar : toolbars)
+    {
+        QPalette barPal = toolbar->palette();
+        applyPaletteColors(barPal, theme);
+        toolbar->setPalette(barPal);
+        toolbar->setAutoFillBackground(true);
     }
 
     if (ui->statusBar)
@@ -619,15 +783,121 @@ void MainWindow::applyWidgetTheme()
         statusPal.setColor(QPalette::ButtonText, theme.textMuted);
         ui->statusBar->setAutoFillBackground(true);
         ui->statusBar->setPalette(statusPal);
+        ui->statusBar->setStyleSheet(QStringLiteral(
+            "QStatusBar {"
+            " background: %1;"
+            " color: %2;"
+            " border-top: 1px solid %3;"
+            "}"
+            "QStatusBar::item {"
+            " border: none;"
+            " }")
+                                         .arg(theme.statusBg.name(), theme.textMuted.name(), theme.border.name()));
+    }
+
+    auto styleToolButtons = [&](QObject *root) {
+        if (!root)
+            return;
+        const QString normalBg = theme.surfaceAlt.name();
+        const QString pressedBg = theme.surface.name();
+        const QString borderColor = theme.border.name();
+        const QString textColor = theme.text.name();
+        const QString style = QStringLiteral(
+            "QToolButton {"
+            " background:%1;"
+            " border:1px solid %2;"
+            " border-radius:3px;"
+            " padding:4px 6px;"
+            " color:%4;"
+            "}"
+            "QToolButton:pressed, QToolButton:checked {"
+            " background:%3;"
+            "}"
+            "QToolButton:hover {"
+            " background:%3;"
+            "}")
+                                      .arg(normalBg, borderColor, pressedBg, textColor);
+        const auto buttons = root->findChildren<QToolButton *>();
+        for (QToolButton *btn : buttons)
+        {
+            if (btn == status_dark_button)
+                continue; // Status bar uses its own minimal styling
+            btn->setStyleSheet(style);
+            btn->setAutoRaise(false);
+        }
+    };
+
+    styleToolButtons(this);
+    styleToolButtons(ui->headerBar);
+
+    if (ui->buttonSpeed)
+    {
+        ui->buttonSpeed->setFlat(false);
+        ui->buttonSpeed->setAutoDefault(false);
+        ui->buttonSpeed->setDefault(false);
+        ui->buttonSpeed->setStyleSheet(QStringLiteral(
+            "QPushButton#buttonSpeed {"
+            " background: %1;"
+            " border: 1px solid %2;"
+            " border-radius: 3px;"
+            " padding: 4px 6px;"
+            " color: %3;"
+            "}"
+            "QPushButton#buttonSpeed:hover {"
+            " background: %4;"
+            "}"
+            "QPushButton#buttonSpeed:pressed {"
+            " background: %5;"
+            "}"
+            "QPushButton#buttonSpeed:checked {"
+            " background: %6;"
+            " color: %7;"
+            " border-color: %6;"
+            "}"
+            "QPushButton#buttonSpeed:checked:hover {"
+            " background: %6;"
+            "}"
+            "QPushButton#buttonSpeed:checked:pressed {"
+            " background: %5;"
+            " color: %7;"
+            " border-color: %6;"
+            "}")
+                                           .arg(theme.surfaceAlt.name(),
+                                                theme.border.name(),
+                                                theme.text.name(),
+                                                theme.surface.name(),
+                                                theme.surfaceAlt.name(),
+                                                theme.accent.name(),
+                                                theme.selectionText.name()));
+
+        // Align speed button size with the other control buttons after styling.
+        QSize targetSize = ui->buttonPlayPause->sizeHint();
+        targetSize.setWidth(qMax(targetSize.width(), ui->buttonReset->sizeHint().width()));
+        targetSize.setWidth(qMax(targetSize.width(), ui->buttonScreenshot->sizeHint().width()));
+        targetSize.setWidth(qMax(targetSize.width(), ui->buttonUSB->sizeHint().width()));
+        targetSize.setHeight(qMax(targetSize.height(), ui->buttonReset->sizeHint().height()));
+        targetSize.setHeight(qMax(targetSize.height(), ui->buttonScreenshot->sizeHint().height()));
+        targetSize.setHeight(qMax(targetSize.height(), ui->buttonUSB->sizeHint().height()));
+        ui->buttonSpeed->setFixedSize(targetSize);
     }
 
     const auto docks = findChildren<DockWidget *>();
     for (DockWidget *dock : docks)
     {
         setWidgetBackground(dock, theme.dock, theme.text);
+        dock->setStyleSheet(QStringLiteral(
+            "QDockWidget {"
+            " border: 1px solid %1;"
+            "}"
+            "QDockWidget::title {"
+            " background: %2;"
+            " margin: 0;"
+            " padding: 0;"
+            " }")
+                                .arg(theme.border.name(), theme.dockTitle.name()));
         if (auto *title = dock->findChild<QWidget *>(QStringLiteral("dockTitleBar")))
         {
-            setWidgetBackground(title, QColor(QStringLiteral("#1b1b1c")), theme.text);
+            setWidgetBackground(title, theme.dockTitle, theme.text);
         }
         if (auto *label = dock->findChild<QLabel *>(QStringLiteral("dockTitleLabel")))
         {
@@ -636,6 +906,7 @@ void MainWindow::applyWidgetTheme()
             labelPal.setColor(QPalette::Text, theme.text);
             label->setPalette(labelPal);
         }
+        dock->applyButtonStyle(material_icon_font);
     }
 
     if (ui->tabDebugger)
@@ -653,7 +924,7 @@ void MainWindow::applyWidgetTheme()
         viewPal.setColor(QPalette::AlternateBase, theme.surfaceAlt);
         viewPal.setColor(QPalette::Text, theme.text);
         viewPal.setColor(QPalette::Highlight, theme.selection);
-        viewPal.setColor(QPalette::HighlightedText, QColor(QStringLiteral("#ffffff")));
+        viewPal.setColor(QPalette::HighlightedText, theme.selectionText);
         view->setPalette(viewPal);
         view->setAutoFillBackground(true);
     }
@@ -858,23 +1129,23 @@ void MainWindow::refreshDisassemblyTable()
     stack_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
 
     int row = 0;
+    const WidgetTheme &theme = currentWidgetTheme();
     for (const auto &entry : disasm_entries)
     {
         auto *addrItem = new QTableWidgetItem(entry.address);
         auto *textItem = new QTableWidgetItem(entry.text);
         addrItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
         textItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        addrItem->setForeground(QColor(QStringLiteral("#d4d4d4")));
-        textItem->setForeground(QColor(QStringLiteral("#d4d4d4")));
+        addrItem->setForeground(theme.text);
+        textItem->setForeground(theme.text);
         stack_table->setItem(row, 0, addrItem);
         stack_table->setItem(row, 1, textItem);
         if (entry.is_current)
         {
-            const QColor highlight(QStringLiteral("#1f6b3a"));
-            addrItem->setBackground(highlight);
-            textItem->setBackground(highlight);
-            addrItem->setForeground(Qt::white);
-            textItem->setForeground(Qt::white);
+            addrItem->setBackground(theme.selection);
+            textItem->setBackground(theme.selection);
+            addrItem->setForeground(theme.selectionText);
+            textItem->setForeground(theme.selectionText);
         }
         ++row;
     }
@@ -1025,7 +1296,7 @@ void MainWindow::updateUIActionState(bool emulation_running)
     ui->actionSuspend_to_file->setEnabled(emulation_running);
     ui->actionSave->setEnabled(emulation_running);
 
-    ui->buttonSpeed->setEnabled(emulation_running);
+    ui->buttonSpeed->setEnabled(true);
 }
 
 void MainWindow::raiseDebugger()
@@ -1198,7 +1469,8 @@ void MainWindow::retranslateDocks()
 
 void MainWindow::showSpeed(double value)
 {
-    ui->buttonSpeed->setText(tr("Speed: %1 %").arg(value * 100, 1, 'f', 0));
+    if (status_bar_speed_label)
+        status_bar_speed_label->setText(tr("Speed: %1 %").arg(value * 100, 1, 'f', 0));
 }
 
 void MainWindow::screenshot()

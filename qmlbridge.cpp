@@ -184,6 +184,20 @@ void QMLBridge::setAutostart(bool e)
     emit autostartChanged();
 }
 
+bool QMLBridge::getDarkTheme()
+{
+    return settings.value(QStringLiteral("darkTheme"), true).toBool();
+}
+
+void QMLBridge::setDarkTheme(bool enabled)
+{
+    if (getDarkTheme() == enabled)
+        return;
+
+    settings.setValue(QStringLiteral("darkTheme"), enabled);
+    emit darkThemeChanged();
+}
+
 unsigned int QMLBridge::getDefaultKit()
 {
     return settings.value(QStringLiteral("defaultKit"), 0).toUInt();

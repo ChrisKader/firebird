@@ -6,6 +6,7 @@
 #include <QImage>
 #include <QPainter>
 #include <QGuiApplication>
+#include <QPalette>
 #include <QScreen>
 
 #include "core/debug.h"
@@ -63,7 +64,25 @@ void paintFramebuffer(QPainter *p)
     {
         QImage image = renderFramebuffer().scaled(p->window().size(), Qt::KeepAspectRatio, Qt::SmoothTransformation);
         image.setDevicePixelRatio(devicePixelRatio);
-        p->drawImage((p->window().width() - image.width()) / 2, (p->window().height() - image.height()) / 2, image);
+        const int x = (p->window().width() - image.width()) / 2;
+        const int y = (p->window().height() - image.height()) / 2;
+        QRect imageRect(x, y, image.width(), image.height());
+        p->drawImage(imageRect.topLeft(), image);
+
+        // Draw a visible border around the rendered framebuffer area.
+        QPalette pal = QGuiApplication::palette();
+        QColor border = pal.color(QPalette::Light);
+        if (border.lightness() < 140)
+            border = pal.color(QPalette::Highlight);
+        if (border.lightness() < 140)
+            border = QColor(Qt::white);
+        border.setAlpha(220);
+        QPen pen(border);
+        pen.setWidth(1);
+        p->setPen(pen);
+        p->setBrush(Qt::NoBrush);
+        // Draw inside the image bounds to avoid clipping on the edges.
+        p->drawRect(imageRect.adjusted(0, 0, -1, -1));
     }
 
     if(in_debugger)

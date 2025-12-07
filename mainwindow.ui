@@ -731,6 +731,7 @@
     <addaction name="actionXModem"/>
     <addaction name="actionLeavePTT"/>
     <addaction name="actionSwitch_to_Mobile_UI"/>
+    <addaction name="actionDarkMode"/>
     <addaction name="separator"/>
     <addaction name="menuLanguage"/>
    </widget>
@@ -944,6 +945,17 @@
   <action name="actionLeavePTT">
    <property name="text">
     <string>Leave &amp;PTT</string>
+   </property>
+  </action>
+  <action name="actionDarkMode">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Dark mode</string>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
    </property>
   </action>
  </widget>

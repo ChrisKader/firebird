@@ -117,6 +117,23 @@ ColumnLayout {
         }
     }
 
+    FBLabel {
+        text: qsTr("Appearance")
+        font.pixelSize: emuPage.title2Size
+        Layout.topMargin: 10
+        Layout.bottomMargin: 5
+    }
+
+    CheckBox {
+        text: qsTr("Dark mode")
+
+        checked: Emu.darkTheme
+        onCheckedChanged: {
+            Emu.darkTheme = checked;
+            checked = Qt.binding(function() { return Emu.darkTheme; });
+        }
+    }
+
     Item {
         Layout.fillHeight: true
     }

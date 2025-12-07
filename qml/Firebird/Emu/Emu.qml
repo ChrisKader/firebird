@@ -8,6 +8,7 @@ QtObject {
     property int rdbPort: 3334
     property bool running: false
     property bool leftHanded: false
+    property bool darkTheme: true
     property string version: "1.6"
 
     function useDefaultKit() {}

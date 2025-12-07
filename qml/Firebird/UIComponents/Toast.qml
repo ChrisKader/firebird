@@ -1,18 +1,14 @@
 import QtQuick 6.0
 
-import Firebird.UIComponents 1.0
+import Firebird.UIComponents 1.0 as FBUI
 
 Rectangle {
     property int maxWidth: parent ? Math.round(parent.width * 0.9) : 320
     height: (message && message.implicitHeight ? Math.round(message.implicitHeight + 8) : 24)
     width: (message && message.implicitWidth ? Math.min(maxWidth, Math.round(message.implicitWidth + 10)) : Math.min(maxWidth, 200))
 
-    SystemPalette {
-        id: paletteActive
-    }
-
-    color: paletteActive.window
-    border.color: paletteActive.mid
+    color: FBUI.Theme.surfaceAlt
+    border.color: FBUI.Theme.border
     border.width: 1
 
     opacity: 0
@@ -26,10 +22,10 @@ Rectangle {
         timer.restart();
     }
 
-    FBLabel {
+    FBUI.FBLabel {
         id: message
         text: "Text"
-        color: paletteActive.windowText
+        color: FBUI.Theme.text
         width: parent ? parent.maxWidth : 320
 
         anchors.centerIn: parent

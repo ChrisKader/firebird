@@ -21,6 +21,7 @@ public:
     Q_PROPERTY(bool debugOnWarn READ getDebugOnWarn WRITE setDebugOnWarn NOTIFY debugOnWarnChanged)
     Q_PROPERTY(bool printOnWarn READ getPrintOnWarn WRITE setPrintOnWarn NOTIFY printOnWarnChanged)
     Q_PROPERTY(bool autostart READ getAutostart WRITE setAutostart NOTIFY autostartChanged)
+    Q_PROPERTY(bool darkTheme READ getDarkTheme WRITE setDarkTheme NOTIFY darkThemeChanged)
     Q_PROPERTY(unsigned int defaultKit READ getDefaultKit WRITE setDefaultKit NOTIFY defaultKitChanged)
     Q_PROPERTY(bool leftHanded READ getLeftHanded WRITE setLeftHanded NOTIFY leftHandedChanged)
     Q_PROPERTY(bool suspendOnClose READ getSuspendOnClose WRITE setSuspendOnClose NOTIFY suspendOnCloseChanged)
@@ -53,6 +54,8 @@ public:
     bool getPrintOnWarn();
     void setAutostart(bool e);
     bool getAutostart();
+    void setDarkTheme(bool enabled);
+    bool getDarkTheme();
     unsigned int getDefaultKit();
     void setDefaultKit(unsigned int id);
     bool getLeftHanded();
@@ -145,6 +148,7 @@ signals:
     void debugOnStartChanged();
     void printOnWarnChanged();
     void autostartChanged();
+    void darkThemeChanged();
     void defaultKitChanged();
     void leftHandedChanged();
     void suspendOnCloseChanged();

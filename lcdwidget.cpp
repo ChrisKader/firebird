@@ -61,4 +61,11 @@ void LCDWidget::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
     paintFramebuffer(&painter);
+    painter.save();
+    QPen pen(palette().color(QPalette::Mid));
+    pen.setWidth(1);
+    painter.setPen(pen);
+    painter.setBrush(Qt::NoBrush);
+    painter.drawRect(rect().adjusted(0, 0, -1, -1));
+    painter.restore();
 }
