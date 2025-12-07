@@ -113,7 +113,7 @@ void MainWindow::mousePressEvent(QMouseEvent *event)
 {
 #ifdef Q_OS_MAC
     // Allow dragging the window when clicking in the header area
-    // (adjust the height as needed – currently top 40 px)
+    // (adjust the height as needed - currently top 40 px)
     if (event->button() == Qt::LeftButton && event->position().y() < 40)
     {
         m_dragStartPos = event->globalPosition().toPoint() - frameGeometry().topLeft();

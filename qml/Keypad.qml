@@ -48,7 +48,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: accent
+                color: rectangle1.accent
                 text: "save"
                 horizontalAlignment: Text.AlignHCenter
                 font.pixelSize: 9
@@ -112,7 +112,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: accent
+                color: rectangle1.accent
                 text: "+page"
                 horizontalAlignment: Text.AlignHCenter
                 font.pixelSize: 9
@@ -181,7 +181,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: accent
+                color: rectangle1.accent
                 text: "CAPS"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -208,7 +208,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: accent
+                color: rectangle1.accent
                 text: "sto→"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -291,7 +291,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: accent
+                color: rectangle1.accent
                 text: "capture"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -313,7 +313,7 @@ Rectangle {
                 y: -11
                 width: 33
                 height: 11
-                color: accent
+                color: rectangle1.accent
                 text: "ans"
                 anchors.bottom: parent.top
                 horizontalAlignment: Text.AlignHCenter
@@ -334,8 +334,8 @@ Rectangle {
         keymap_id: 86
         anchors.left: parent.left
         anchors.leftMargin: 5
-        active_color: accent
-        back_color: accentMuted
+        active_color: rectangle1.accent
+        back_color: rectangle1.accentMuted
         border_color: FBUI.Theme.border
         font_color: FBUI.Theme.textOnAccent
     }
@@ -357,7 +357,7 @@ Rectangle {
             y: -11
             width: 33
             height: 11
-            color: accent
+            color: rectangle1.accent
             text: "clear"
             horizontalAlignment: Text.AlignHCenter
             font.pixelSize: 9
@@ -605,7 +605,7 @@ Rectangle {
             y: -12
             width: 50
             height: 11
-            color: accent
+            color: rectangle1.accent
             text: "≈"
             font.bold: true
             anchors.bottom: nButton8.top
