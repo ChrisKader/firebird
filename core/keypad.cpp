@@ -9,6 +9,7 @@
 #include "schedule.h"
 #include "interrupt.h"
 #include "mem.h"
+#include "cx2.h"
 
 /* 900E0000: Keypad controller */
 keypad_state keypad;
@@ -30,9 +31,16 @@ void keypad_int_check() {
 }
 
 void keypad_on_pressed() {
-    // TODO: The CX II may have an enable bit somewhere
-    if(!emulate_cx2 && pmu.on_irq_enabled)
-        int_set(INT_POWER, true);
+    if(emulate_cx2) {
+        // CX II: Register 0x901400C4 bit 0 enables the ON key interrupt.
+        // The OS sets this before entering sleep so INT_POWER can wake the device.
+        if(aladdin_pmu.int_enable & 1)
+            int_set(INT_POWER, true);
+    } else {
+        // Classic/CX: Check PMU on_irq_enabled register (0x900B0010)
+        if(pmu.on_irq_enabled)
+            int_set(INT_POWER, true);
+    }
 
     if(cpu_events & EVENT_SLEEP) {
         assert(emulate_cx2);

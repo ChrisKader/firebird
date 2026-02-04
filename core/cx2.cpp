@@ -48,6 +48,7 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		case 0x30: return aladdin_pmu.clocks;
 		case 0x50: return aladdin_pmu.disable[1];
 		case 0x60: return aladdin_pmu.disable[2];
+		case 0xC4: return aladdin_pmu.int_enable;
 		}
 	}
 	else if(offset == 0x808) // efuse
@@ -98,7 +99,7 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 			return;
 		case 0x50: aladdin_pmu.disable[1] = value; return;
 		case 0x60: aladdin_pmu.disable[2] = value; return;
-		case 0xC4: return;
+		case 0xC4: aladdin_pmu.int_enable = value; return;
 		}
 	}
 	else if(offset == 0x80C || offset == 0x810)

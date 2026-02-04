@@ -13,8 +13,11 @@ typedef struct aladdin_pmu_state {
 	uint32_t clocks;
 	uint32_t disable[3];
 	uint32_t int_state; // Actual bit assignments not known
+	uint32_t int_enable; // 0xC4: Interrupt enable (bit 0 = ON key?)
 	uint32_t noidea[0x100 / sizeof(uint32_t)];
 } aladdin_pmu_state;
+
+extern struct aladdin_pmu_state aladdin_pmu;
 
 void aladdin_pmu_write(uint32_t addr, uint32_t value);
 uint32_t aladdin_pmu_read(uint32_t addr);
