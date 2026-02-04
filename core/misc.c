@@ -559,6 +559,21 @@ static uint32_t timer_cx_fast_scheduled_ticks = 1;
 static uint32_t timer_cx_slow_scheduled_cpu_ticks = 1;
 static uint8_t timer_cx_clock_select[3];
 
+/*
+ * SP804 Prescaler calculation.
+ * Per ARM SP804 TRM, TimerXControl bits [3:2] select prescale:
+ *   00 = divide by 1   (stages 0)
+ *   01 = divide by 16  (stages 4)
+ *   10 = divide by 256 (stages 8)
+ *   11 = undefined, treated as divide by 256 for compatibility
+ */
+static inline uint32_t timer_cx_prescale_shift(uint8_t control) {
+    uint32_t bits = (control >> 2) & 3;
+    if (bits == 3)
+        bits = 2;  /* Undefined value, treat as 256 per SP804 convention */
+    return bits * 4;  /* 0, 4, or 8 -> period 1, 16, or 256 */
+}
+
 static uint32_t timer_cx_clock_rate(int which) {
     if (which < 0 || which >= 3)
         return 0;
@@ -600,13 +615,91 @@ void timer_cx_int_check(int which) {
     int_set(INT_TIMER0+which, (timer_cx.timer[which][0].interrupt & timer_cx.timer[which][0].control >> 5)
             | (timer_cx.timer[which][1].interrupt & timer_cx.timer[which][1].control >> 5));
 }
+
+/*
+ * Calculate the current timer value for accurate reads.
+ * Per ARM SP804 TRM, reading TimerXValue returns the current countdown value,
+ * which changes every prescaled clock tick. This function computes the value
+ * based on elapsed time since the last scheduler update.
+ */
+static uint32_t timer_cx_current_value(int which, int timer_idx) {
+    struct cx_timer *t = &timer_cx.timer[which][timer_idx];
+
+    /* If timer is disabled, return stored value */
+    if (!(t->control & 0x80))
+        return t->value;
+
+    /* Get scheduler event for this timer group */
+    int sched_idx = (which == 0) ? SCHED_TIMER_FAST : SCHED_TIMERS;
+    struct sched_item *item = &sched.items[sched_idx];
+
+    /* If no event scheduled, return stored value */
+    if (item->second < 0)
+        return t->value;
+
+    /* Get remaining CPU ticks until the scheduled event */
+    uint32_t remaining_cpu = event_ticks_remaining(sched_idx);
+
+    /* Convert CPU ticks to timer ticks */
+    uint32_t timer_rate = timer_cx_clock_rate(which);
+    uint32_t cpu_rate = sched.clock_rates[CLOCK_CPU];
+    if (timer_rate == 0 || cpu_rate == 0)
+        return t->value;
+
+    uint64_t remaining_timer = (uint64_t)remaining_cpu * timer_rate / cpu_rate;
+
+    /* Get the scheduled timer ticks for this group */
+    uint32_t scheduled_ticks;
+    if (which == 0) {
+        scheduled_ticks = timer_cx_fast_scheduled_ticks;
+    } else {
+        /* For slow timers, we scheduled in CPU ticks, convert back */
+        scheduled_ticks = (uint64_t)timer_cx_slow_scheduled_cpu_ticks * timer_rate / cpu_rate;
+    }
+
+    /* Calculate elapsed timer ticks since scheduling */
+    uint32_t elapsed;
+    if (remaining_timer >= scheduled_ticks)
+        elapsed = 0;  /* Shouldn't happen, but be safe */
+    else
+        elapsed = scheduled_ticks - (uint32_t)remaining_timer;
+
+    if (elapsed == 0)
+        return t->value;
+
+    /* Apply elapsed ticks through prescaler to get steps (value decrements) */
+    const uint32_t shift = timer_cx_prescale_shift(t->control);
+    uint32_t total_prescale = t->prescale + elapsed;
+    uint32_t steps = total_prescale >> shift;
+
+    if (steps == 0)
+        return t->value;
+
+    /* Calculate current value (countdown), respecting 16/32-bit mode */
+    uint32_t value = (t->control & 2) ? t->value : (t->value & 0xFFFF);
+
+    if (value >= steps) {
+        value -= steps;
+    } else {
+        /* Would have crossed zero - but event hasn't fired yet, so just return 0 */
+        value = 0;
+    }
+
+    return (t->control & 2) ? value : ((t->value & 0xFFFF0000) | value);
+}
+
 uint32_t timer_cx_read(uint32_t addr) {
     cycle_count_delta += 1000; // avoid slowdown with polling loops
     int which = (addr >> 16) % 5;
-    struct cx_timer *t = &timer_cx.timer[which][addr >> 5 & 1];
+    int timer_idx = (addr >> 5) & 1;
+    struct cx_timer *t = &timer_cx.timer[which][timer_idx];
     switch (addr & 0xFFFF) {
         case 0x0000: case 0x0020: return t->load;
-        case 0x0004: case 0x0024: return t->value;
+        /*
+         * TimerXValue (0x04/0x24): Per SP804 TRM, returns current countdown.
+         * We compute this on-the-fly for accuracy instead of returning stale value.
+         */
+        case 0x0004: case 0x0024: return timer_cx_current_value(which, timer_idx);
         case 0x0008: case 0x0028: return t->control;
         case 0x0010: case 0x0030: return t->interrupt;
         case 0x0014: case 0x0034: return t->interrupt & t->control >> 5;
@@ -625,27 +718,68 @@ uint32_t timer_cx_read(uint32_t addr) {
     }
     return bad_read_word(addr);
 }
+/*
+ * Calculate timer ticks until the next interrupt (value reaches 0).
+ * Used by the scheduler to determine when to fire the timer event.
+ */
 static inline uint32_t timer_cx_ticks_to_next(const struct cx_timer *t) {
     if (!(t->control & 0x80))
-        return UINT32_MAX;
+        return UINT32_MAX;  /* Timer disabled */
 
-    const uint32_t shift = (t->control & 0xC);
+    const uint32_t shift = timer_cx_prescale_shift(t->control);
     const uint32_t period = 1u << shift;
     const uint32_t mask = period - 1;
     uint32_t remainder = t->prescale & mask;
-    uint32_t ticks = period - remainder;
-    if (ticks == 0)
-        ticks = period;
-    return ticks;
+    uint32_t ticks_to_step = period - remainder;
+    if (ticks_to_step == 0)
+        ticks_to_step = period;
+
+    /* If reload pending, schedule for one step to process it */
+    if (t->reload)
+        return ticks_to_step;
+
+    /* Get current timer value (respecting 16/32-bit mode per SP804 TimerSize bit) */
+    uint32_t value = (t->control & 2) ? t->value : (t->value & 0xFFFF);
+
+    if (value == 0) {
+        /* One-shot at 0: timer stopped per SP804 OneShot behavior */
+        if (t->control & 1)
+            return UINT32_MAX;
+        /* Free-running/periodic at 0: will wrap/reload on next step */
+        return ticks_to_step;
+    }
+
+    /*
+     * Calculate ticks until value reaches 0 and fires interrupt.
+     * First step costs ticks_to_step (prescaler remainder), subsequent steps cost period each.
+     * Total = ticks_to_step + (value - 1) * period
+     */
+    uint64_t total = (uint64_t)ticks_to_step + (uint64_t)(value - 1) * period;
+
+    if (total > UINT32_MAX)
+        return UINT32_MAX;
+
+    return (uint32_t)total;
 }
 
+/*
+ * Advance timer state by the given number of timer ticks.
+ * This implements the SP804 countdown behavior including prescaler,
+ * interrupt generation, and reload/wrap modes.
+ */
 static void timer_cx_advance_ticks(int which, uint32_t ticks) {
-    if (which < 0 || which >= 3)
+    if (which < 0 || which >= 3 || ticks == 0)
         return;
 
     for (int i = 0; i < 2; i++) {
         struct cx_timer *t = &timer_cx.timer[which][i];
-        const uint32_t shift = (t->control & 0xC);
+
+        /*
+         * SP804 prescaler: divides input clock by 1, 16, or 256.
+         * The prescaler accumulates ticks and generates a "step" (counter decrement)
+         * each time it overflows.
+         */
+        const uint32_t shift = timer_cx_prescale_shift(t->control);
         const uint32_t period = 1u << shift;
         const uint32_t mask = period - 1;
 
@@ -653,8 +787,9 @@ static void timer_cx_advance_ticks(int which, uint32_t ticks) {
         uint32_t steps;
 
         if (shift == 0) {
+            /* No prescaling: each tick is a step */
             steps = ticks;
-            t->prescale = 0; // period is 1, so remainder is always 0
+            t->prescale = 0;
         } else {
             uint32_t new_prescale = old_prescale + ticks;
             steps = (new_prescale >> shift) - (old_prescale >> shift);
@@ -664,29 +799,78 @@ static void timer_cx_advance_ticks(int which, uint32_t ticks) {
         if (!(t->control & 0x80) || steps == 0)
             continue;
 
-        while (steps--) {
-            uint32_t oldvalue = (t->control & 2) ? t->value : t->value & 0xFFFF;
-            uint32_t value = oldvalue;
-            if (t->reload) {
-                t->reload = 0;
-                value = t->load;
-            } else {
-                if (value == 0) {
-                    if (!(t->control & 1)) {
-                        value--;
-                        if (t->control & 0x40)
-                            value = t->load;
-                    }
-                } else {
-                    value--;
-                }
-            }
-            t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | (value & 0xFFFF);
-            if (oldvalue != 0 && value == 0) {
-                t->interrupt = 1;
-                timer_cx_int_check(which);
+        /* SP804 control bits */
+        const uint32_t max_val = (t->control & 2) ? UINT32_MAX : 0xFFFF;  /* TimerSize */
+        const bool one_shot = t->control & 1;   /* OneShot */
+        const bool periodic = t->control & 0x40; /* TimerMode: 1=periodic, 0=free-running */
+
+        uint32_t value = (t->control & 2) ? t->value : (t->value & 0xFFFF);
+
+        /* Handle pending reload (from write to Load register) */
+        if (t->reload) {
+            t->reload = 0;
+            value = t->load & max_val;
+            steps--;
+            if (steps == 0) {
+                t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | value;
+                continue;
             }
         }
+
+        /* SP804 OneShot: timer stops when it reaches 0 */
+        if (one_shot && value == 0)
+            continue;
+
+        /*
+         * Handle value == 0 in non-one-shot mode: first step wraps/reloads.
+         * Per SP804 TRM, interrupt fires on transition TO 0, not FROM 0.
+         */
+        if (value == 0) {
+            value = periodic ? (t->load & max_val) : max_val;
+            steps--;
+            if (steps == 0) {
+                t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | value;
+                continue;
+            }
+        }
+
+        /* Check if we reach or cross 0 (fires interrupt per SP804 RawInt behavior) */
+        if (value > steps) {
+            /* Simple countdown, doesn't reach 0 */
+            value -= steps;
+        } else if (value == steps) {
+            /* Countdown to exactly 0, fire interrupt (no wrap yet) */
+            value = 0;
+            t->interrupt = 1;
+            timer_cx_int_check(which);
+        } else {
+            /* Will cross 0 at least once - fire interrupt */
+            t->interrupt = 1;
+
+            if (one_shot) {
+                /* SP804 OneShot: stop at 0 */
+                value = 0;
+            } else {
+                /*
+                 * SP804 periodic/free-running: calculate position after wrap.
+                 * remaining = steps after hitting 0 and reloading
+                 */
+                uint32_t remaining = steps - value - 1;
+                uint32_t reload_val = periodic ? (t->load & max_val) : max_val;
+                uint32_t cycle = reload_val + 1;
+
+                if (cycle == 0) {
+                    /* 32-bit max value: cycle is 2^32, remaining always fits */
+                    value = reload_val - remaining;
+                } else {
+                    remaining %= cycle;
+                    value = reload_val - remaining;
+                }
+            }
+            timer_cx_int_check(which);
+        }
+
+        t->value = (t->control & 2) ? value : (t->value & 0xFFFF0000) | (value & 0xFFFF);
     }
 }
 
@@ -730,8 +914,25 @@ void timer_cx_write(uint32_t addr, uint32_t value) {
     int which = (addr >> 16) % 5;
     struct cx_timer *t = &timer_cx.timer[which][addr >> 5 & 1];
     switch (addr & 0xFFFF) {
-        case 0x0000: case 0x0020: t->reload = 1; /* fallthrough */
-        case 0x0018: case 0x0038: t->load = value; goto schedule;
+        case 0x0000: case 0x0020:
+            /*
+             * TimerXLoad: Per SP804 TRM, writing to the Load register causes
+             * the counter to immediately restart from the new value.
+             * This differs from BGLoad which only updates for next reload.
+             */
+            t->load = value;
+            t->value = value;
+            t->prescale = 0;  /* Reset prescaler on immediate load */
+            t->reload = 0;    /* Clear any pending deferred reload */
+            goto schedule;
+        case 0x0018: case 0x0038:
+            /*
+             * TimerXBGLoad: Per SP804 TRM, writing to Background Load updates
+             * the load value but does NOT immediately affect the counter.
+             * The new value is used on the next periodic reload.
+             */
+            t->load = value;
+            goto schedule;
         case 0x0004: case 0x0024: goto schedule;
         case 0x0008: case 0x0028:
             t->control = value;
