@@ -96,6 +96,15 @@ void error(const char *fmt, ...) {
     gui_debug_vprintf(fmt, va);
     gui_debug_printf("\n");
     va_end(va);
+    /*
+     * If we're in the debugger with an error handler set (e.g., from pr/pw commands),
+     * longjmp back to the handler instead of the main loop. This allows the debugger
+     * to gracefully handle errors from MMIO operations without breaking out of the
+     * debug session.
+     */
+    if (debugger_error_handler_active) {
+        longjmp(debugger_error_jmp, 1);
+    }
     debugger(DBG_EXCEPTION, 0);
     cpu_events |= EVENT_RESET;
     return_to_loop();

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <setjmp.h>
 
 #ifdef __cplusplus
 
@@ -18,6 +19,13 @@ extern "C" {
 extern bool gdb_connected;
 extern bool in_debugger;
 extern int rdbg_port;
+
+/*
+ * Error handler for catching errors during debugger MMIO operations.
+ * When set, error() will longjmp here instead of back to the main loop.
+ */
+extern jmp_buf debugger_error_jmp;
+extern bool debugger_error_handler_active;
 
 enum DBG_REASON {
     DBG_USER,

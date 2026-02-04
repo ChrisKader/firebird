@@ -33,6 +33,10 @@
 
 std::string ln_target_folder;
 
+// Error handler for catching errors during debugger MMIO operations
+jmp_buf debugger_error_jmp;
+bool debugger_error_handler_active = false;
+
 // Used for debugger input
 static std::mutex debug_input_m;
 static std::condition_variable debug_input_cv;
@@ -533,15 +537,35 @@ int process_debug_cmd(char *cmdline) {
     } else if (!strcasecmp(cmd, "int-")) {
         int_set(atoi(strtok(NULL, " \n\r")), 0);
     } else if (!strcasecmp(cmd, "pr")) {
-        // TODO: need to avoid entering debugger recursively
-        // also, where should error() go?
         uint32_t addr = parse_expr(strtok(NULL, " \n\r"));
-        gui_debug_printf("%08x\n", mmio_read_word(addr));
+        /*
+         * Set up error handler to catch errors from MMIO read.
+         * This prevents error() from longjmp'ing out of the debugger.
+         */
+        if (setjmp(debugger_error_jmp) == 0) {
+            debugger_error_handler_active = true;
+            uint32_t value = mmio_read_word(addr);
+            debugger_error_handler_active = false;
+            gui_debug_printf("%08x\n", value);
+        } else {
+            debugger_error_handler_active = false;
+            /* Error was already printed by error() */
+        }
     } else if (!strcasecmp(cmd, "pw")) {
-        // TODO: ditto
         uint32_t addr = parse_expr(strtok(NULL, " \n\r"));
         uint32_t value = parse_expr(strtok(NULL, " \n\r"));
-        mmio_write_word(addr, value);
+        /*
+         * Set up error handler to catch errors from MMIO write.
+         * This prevents error() from longjmp'ing out of the debugger.
+         */
+        if (setjmp(debugger_error_jmp) == 0) {
+            debugger_error_handler_active = true;
+            mmio_write_word(addr, value);
+            debugger_error_handler_active = false;
+        } else {
+            debugger_error_handler_active = false;
+            /* Error was already printed by error() */
+        }
     } else if(!strcasecmp(cmd, "stop")) {
 	exiting = true;
         return 0;
