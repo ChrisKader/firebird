@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(firebird-emu VERSION 1.0 LANGUAGES C CXX)
+project(firebird-emu VERSION 1.0 LANGUAGES C CXX ASM)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOUIC ON)
@@ -257,30 +257,105 @@ if(IOS)
     )
 endif()
 
-if(TRANSLATION_ENABLED___equals___ON)
-    target_sources(firebird-emu PUBLIC
-        "core/translate_"
-    )
+# JIT / translation configuration (mirrors qmake defaults).
+set(TRANSLATION_ENABLED "AUTO" CACHE STRING "Enable JIT translation (AUTO/ON/OFF)")
+set_property(CACHE TRANSLATION_ENABLED PROPERTY STRINGS AUTO ON OFF)
+
+set(SUPPORT_LINUX "AUTO" CACHE STRING "Enable Linux-like fast paths (AUTO/ON/OFF)")
+set_property(CACHE SUPPORT_LINUX PROPERTY STRINGS AUTO ON OFF)
+
+if(CMAKE_OSX_ARCHITECTURES)
+    list(GET CMAKE_OSX_ARCHITECTURES 0 FB_ARCH_RAW)
+else()
+    set(FB_ARCH_RAW "${CMAKE_SYSTEM_PROCESSOR}")
+endif()
+string(TOLOWER "${FB_ARCH_RAW}" FB_ARCH_RAW_LOWER)
+set(FB_ARCH "${FB_ARCH_RAW_LOWER}")
+if(FB_ARCH_RAW_LOWER MATCHES "^(arm64|aarch64)$")
+    set(FB_ARCH "aarch64")
+elseif(FB_ARCH_RAW_LOWER MATCHES "^arm")
+    set(FB_ARCH "arm")
+elseif(FB_ARCH_RAW_LOWER MATCHES "^(x86_64|amd64)$")
+    set(FB_ARCH "x86_64")
+elseif(FB_ARCH_RAW_LOWER MATCHES "^(i[3-6]86|x86)$")
+    set(FB_ARCH "x86")
 endif()
 
-if(NOT TRANSLATION_ENABLED___equals___ON)
-    target_compile_definitions(firebird-emu PRIVATE
-        NO_TRANSLATION
-    )
+set(TRANSLATE_SOURCES "")
+set(ASM_SOURCES "")
+set(DISABLE_ASMCODE_C FALSE)
+set(TRANSLATION_AVAILABLE FALSE)
+
+if(FB_ARCH STREQUAL "x86")
+    set(TRANSLATION_AVAILABLE TRUE)
+    set(TRANSLATE_SOURCES core/translate_x86.c)
+    set(ASM_SOURCES core/asmcode_x86.S)
+    set(DISABLE_ASMCODE_C TRUE)
+elseif(FB_ARCH STREQUAL "x86_64")
+    set(TRANSLATION_AVAILABLE TRUE)
+    set(TRANSLATE_SOURCES core/translate_x86_64.c)
+    set(ASM_SOURCES core/asmcode_x86_64.S)
+elseif(FB_ARCH STREQUAL "arm")
+    set(TRANSLATION_AVAILABLE TRUE)
+    set(TRANSLATE_SOURCES core/translate_arm.cpp)
+    set(ASM_SOURCES core/asmcode_arm.S)
+elseif(FB_ARCH STREQUAL "aarch64")
+    set(TRANSLATION_AVAILABLE TRUE)
+    set(TRANSLATE_SOURCES core/translate_aarch64.cpp)
+    set(ASM_SOURCES core/asmcode_aarch64.S)
 endif()
 
-if(SUPPORT_LINUX___equals___ON)
-    target_compile_definitions(firebird-emu PRIVATE
-        SUPPORT_LINUX
-    )
+string(TOUPPER "${TRANSLATION_ENABLED}" TRANSLATION_ENABLED_UPPER)
+if(TRANSLATION_ENABLED_UPPER STREQUAL "AUTO")
+    set(TRANSLATION_ENABLED_ON ${TRANSLATION_AVAILABLE})
+elseif(TRANSLATION_ENABLED_UPPER STREQUAL "ON" OR TRANSLATION_ENABLED_UPPER STREQUAL "TRUE")
+    if(NOT TRANSLATION_AVAILABLE)
+        message(FATAL_ERROR "No JIT found for arch ${FB_ARCH}")
+    endif()
+    set(TRANSLATION_ENABLED_ON TRUE)
+elseif(TRANSLATION_ENABLED_UPPER STREQUAL "OFF" OR TRANSLATION_ENABLED_UPPER STREQUAL "FALSE")
+    set(TRANSLATION_ENABLED_ON FALSE)
+else()
+    message(FATAL_ERROR "TRANSLATION_ENABLED must be AUTO, ON, or OFF")
 endif()
 
-if(FB_ARCH___contains___arm AND NOT ANDROID)
-    target_compile_options(firebird-emu
-        -march=armv7-a
-        -marm
-    )
+if(TRANSLATION_ENABLED_ON)
+    target_sources(firebird-emu PRIVATE ${ASM_SOURCES} ${TRANSLATE_SOURCES})
+else()
+    target_compile_definitions(firebird-emu PRIVATE NO_TRANSLATION)
 endif()
+
+if(DISABLE_ASMCODE_C AND TRANSLATION_ENABLED_ON)
+    set_source_files_properties(core/asmcode.c PROPERTIES HEADER_FILE_ONLY TRUE)
+else()
+    set_source_files_properties(core/asmcode.c PROPERTIES HEADER_FILE_ONLY FALSE)
+endif()
+
+string(TOUPPER "${SUPPORT_LINUX}" SUPPORT_LINUX_UPPER)
+if(SUPPORT_LINUX_UPPER STREQUAL "AUTO")
+    set(SUPPORT_LINUX_ON TRUE)
+    if(ANDROID OR IOS)
+        set(SUPPORT_LINUX_ON FALSE)
+    endif()
+elseif(SUPPORT_LINUX_UPPER STREQUAL "ON" OR SUPPORT_LINUX_UPPER STREQUAL "TRUE")
+    set(SUPPORT_LINUX_ON TRUE)
+elseif(SUPPORT_LINUX_UPPER STREQUAL "OFF" OR SUPPORT_LINUX_UPPER STREQUAL "FALSE")
+    set(SUPPORT_LINUX_ON FALSE)
+else()
+    message(FATAL_ERROR "SUPPORT_LINUX must be AUTO, ON, or OFF")
+endif()
+
+if(SUPPORT_LINUX_ON)
+    target_compile_definitions(firebird-emu PRIVATE SUPPORT_LINUX)
+endif()
+
+if(FB_ARCH STREQUAL "arm" AND NOT ANDROID)
+    target_compile_options(firebird-emu PRIVATE -march=armv7-a -marm)
+endif()
+
+message(STATUS "FB_ARCH: ${FB_ARCH}")
+message(STATUS "TRANSLATION_ENABLED: ${TRANSLATION_ENABLED_ON}")
+message(STATUS "SUPPORT_LINUX: ${SUPPORT_LINUX_ON}")
 
 if(lupdate_only)
     target_sources(firebird-emu PUBLIC

@@ -14,6 +14,7 @@
 #include <QShortcut>
 #include <QTimer>
 #include <QKeySequence>
+#include <QProcess>
 #include <QQmlComponent>
 #include <QToolBar>
 #include <QWidgetAction>
@@ -311,6 +312,26 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
                         setDebuggerActive(false);
                     } });
             }
+            if (auto *clear = bar->findChild<QToolButton *>(QStringLiteral("debuggerClearButton")))
+            {
+                applyMaterialGlyph(clear, 0xE14C, tr("Clear debug output"));
+                connect(clear, &QToolButton::clicked, this, [this]()
+                        {
+                    ui->debugConsole->clear();
+                });
+            }
+        }
+    }
+
+    if (ui->tabSerial)
+    {
+        if (auto *clear = ui->tabSerial->findChild<QToolButton *>(QStringLiteral("serialClearButton")))
+        {
+            applyMaterialGlyph(clear, 0xE14C, tr("Clear serial output"));
+            connect(clear, &QToolButton::clicked, this, [this]()
+                    {
+                ui->serialConsole->clear();
+            });
         }
     }
 
@@ -548,6 +569,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(&emu_thread, SIGNAL(isBusy(bool)), this, SLOT(isBusy(bool)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(statusMsg(QString)), this, SLOT(showStatusMsg(QString)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(debugInputRequested(bool)), this, SLOT(debugInputRequested(bool)), Qt::QueuedConnection);
+    connect(&emu_thread, SIGNAL(debuggerEntered(bool)), this, SLOT(debuggerEntered(bool)), Qt::QueuedConnection);
 
     // GUI -> Emu (no QueuedConnection possible, watch out!)
     connect(this, SIGNAL(debuggerCommand(QString)), &emu_thread, SLOT(debuggerInput(QString)));
@@ -557,6 +579,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->actionReset, SIGNAL(triggered()), &emu_thread, SLOT(reset()));
     connect(ui->actionRestart, SIGNAL(triggered()), this, SLOT(restart()));
     connect(ui->actionDebugger, SIGNAL(triggered()), &emu_thread, SLOT(enterDebugger()));
+    connect(ui->actionLaunch_IDA, SIGNAL(triggered()), this, SLOT(launchIdaInstantDebugging()));
     connect(ui->actionConfiguration, SIGNAL(triggered()), this, SLOT(openConfiguration()));
     connect(ui->actionPause, SIGNAL(toggled(bool)), &emu_thread, SLOT(setPaused(bool)));
     connect(ui->buttonSpeed, SIGNAL(clicked(bool)), &emu_thread, SLOT(setTurboMode(bool)));
@@ -1023,6 +1046,112 @@ void MainWindow::serialChar(const char c)
     ui->serialConsole->moveCursor(QTextCursor::End);
 
     static char previous = 0;
+    enum EscapeState { EscapeNone, EscapeStart, EscapeCSI };
+    static EscapeState escape_state = EscapeNone;
+    static QByteArray escape_buffer;
+    static bool format_initialized = false;
+    static QTextCharFormat base_format;
+    static QTextCharFormat current_format;
+
+    if (!format_initialized)
+    {
+        base_format = ui->serialConsole->currentCharFormat();
+        current_format = base_format;
+        format_initialized = true;
+    }
+
+    auto applySgr = [&](const QList<int> &params)
+    {
+        if (params.isEmpty())
+        {
+            current_format = base_format;
+            return;
+        }
+
+        for (int code : params)
+        {
+            if (code == 0)
+            {
+                current_format = base_format;
+            }
+            else if (code == 1)
+            {
+                current_format.setFontWeight(QFont::Bold);
+            }
+            else if (code == 22)
+            {
+                current_format.setFontWeight(base_format.fontWeight());
+            }
+            else if (code == 39)
+            {
+                current_format.setForeground(base_format.foreground());
+            }
+            else if (code >= 30 && code <= 37)
+            {
+                static const QColor colors[] = {
+                    Qt::black, Qt::red, Qt::green, Qt::yellow,
+                    Qt::blue, Qt::magenta, Qt::cyan, Qt::lightGray};
+                current_format.setForeground(colors[code - 30]);
+            }
+            else if (code >= 90 && code <= 97)
+            {
+                static const QColor bright_colors[] = {
+                    Qt::darkGray, Qt::red, Qt::green, Qt::yellow,
+                    Qt::blue, Qt::magenta, Qt::cyan, Qt::white};
+                current_format.setForeground(bright_colors[code - 90]);
+            }
+        }
+    };
+
+    if (escape_state == EscapeStart)
+    {
+        if (c == '[')
+        {
+            escape_state = EscapeCSI;
+            escape_buffer.clear();
+        }
+        else if (c >= 0x40 && c <= 0x7E)
+        {
+            escape_state = EscapeNone; // Short escape, ignore
+        }
+        else
+        {
+            escape_state = EscapeNone;
+        }
+        previous = 0;
+        return;
+    }
+    if (escape_state == EscapeCSI)
+    {
+        if (c >= 0x40 && c <= 0x7E)
+        {
+            if (c == 'm')
+            {
+                // Parse SGR parameters separated by ';'
+                QList<int> params;
+                if (escape_buffer.isEmpty())
+                    params.append(0);
+                else
+                {
+                    for (const QByteArray &part : escape_buffer.split(';'))
+                        params.append(part.isEmpty() ? 0 : part.toInt());
+                }
+                applySgr(params);
+            }
+            escape_state = EscapeNone;
+            escape_buffer.clear();
+            previous = 0;
+            return;
+        }
+        escape_buffer.append(c);
+        return;
+    }
+    if (c == '\x1B') // ESC starts an ANSI sequence
+    {
+        escape_state = EscapeStart;
+        previous = 0;
+        return;
+    }
 
     switch (c)
     {
@@ -1044,7 +1173,11 @@ void MainWindow::serialChar(const char c)
             ui->serialConsole->textCursor().removeSelectedText();
             previous = 0;
         }
-        ui->serialConsole->insertPlainText(QChar::fromLatin1(c));
+        {
+            QTextCursor cursor = ui->serialConsole->textCursor();
+            cursor.insertText(QString(QChar::fromLatin1(c)), current_format);
+            ui->serialConsole->setTextCursor(cursor);
+        }
     }
 }
 
@@ -1056,6 +1189,20 @@ void MainWindow::debugInputRequested(bool b)
     ui->lineEdit->setEnabled(b);
 
     if (b)
+    {
+        raiseDebugger();
+        ui->lineEdit->setFocus();
+    }
+}
+
+void MainWindow::debuggerEntered(bool entered)
+{
+    if (!gdb_connected)
+        return;
+
+    setDebuggerActive(entered);
+    ui->lineEdit->setEnabled(entered);
+    if (entered)
     {
         raiseDebugger();
         ui->lineEdit->setFocus();
@@ -1516,6 +1663,60 @@ void MainWindow::recordGIF()
     }
 
     ui->actionRecord_GIF->setChecked(!path.isEmpty());
+}
+
+void MainWindow::launchIdaInstantDebugging()
+{
+    if (!the_qml_bridge || !the_qml_bridge->getGDBEnabled())
+    {
+        QMessageBox::warning(this, tr("GDB server disabled"),
+                             tr("Enable the GDB server in settings before launching IDA."));
+        return;
+    }
+
+    QString ida_path = settings ? settings->value(QStringLiteral("ida_binary_path")).toString() : QString();
+    if (ida_path.isEmpty() || !QFileInfo::exists(ida_path))
+    {
+        ida_path = QFileDialog::getOpenFileName(this, tr("Select IDA executable"));
+        if (ida_path.isEmpty())
+            return;
+        if (settings)
+            settings->setValue(QStringLiteral("ida_binary_path"), ida_path);
+    }
+
+    QString last_input = settings ? settings->value(QStringLiteral("ida_last_input")).toString() : QString();
+    QString input_path = QFileDialog::getOpenFileName(this, tr("Select IDA input file"), last_input);
+    if (input_path.isEmpty())
+    {
+        const auto choice = QMessageBox::question(this, tr("No input file"),
+                                                  tr("Launch IDA without an input file?"));
+        if (choice != QMessageBox::Yes)
+            return;
+    }
+    else if (settings)
+    {
+        settings->setValue(QStringLiteral("ida_last_input"), input_path);
+    }
+
+    const QString host = settings ? settings->value(QStringLiteral("ida_gdb_host"),
+                                                   QStringLiteral("127.0.0.1")).toString()
+                                  : QStringLiteral("127.0.0.1");
+    const int port = the_qml_bridge->getGDBPort();
+
+    const QString r_arg = QStringLiteral("-rgdb@%1:%2").arg(host).arg(port);
+    QStringList args;
+    args << r_arg;
+    if (!input_path.isEmpty())
+        args << input_path;
+
+    auto *proc = new QProcess(this);
+    proc->start(ida_path, args);
+    if (!proc->waitForStarted())
+    {
+        QMessageBox::warning(this, tr("Launch failed"),
+                             tr("Failed to launch IDA at %1").arg(ida_path));
+        proc->deleteLater();
+    }
 }
 
 void MainWindow::connectUSB()

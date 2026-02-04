@@ -181,8 +181,10 @@ void des_write_word(uint32_t addr, uint32_t value) {
         case 0x10010: case 0x10014:
         case 0x10018: case 0x1001C:
             des.key[(addr - 8) >> 2 & 7] = value;
-            des.key_schedule_valid = false;
-            return;
+						emuprintf("DES KEY WRITE: addr=0x%08X value=0x%08X\n",
+											addr, value);
+						des.key_schedule_valid = false;
+						return;
     }
     bad_write_word(addr, value);
 }
@@ -194,5 +196,11 @@ bool des_suspend(emu_snapshot *snapshot)
 
 bool des_resume(const emu_snapshot *snapshot)
 {
-    return snapshot_read(snapshot, &des, sizeof(des));
+    if(!snapshot_read(snapshot, &des, sizeof(des)))
+        return false;
+
+    /* Rebuild the schedule with the current code to handle snapshots produced
+     * by older versions. */
+    des.key_schedule_valid = false;
+    return true;
 }

@@ -12,6 +12,9 @@ void gdbstub_quit();
 void gdbstub_reset(void);
 void gdbstub_recv(void);
 void gdbstub_debugger(enum DBG_REASON reason, uint32_t addr);
+bool gdbstub_queue_local_command(const char *cmd);
+bool gdbstub_is_listening(void);
+void gdbstub_set_waiting_for_attach(bool waiting);
 
 #ifdef __cplusplus
 }

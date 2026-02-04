@@ -15,6 +15,7 @@
 #endif
 
 #include "core/debug.h"
+#include "core/gdbstub.h"
 #include "core/emu.h"
 #include "core/usblink_queue.h"
 
@@ -205,7 +206,10 @@ void EmuThread::enterDebugger()
 void EmuThread::debuggerInput(QString str)
 {
     debug_input = str.toStdString();
-    debug_callback(debug_input.c_str());
+    if (gdb_connected && gdbstub_queue_local_command(debug_input.c_str()))
+        return;
+    if (debug_callback)
+        debug_callback(debug_input.c_str());
 }
 
 void EmuThread::setPaused(bool paused)

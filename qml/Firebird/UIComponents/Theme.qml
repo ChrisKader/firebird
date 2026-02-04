@@ -3,7 +3,7 @@ import QtQuick 6.0
 import Firebird.Emu 1.0
 
 QtObject {
-    // VS Code–inspired palettes for dark/light.
+    // VS Code inspired palettes for dark/light.
     property bool darkMode: (typeof Emu !== "undefined") ? Emu.darkTheme : true
     property color background: darkMode ? "#1e1e1e" : "#f5f5f5"
     property color surface: darkMode ? "#252526" : "#ffffff"

@@ -3,6 +3,7 @@
 #ifndef _H_MEM
 #define _H_MEM
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "cpu.h"
@@ -20,6 +21,14 @@ struct mem_area_desc {
     uint8_t *ptr;
 };
 extern struct mem_area_desc mem_areas[5];
+
+struct memory_region_info {
+    uint32_t start;
+    uint32_t size;
+    char perm[4];
+};
+
+bool memory_query_region(uint32_t addr, struct memory_region_info *info);
 void *phys_mem_ptr(uint32_t addr, uint32_t size);
 uint32_t phys_mem_addr(void *ptr);
 
@@ -69,6 +78,10 @@ typedef struct emu_snapshot emu_snapshot;
 bool memory_suspend(emu_snapshot *snapshot);
 bool memory_resume(const emu_snapshot *snapshot);
 void memory_deinitialize();
+/* If out is NULL or out_size is 0, returns the required size. */
+size_t memory_build_gdb_map(char *out, size_t out_size);
+/* If out is NULL or out_size is 0, returns the required size. */
+size_t memory_build_fb_map(char *out, size_t out_size);
 
 #ifdef __cplusplus
 }

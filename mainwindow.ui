@@ -24,22 +24,22 @@
    <set>QMainWindow::AllowNestedDocks|QMainWindow::AllowTabbedDocks|QMainWindow::AnimatedDocks</set>
   </property>
   <widget class="QWidget" name="centralwidget">
-    <layout class="QVBoxLayout" name="mainLayout">
-     <property name="spacing">
-      <number>0</number>
-     </property>
-     <property name="leftMargin">
-      <number>0</number>
-     </property>
-     <property name="topMargin">
-      <number>0</number>
-     </property>
-     <property name="rightMargin">
-      <number>0</number>
-     </property>
-     <property name="bottomMargin">
-      <number>0</number>
-     </property>
+   <layout class="QVBoxLayout" name="mainLayout">
+    <property name="spacing">
+     <number>0</number>
+    </property>
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
     <item>
      <widget class="QWidget" name="headerBar">
       <property name="sizePolicy">
@@ -352,7 +352,7 @@
        </sizepolicy>
       </property>
       <property name="minimumWidth">
-       <number>30</number>
+       <number>32</number>
       </property>
       <layout class="QVBoxLayout" name="debuggerButtonLayout">
        <property name="spacing">
@@ -375,11 +375,36 @@
          <property name="toolTip">
           <string>Enter debugger</string>
          </property>
+        <property name="autoRaise">
+         <bool>true</bool>
+        </property>
+        <property name="text">
+          <string/>
+         </property>
+         <property name="minimumWidth">
+          <number>22</number>
+         </property>
+         <property name="maximumWidth">
+          <number>28</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="debuggerClearButton">
+         <property name="toolTip">
+          <string>Clear debug output</string>
+         </property>
          <property name="autoRaise">
           <bool>true</bool>
          </property>
          <property name="text">
           <string/>
+         </property>
+         <property name="minimumWidth">
+          <number>22</number>
+         </property>
+         <property name="maximumWidth">
+          <number>28</number>
          </property>
         </widget>
        </item>
@@ -580,21 +605,102 @@
       <property name="rightMargin">
        <number>0</number>
       </property>
-      <property name="bottomMargin">
-       <number>0</number>
-      </property>
+     <property name="bottomMargin">
+      <number>0</number>
+     </property>
       <item>
-       <widget class="QPlainTextEdit" name="serialConsole">
-        <property name="undoRedoEnabled">
-         <bool>false</bool>
+      <layout class="QHBoxLayout" name="serialRowLayout">
+        <property name="spacing">
+         <number>0</number>
         </property>
-        <property name="lineWrapMode">
-         <enum>QPlainTextEdit::NoWrap</enum>
+        <property name="leftMargin">
+         <number>0</number>
         </property>
-        <property name="readOnly">
-         <bool>true</bool>
+        <property name="topMargin">
+         <number>0</number>
         </property>
-       </widget>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QWidget" name="serialButtonBar">
+          <property name="sizePolicy">
+          <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="minimumWidth">
+           <number>32</number>
+          </property>
+          <layout class="QVBoxLayout" name="serialButtonLayout">
+           <property name="spacing">
+            <number>6</number>
+           </property>
+           <property name="leftMargin">
+            <number>4</number>
+           </property>
+           <property name="topMargin">
+            <number>6</number>
+           </property>
+           <property name="rightMargin">
+            <number>4</number>
+           </property>
+           <property name="bottomMargin">
+            <number>6</number>
+           </property>
+           <item>
+            <widget class="QToolButton" name="serialClearButton">
+             <property name="toolTip">
+              <string>Clear serial output</string>
+             </property>
+             <property name="autoRaise">
+              <bool>true</bool>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="minimumWidth">
+              <number>22</number>
+             </property>
+             <property name="maximumWidth">
+              <number>28</number>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="serialButtonSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPlainTextEdit" name="serialConsole">
+          <property name="undoRedoEnabled">
+           <bool>false</bool>
+          </property>
+          <property name="lineWrapMode">
+           <enum>QPlainTextEdit::NoWrap</enum>
+          </property>
+          <property name="readOnly">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>
@@ -717,6 +823,7 @@
     <addaction name="actionLCD_Window"/>
     <addaction name="separator"/>
     <addaction name="actionDebugger"/>
+    <addaction name="actionLaunch_IDA"/>
     <addaction name="separator"/>
     <addaction name="actionXModem"/>
     <addaction name="actionLeavePTT"/>
@@ -764,6 +871,11 @@
    </property>
    <property name="text">
     <string>Enter &amp;Debugger</string>
+   </property>
+  </action>
+  <action name="actionLaunch_IDA">
+   <property name="text">
+    <string>Launch &amp;IDA Instant Debugging</string>
    </property>
   </action>
   <action name="actionQuit">

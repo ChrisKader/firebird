@@ -75,6 +75,7 @@ public slots:
     void setExtLCD(bool state);
     void xmodemSend();
     void switchToMobileUI();
+    void launchIdaInstantDebugging();
 
     //Menu "State"
     bool resume();
@@ -104,6 +105,7 @@ public slots:
 
     //Debugging
     void debugInputRequested(bool b);
+    void debuggerEntered(bool entered);
     void debugStr(QString str);
     void debugCommand();
 

@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 
 #include "emu.h"
 #include "os/os.h"
@@ -509,6 +510,476 @@ void memory_deinitialize()
     }
 
     reset_proc_count = 0;
+}
+
+static size_t map_append(char *out, size_t out_size, size_t pos, const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    size_t avail = (pos < out_size) ? (out_size - pos) : 0;
+    int written = vsnprintf(out ? out + pos : NULL, avail, fmt, ap);
+    va_end(ap);
+    if (written < 0)
+        return pos;
+    if (out && avail > 0 && (size_t)written >= avail)
+        return out_size - 1;
+    return pos + (size_t)written;
+}
+
+static bool mem_area_is_read_only(uint8_t *ptr, uint32_t size)
+{
+    if (!ptr || size == 0)
+        return false;
+    uint32_t aligned = size & ~3u;
+    uint8_t *end = ptr + aligned;
+    for (uint32_t *p = (uint32_t *)ptr; (uint8_t *)p < end; ++p)
+    {
+        if (!(RAM_FLAGS(p) & RF_READ_ONLY))
+            return false;
+    }
+    return true;
+}
+
+size_t memory_build_gdb_map(char *out, size_t out_size)
+{
+    size_t pos = 0;
+    if (!out || !out_size) {
+        out = NULL;
+        out_size = 0;
+    }
+
+    pos = map_append(out, out_size, pos, "<?xml version=\"1.0\"?><memory-map>");
+
+    // RAM/ROM areas
+    for (size_t i = 0; i < sizeof(mem_areas) / sizeof(mem_areas[0]); ++i)
+    {
+        if (!mem_areas[i].size)
+            continue;
+        const bool is_rom = (mem_areas[0].ptr && mem_areas[i].ptr == mem_areas[0].ptr);
+        const char *type = is_rom ? "rom" : "ram";
+        const char *name = NULL;
+        switch (mem_areas[i].base)
+        {
+            case 0x00000000: name = "boot_rom"; break;
+            case 0x10000000: name = "sdram"; break;
+            case 0x20000000: name = "internal_sram"; break;
+            case 0xA4000000: name = "internal_sram"; break;
+            case 0xA8000000: name = "vram"; break;
+            case 0xF0000000: name = "boot_rom_mirror"; break;
+            case 0xA0000000: name = "boot_rom_mirror"; break;
+        }
+        char name_buf[32];
+        if (!name) {
+            if (is_rom) {
+                name = "boot_rom_mirror";
+            } else {
+                snprintf(name_buf, sizeof(name_buf), "mem_area_%zu", i);
+                name = name_buf;
+            }
+        }
+        pos = map_append(out, out_size, pos,
+                         "<memory type=\"%s\" start=\"0x%08x\" length=\"0x%08x\" name=\"%s\"/>",
+                         type, mem_areas[i].base, mem_areas[i].size, name);
+    }
+
+    // APB submap (0x90000000)
+    if (read_word_map[0x90 >> 2] == apb_read_word)
+    {
+        for (size_t i = 0; i < sizeof(apb_map) / sizeof(apb_map[0]); ++i)
+        {
+            if (apb_map[i].read == bad_read_word && apb_map[i].write == bad_write_word)
+                continue;
+            uint32_t base = 0x90000000u + (uint32_t)(i << 16);
+            const char *name = NULL;
+            switch (i)
+            {
+                case 0x00: name = "gpio"; break;
+                case 0x06: name = "watchdog"; break;
+                case 0x09: name = "rtc"; break;
+                case 0x0A: name = "misc"; break;
+                case 0x0E: name = "keypad"; break;
+                case 0x0F: name = "hdq1w"; break;
+                case 0x11: name = "led"; break;
+                default: break;
+            }
+            if (emulate_cx2)
+            {
+                switch (i)
+                {
+                    case 0x01: name = "fast_timer"; break;
+                    case 0x02: name = "uart0"; break;
+                    case 0x03: name = "fastboot_ram"; break;
+                    case 0x04: name = "lcd_spi"; break;
+                    case 0x05: name = "i2c_touchpad"; break;
+                    case 0x07: name = "uart1"; break;
+                    case 0x08: name = "cradle_spi"; break;
+                    case 0x0B: name = "adc"; break;
+                    case 0x0C: name = "timer_first"; break;
+                    case 0x0D: name = "timer_second"; break;
+                    case 0x12: name = "sdram_ctrl"; break;
+                    case 0x13: name = "backlight"; break;
+                    case 0x14: name = "pmu_aladdin"; break;
+                    default: break;
+                }
+            }
+            else if (emulate_cx)
+            {
+                switch (i)
+                {
+                    case 0x01: name = "fast_timer"; break;
+                    case 0x02: name = "uart0"; break;
+                    case 0x03: name = "fastboot_ram"; break;
+                    case 0x04: name = "spi"; break;
+                    case 0x05: name = "i2c_touchpad"; break;
+                    case 0x08: name = "cradle_spi"; break;
+                    case 0x0B: name = "pmu"; break;
+                    case 0x0C: name = "timer_first"; break;
+                    case 0x0D: name = "timer_second"; break;
+                    default: break;
+                }
+            }
+            else
+            {
+                switch (i)
+                {
+                    case 0x01: name = "fast_timer"; break;
+                    case 0x02: name = "uart0"; break;
+                    case 0x08: name = "cradle_spi"; break;
+                    case 0x0B: name = "pmu"; break;
+                    case 0x0C: name = "timer_first"; break;
+                    case 0x0D: name = "timer_second"; break;
+                    case 0x10: name = "ti84_link"; break;
+                    default: break;
+                }
+            }
+            char name_buf[32];
+            if (!name) {
+                snprintf(name_buf, sizeof(name_buf), "apb_0x%02zx", i);
+                name = name_buf;
+            }
+            pos = map_append(out, out_size, pos,
+                             "<memory type=\"ram\" start=\"0x%08x\" length=\"0x00010000\" name=\"%s\"/>",
+                             base, name);
+        }
+    }
+
+    if (emulate_cx2)
+    {
+        struct mmio_region {
+            uint32_t base;
+            uint32_t size;
+            const char *name;
+        };
+        static const struct mmio_region cx2_mmio_regions[] = {
+            { 0xAC000000, 0x00001000, "sdio" },
+            { 0xB0000000, 0x00001000, "usb_otg_top" },
+            { 0xB4000000, 0x00001000, "usb_otg_bottom" },
+            { 0xB8000000, 0x00010000, "spi_nand" },
+            { 0xBC000000, 0x00001000, "dma" },
+            { 0xC0000000, 0x00001000, "lcd" },
+            { 0xC4000000, 0x00001000, "adc" },
+            { 0xC8010000, 0x00001000, "des" },
+            { 0xCC000000, 0x00001000, "sha256" },
+            { 0xDC000000, 0x00001000, "interrupt_controller" },
+        };
+        for (size_t i = 0; i < sizeof(cx2_mmio_regions) / sizeof(cx2_mmio_regions[0]); ++i)
+        {
+            uint32_t window = cx2_mmio_regions[i].base & 0xFC000000u;
+            if (read_word_map[window >> 26] == memory_read_word)
+                continue;
+            if (read_word_map[window >> 26] == apb_read_word)
+                continue;
+            pos = map_append(out, out_size, pos,
+                             "<memory type=\"ram\" start=\"0x%08x\" length=\"0x%08x\" name=\"%s\"/>",
+                             cx2_mmio_regions[i].base, cx2_mmio_regions[i].size, cx2_mmio_regions[i].name);
+        }
+    }
+    else
+    {
+        // Other MMIO segments (64MB windows)
+        for (uint32_t i = 0; i < 64; ++i)
+        {
+            if (read_word_map[i] == memory_read_word)
+                continue;
+            if (read_word_map[i] == apb_read_word)
+                continue;
+            uint32_t base = i << 26;
+            pos = map_append(out, out_size, pos,
+                             "<memory type=\"ram\" start=\"0x%08x\" length=\"0x04000000\" name=\"mmio_%02x\"/>",
+                             base, i);
+        }
+    }
+
+    pos = map_append(out, out_size, pos, "</memory-map>");
+    if (out && out_size > 0) {
+        if (pos >= out_size)
+            pos = out_size - 1;
+        out[pos] = 0;
+    }
+    return pos;
+}
+
+size_t memory_build_fb_map(char *out, size_t out_size)
+{
+    size_t pos = 0;
+    if (!out || !out_size) {
+        out = NULL;
+        out_size = 0;
+    }
+
+    pos = map_append(out, out_size, pos, "FBMAP v1\n");
+
+    // RAM/ROM areas
+    for (size_t i = 0; i < sizeof(mem_areas) / sizeof(mem_areas[0]); ++i)
+    {
+        if (!mem_areas[i].size)
+            continue;
+        const bool is_rom = (mem_areas[0].ptr && mem_areas[i].ptr == mem_areas[0].ptr);
+        const char *type = is_rom ? "rom" : "ram";
+        const char *perm = mem_area_is_read_only(mem_areas[i].ptr, mem_areas[i].size) ? "r-x" : "rwx";
+        const char *name = NULL;
+        switch (mem_areas[i].base)
+        {
+            case 0x00000000: name = "boot_rom"; break;
+            case 0x10000000: name = "sdram"; break;
+            case 0x20000000: name = "internal_sram"; break;
+            case 0xA4000000: name = "internal_sram"; break;
+            case 0xA8000000: name = "vram"; break;
+            case 0xF0000000: name = "boot_rom_mirror"; break;
+            case 0xA0000000: name = "boot_rom_mirror"; break;
+        }
+        char name_buf[32];
+        if (!name) {
+            if (is_rom) {
+                name = "boot_rom_mirror";
+            } else {
+                snprintf(name_buf, sizeof(name_buf), "mem_area_%zu", i);
+                name = name_buf;
+            }
+        }
+        pos = map_append(out, out_size, pos,
+                         "%08x %08x %s %s %s\n",
+                         mem_areas[i].base, mem_areas[i].size, type, perm, name);
+    }
+
+    // APB submap (0x90000000)
+    if (read_word_map[0x90 >> 2] == apb_read_word)
+    {
+        for (size_t i = 0; i < sizeof(apb_map) / sizeof(apb_map[0]); ++i)
+        {
+            if (apb_map[i].read == bad_read_word && apb_map[i].write == bad_write_word)
+                continue;
+            uint32_t base = 0x90000000u + (uint32_t)(i << 16);
+            const char *name = NULL;
+            switch (i)
+            {
+                case 0x00: name = "gpio"; break;
+                case 0x06: name = "watchdog"; break;
+                case 0x09: name = "rtc"; break;
+                case 0x0A: name = "misc"; break;
+                case 0x0E: name = "keypad"; break;
+                case 0x0F: name = "hdq1w"; break;
+                case 0x11: name = "led"; break;
+                default: break;
+            }
+            if (emulate_cx2)
+            {
+                switch (i)
+                {
+                    case 0x01: name = "fast_timer"; break;
+                    case 0x02: name = "uart0"; break;
+                    case 0x03: name = "fastboot_ram"; break;
+                    case 0x04: name = "lcd_spi"; break;
+                    case 0x05: name = "i2c_touchpad"; break;
+                    case 0x07: name = "uart1"; break;
+                    case 0x08: name = "cradle_spi"; break;
+                    case 0x0B: name = "adc"; break;
+                    case 0x0C: name = "timer_first"; break;
+                    case 0x0D: name = "timer_second"; break;
+                    case 0x12: name = "sdram_ctrl"; break;
+                    case 0x13: name = "backlight"; break;
+                    case 0x14: name = "pmu_aladdin"; break;
+                    default: break;
+                }
+            }
+            else if (emulate_cx)
+            {
+                switch (i)
+                {
+                    case 0x01: name = "fast_timer"; break;
+                    case 0x02: name = "uart0"; break;
+                    case 0x03: name = "fastboot_ram"; break;
+                    case 0x04: name = "spi"; break;
+                    case 0x05: name = "i2c_touchpad"; break;
+                    case 0x08: name = "cradle_spi"; break;
+                    case 0x0B: name = "pmu"; break;
+                    case 0x0C: name = "timer_first"; break;
+                    case 0x0D: name = "timer_second"; break;
+                    default: break;
+                }
+            }
+            else
+            {
+                switch (i)
+                {
+                    case 0x01: name = "fast_timer"; break;
+                    case 0x02: name = "uart0"; break;
+                    case 0x08: name = "cradle_spi"; break;
+                    case 0x0B: name = "pmu"; break;
+                    case 0x0C: name = "timer_first"; break;
+                    case 0x0D: name = "timer_second"; break;
+                    case 0x10: name = "ti84_link"; break;
+                    default: break;
+                }
+            }
+            char name_buf[32];
+            if (!name) {
+                snprintf(name_buf, sizeof(name_buf), "apb_0x%02zx", i);
+                name = name_buf;
+            }
+            pos = map_append(out, out_size, pos,
+                             "%08x %08x io rw- %s\n",
+                             base, 0x00010000u, name);
+        }
+    }
+
+    if (emulate_cx2)
+    {
+        struct mmio_region {
+            uint32_t base;
+            uint32_t size;
+            const char *name;
+        };
+        static const struct mmio_region cx2_mmio_regions[] = {
+            { 0xAC000000, 0x00001000, "sdio" },
+            { 0xB0000000, 0x00001000, "usb_otg_top" },
+            { 0xB4000000, 0x00001000, "usb_otg_bottom" },
+            { 0xB8000000, 0x00010000, "spi_nand" },
+            { 0xBC000000, 0x00001000, "dma" },
+            { 0xC0000000, 0x00001000, "lcd" },
+            { 0xC4000000, 0x00001000, "adc" },
+            { 0xC8010000, 0x00001000, "des" },
+            { 0xCC000000, 0x00001000, "sha256" },
+            { 0xDC000000, 0x00001000, "interrupt_controller" },
+        };
+        for (size_t i = 0; i < sizeof(cx2_mmio_regions) / sizeof(cx2_mmio_regions[0]); ++i)
+        {
+            uint32_t window = cx2_mmio_regions[i].base & 0xFC000000u;
+            if (read_word_map[window >> 26] == memory_read_word)
+                continue;
+            if (read_word_map[window >> 26] == apb_read_word)
+                continue;
+            pos = map_append(out, out_size, pos,
+                             "%08x %08x io rw- %s\n",
+                             cx2_mmio_regions[i].base, cx2_mmio_regions[i].size, cx2_mmio_regions[i].name);
+        }
+    }
+    else
+    {
+        // Other MMIO segments (64MB windows)
+        for (uint32_t i = 0; i < 64; ++i)
+        {
+            if (read_word_map[i] == memory_read_word)
+                continue;
+            if (read_word_map[i] == apb_read_word)
+                continue;
+            uint32_t base = i << 26;
+            pos = map_append(out, out_size, pos,
+                             "%08x %08x io rw- mmio_%02x\n",
+                             base, 0x04000000u, i);
+        }
+    }
+
+    if (out && out_size > 0) {
+        if (pos >= out_size)
+            pos = out_size - 1;
+        out[pos] = 0;
+    }
+    return pos;
+}
+
+bool memory_query_region(uint32_t addr, struct memory_region_info *info)
+{
+    if (!info)
+        return false;
+
+    for (size_t i = 0; i < sizeof(mem_areas) / sizeof(mem_areas[0]); ++i)
+    {
+        if (!mem_areas[i].size)
+            continue;
+        uint32_t start = mem_areas[i].base;
+        uint32_t end = start + mem_areas[i].size;
+        if (addr >= start && addr < end)
+        {
+            bool ro = mem_area_is_read_only(mem_areas[i].ptr, mem_areas[i].size);
+            info->start = start;
+            info->size = mem_areas[i].size;
+            strcpy(info->perm, ro ? "r-x" : "rwx");
+            return true;
+        }
+    }
+
+    if (read_word_map[0x90 >> 2] == apb_read_word)
+    {
+        if (addr >= 0x90000000u && addr < 0x90150000u)
+        {
+            uint32_t idx = (addr - 0x90000000u) >> 16;
+            if (idx < (uint32_t)(sizeof(apb_map) / sizeof(apb_map[0])))
+            {
+                if (apb_map[idx].read != bad_read_word || apb_map[idx].write != bad_write_word)
+                {
+                    info->start = 0x90000000u + (idx << 16);
+                    info->size = 0x00010000u;
+                    strcpy(info->perm, "rw-");
+                    return true;
+                }
+            }
+        }
+    }
+
+    if (emulate_cx2)
+    {
+        struct mmio_region {
+            uint32_t base;
+            uint32_t size;
+        };
+        static const struct mmio_region cx2_mmio_regions[] = {
+            { 0xAC000000, 0x00001000 },
+            { 0xB0000000, 0x00001000 },
+            { 0xB4000000, 0x00001000 },
+            { 0xB8000000, 0x00010000 },
+            { 0xBC000000, 0x00001000 },
+            { 0xC0000000, 0x00001000 },
+            { 0xC4000000, 0x00001000 },
+            { 0xC8010000, 0x00001000 },
+            { 0xCC000000, 0x00001000 },
+            { 0xDC000000, 0x00001000 },
+        };
+        for (size_t i = 0; i < sizeof(cx2_mmio_regions) / sizeof(cx2_mmio_regions[0]); ++i)
+        {
+            uint32_t start = cx2_mmio_regions[i].base;
+            uint32_t end = start + cx2_mmio_regions[i].size;
+            if (addr >= start && addr < end)
+            {
+                info->start = start;
+                info->size = cx2_mmio_regions[i].size;
+                strcpy(info->perm, "rw-");
+                return true;
+            }
+        }
+    }
+
+    uint32_t window = addr & 0xFC000000u;
+    uint32_t index = window >> 26;
+    if (read_word_map[index] != memory_read_word && read_word_map[index] != apb_read_word)
+    {
+        info->start = window;
+        info->size = 0x04000000u;
+        strcpy(info->perm, "rw-");
+        return true;
+    }
+
+    return false;
 }
 
 bool memory_suspend(emu_snapshot *snapshot)

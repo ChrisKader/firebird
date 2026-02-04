@@ -6,3 +6,5 @@
 *.qmlc
 build/
 android/.gradle
+.DS_Store
+.python-version

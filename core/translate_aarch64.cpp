@@ -232,374 +232,363 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 		// Mark translate_buffer as RW_
 		mprotect(translate_buffer, INSN_BUFFER_SIZE, PROT_READ | PROT_WRITE);
 	#endif
-    
-	uint32_t **jump_table_start = jump_table_current;
-	uint32_t pc = pc_start, *insn_ptr = insn_ptr_start;
-	// Pointer to translation of current instruction
-	uint32_t *translate_buffer_inst_start = translate_current;
-	// Pointer to struct translation for this block
-	translation *this_translation = &translation_table[next_translation_index];
 
-	// Whether we can avoid the jump to translation_next at the end
-	bool jumps_away = false;
-	// Whether to stop translating code
-	bool stop_here = false;
-	// cond_branch points to the b.cond, see below
-	uint32_t *cond_branch = nullptr;
+		#if defined(__APPLE__) && !defined(IS_IOS_BUILD)
+				// MAP_JIT uses per-thread W^X; enable writes while generating code.
+				os_jit_write_protect(0);
+		#endif
+		uint32_t **jump_table_start = jump_table_current;
+		uint32_t pc = pc_start, *insn_ptr = insn_ptr_start;
+		// Pointer to translation of current instruction
+		uint32_t *translate_buffer_inst_start = translate_current;
+		// Pointer to struct translation for this block
+		translation *this_translation = &translation_table[next_translation_index];
 
-	// We know this already. end_ptr will be set after the loop
-	this_translation->jump_table = reinterpret_cast<void**>(jump_table_start);
-	this_translation->start_ptr = insn_ptr_start;
+		// Whether we can avoid the jump to translation_next at the end
+		bool jumps_away = false;
+		// Whether to stop translating code
+		bool stop_here = false;
+		// cond_branch points to the b.cond, see below
+		uint32_t *cond_branch = nullptr;
 
-	while(1)
-	{
-		// Translate further?
-		if(stop_here
-		   || size_t((translate_current + 16) - translate_buffer) > (INSN_BUFFER_SIZE/sizeof(*translate_buffer))
-		   || RAM_FLAGS(insn_ptr) & DONT_TRANSLATE
-		   || (pc ^ pc_start) & ~0x3ff)
-			goto exit_translation;
+		// We know this already. end_ptr will be set after the loop
+		this_translation->jump_table = reinterpret_cast<void **>(jump_table_start);
+		this_translation->start_ptr = insn_ptr_start;
 
-		Instruction i;
-		i.raw = *insn_ptr;
-
-		*jump_table_current = translate_current;
-
-		if(unlikely(i.cond == CC_NV))
+		while (1)
 		{
-			if((i.raw & 0xFD70F000) == 0xF550F000)
-				goto instruction_translated; // PLD
-			else
-				goto unimpl;
-		}
-		else if(unlikely(i.cond != CC_AL))
-		{
-			// Conditional instruction -> Generate jump over code with inverse condition
-			cond_branch = translate_current;
-			emit(0x54000000 | (i.cond ^ 1));
-		}
+			// Translate further?
+			if (stop_here || size_t((translate_current + 16) - translate_buffer) > (INSN_BUFFER_SIZE / sizeof(*translate_buffer)) || RAM_FLAGS(insn_ptr) & DONT_TRANSLATE || (pc ^ pc_start) & ~0x3ff)
+				goto exit_translation;
 
-		if((i.raw & 0xE000090) == 0x0000090)
-		{
-			if(!i.mem_proc2.s && !i.mem_proc2.h)
+			Instruction i;
+			i.raw = *insn_ptr;
+
+			*jump_table_current = translate_current;
+
+			if (unlikely(i.cond == CC_NV))
 			{
-				// Not mem_proc2 -> multiply or swap
-				if((i.raw & 0x0FB00000) == 0x01000000)
-					goto unimpl; // SWP/SWPB not implemented
+				if ((i.raw & 0xFD70F000) == 0xF550F000)
+					goto instruction_translated; // PLD
+				else
+					goto unimpl;
+			}
+			else if (unlikely(i.cond != CC_AL))
+			{
+				// Conditional instruction -> Generate jump over code with inverse condition
+				cond_branch = translate_current;
+				emit(0x54000000 | (i.cond ^ 1));
+			}
 
-				// MUL, UMLAL, etc.
-				if(i.mult.rm == PC || i.mult.rs == PC
-				   || i.mult.rn == PC || i.mult.rd == PC)
-					goto unimpl; // PC as register not implemented
-
-				if(i.mult.s)
-					goto unimpl; // setcc not implemented (not easily possible as no aarch64 instruction only changes n and z)
-
-				if ((i.raw & 0xFC000F0) == 0x0000090)
+			if ((i.raw & 0xE000090) == 0x0000090)
+			{
+				if (!i.mem_proc2.s && !i.mem_proc2.h)
 				{
-					uint32_t instruction = 0x1B000000; // madd w0, w0, w0, w0
+					// Not mem_proc2 -> multiply or swap
+					if ((i.raw & 0x0FB00000) == 0x01000000)
+						goto unimpl; // SWP/SWPB not implemented
 
-					instruction |= (mapreg(i.mult.rs) << 16) | (mapreg(i.mult.rm) << 5) | mapreg(i.mult.rd);
-					if(i.mult.a)
-						instruction |= mapreg(i.mult.rn) << 10;
+					// MUL, UMLAL, etc.
+					if (i.mult.rm == PC || i.mult.rs == PC || i.mult.rn == PC || i.mult.rd == PC)
+						goto unimpl; // PC as register not implemented
+
+					if (i.mult.s)
+						goto unimpl; // setcc not implemented (not easily possible as no aarch64 instruction only changes n and z)
+
+					if ((i.raw & 0xFC000F0) == 0x0000090)
+					{
+						uint32_t instruction = 0x1B000000; // madd w0, w0, w0, w0
+
+						instruction |= (mapreg(i.mult.rs) << 16) | (mapreg(i.mult.rm) << 5) | mapreg(i.mult.rd);
+						if (i.mult.a)
+							instruction |= mapreg(i.mult.rn) << 10;
+						else
+							instruction |= WZR << 10;
+
+						emit(instruction);
+						goto instruction_translated;
+					}
+
+					goto unimpl; // UMULL, UMLAL, SMULL, SMLAL not implemented
+				}
+
+				if (i.mem_proc2.s || !i.mem_proc2.h)
+					goto unimpl; // Signed byte/halfword and doubleword not implemented
+
+				if (i.mem_proc2.rn == PC || i.mem_proc2.rd == PC || i.mem_proc2.rm == PC)
+					goto unimpl; // PC as operand or dest. not implemented
+
+				// Load base into w0
+				emit_mov_reg(W0, mapreg(i.mem_proc2.rn));
+
+				// Offset into w25
+				if (i.mem_proc2.i) // Immediate offset
+					emit_mov_imm(W25, (i.mem_proc2.immed_h << 4) | i.mem_proc2.immed_l);
+				else // Register offset
+					emit_mov_reg(W25, mapreg(i.mem_proc2.rm));
+
+				// Get final address..
+				if (i.mem_proc2.p)
+				{
+					// ..into r0
+					if (i.mem_proc2.u)
+						emit(0x0b190000); // add w0, w0, w25
 					else
-						instruction |= WZR << 10;
+						emit(0x4b190000); // sub w0, w0, w25
 
-					emit(instruction);
-					goto instruction_translated;
+					if (i.mem_proc2.w) // Writeback: final address into rn
+						emit_mov_reg(mapreg(i.mem_proc2.rn), W0);
+				}
+				else
+				{
+					// ..into r5
+					if (i.mem_proc2.u)
+						emit(0x0b190019); // add w25, w0, w25
+					else
+						emit(0x4b190019); // sub w25, w0, w25
 				}
 
-				goto unimpl; // UMULL, UMLAL, SMULL, SMLAL not implemented
-			}
-
-			if(i.mem_proc2.s || !i.mem_proc2.h)
-				goto unimpl; // Signed byte/halfword and doubleword not implemented
-
-			if(i.mem_proc2.rn == PC
-			   || i.mem_proc2.rd == PC
-			   || i.mem_proc2.rm == PC)
-				goto unimpl; // PC as operand or dest. not implemented
-
-			// Load base into w0
-			emit_mov_reg(W0, mapreg(i.mem_proc2.rn));
-
-			// Offset into w25
-			if(i.mem_proc2.i) // Immediate offset
-				emit_mov_imm(W25, (i.mem_proc2.immed_h << 4) | i.mem_proc2.immed_l);
-			else // Register offset
-				emit_mov_reg(W25, mapreg(i.mem_proc2.rm));
-
-			// Get final address..
-			if(i.mem_proc2.p)
-			{
-				// ..into r0
-				if(i.mem_proc2.u)
-					emit(0x0b190000); // add w0, w0, w25
-				else
-					emit(0x4b190000); // sub w0, w0, w25
-
-				if(i.mem_proc2.w) // Writeback: final address into rn
-					emit_mov_reg(mapreg(i.mem_proc2.rn), W0);
-			}
-			else
-			{
-				// ..into r5
-				if(i.mem_proc2.u)
-					emit(0x0b190019); // add w25, w0, w25
-				else
-					emit(0x4b190019); // sub w25, w0, w25
-			}
-
-			if(i.mem_proc2.l)
-			{
-				emit_call(reinterpret_cast<void*>(read_half_asm));
-				emit_mov_reg(mapreg(i.mem_proc2.rd), W0);
-			}
-			else
-			{
-				emit_mov_reg(W1, mapreg(i.mem_proc2.rd));
-				emit_call(reinterpret_cast<void*>(write_half_asm));
-			}
-
-			// Post-indexed: final address in r5 back into rn
-			if(!i.mem_proc2.p)
-				emit_mov_reg(mapreg(i.mem_proc2.rn), W25);
-
-		}
-		else if((i.raw & 0xD900000) == 0x1000000)
-		{
-			if((i.raw & 0xFFFFFD0) == 0x12FFF10)
-			{
-				//B(L)X
-				if(i.bx.rm == PC)
-					goto unimpl;
-
-				emit_mov_reg(W0, mapreg(i.bx.rm));
-
-				if(i.bx.l)
-					emit_mov_imm(mapreg(LR), pc + 4);
-				else if(i.cond == CC_AL)
-					stop_here = jumps_away = true;
-
-				emit_jmp(reinterpret_cast<void*>(translation_next_bx));
-			}
-			else
-				goto unimpl;
-		}
-		else if((i.raw & 0xC000000) == 0x0000000)
-		{
-			// Data processing
-			if(!i.data_proc.imm && i.data_proc.reg_shift) // reg shift
-				goto unimpl;
-
-			if(i.data_proc.s
-			   && !(i.data_proc.op == OP_ADD || i.data_proc.op == OP_SUB
-			        || i.data_proc.op == OP_CMP || i.data_proc.op == OP_CMN))
-			{
-				/* We can't translate the S-bit that easily,
-				   as the barrel shifter output does not influence
-				   the carry flag anymore. */
-				goto unimpl;
-			}
-
-			if(i.data_proc.op == OP_RSB)
-			{
-				// RSB is not possible on AArch64, so try to convert it to SUB
-				if(!i.data_proc.imm && !i.data_proc.reg_shift && i.data_proc.shift == SH_LSL && i.data_proc.shift_imm == 0)
+				if (i.mem_proc2.l)
 				{
-					// Swap rm and rn, change op to SUB
-					unsigned int tmp = i.data_proc.rm;
-					i.data_proc.rm = i.data_proc.rn;
-					i.data_proc.rn = tmp;
-					i.data_proc.op = OP_SUB;
+					emit_call(reinterpret_cast<void *>(read_half_asm));
+					emit_mov_reg(mapreg(i.mem_proc2.rd), W0);
+				}
+				else
+				{
+					emit_mov_reg(W1, mapreg(i.mem_proc2.rd));
+					emit_call(reinterpret_cast<void *>(write_half_asm));
+				}
+
+				// Post-indexed: final address in r5 back into rn
+				if (!i.mem_proc2.p)
+					emit_mov_reg(mapreg(i.mem_proc2.rn), W25);
+			}
+			else if ((i.raw & 0xD900000) == 0x1000000)
+			{
+				if ((i.raw & 0xFFFFFD0) == 0x12FFF10)
+				{
+					// B(L)X
+					if (i.bx.rm == PC)
+						goto unimpl;
+
+					emit_mov_reg(W0, mapreg(i.bx.rm));
+
+					if (i.bx.l)
+						emit_mov_imm(mapreg(LR), pc + 4);
+					else if (i.cond == CC_AL)
+						stop_here = jumps_away = true;
+
+					emit_jmp(reinterpret_cast<void *>(translation_next_bx));
 				}
 				else
 					goto unimpl;
 			}
-
-			if(i.data_proc.op == OP_RSC || i.data_proc.op == OP_TEQ)
-				goto unimpl;
-
-			if(!i.data_proc.imm && i.data_proc.shift == SH_ROR)
+			else if ((i.raw & 0xC000000) == 0x0000000)
 			{
-				if(i.data_proc.shift_imm == 0)
-					goto unimpl; // RRX (encoded as ror #0) is not supported anywhere
+				// Data processing
+				if (!i.data_proc.imm && i.data_proc.reg_shift) // reg shift
+					goto unimpl;
 
-				if(i.data_proc.op == OP_ADD || i.data_proc.op == OP_SUB
-				   || i.data_proc.op == OP_CMP || i.data_proc.op == OP_CMN)
-					goto unimpl; // ADD/SUB(S) do not support ROR.
-			}
-
-			// Using pc is not supported
-			if(i.data_proc.rd == PC
-			   || (!i.data_proc.imm && i.data_proc.rm == PC))
-				goto unimpl;
-
-			// AArch64 ADC and SBC do not support a shifted reg
-			if((i.data_proc.op == OP_ADC || i.data_proc.op == OP_SBC)
-			   && (i.data_proc.shift != SH_LSL || i.data_proc.shift_imm != 0))
-				goto unimpl;
-
-			// Shortcut for simple register mov (mov rd, rm)
-			if((i.raw & 0xFFF0FF0) == 0x1a00000)
-			{
-				emit_mov_reg(mapreg(i.data_proc.rd), mapreg(i.data_proc.rm));
-				goto instruction_translated;
-			}
-
-			static const uint32_t opmap[] =
-			{
-				0x0A000000, // AND
-				0x4A000000, // EOR
-				0x4B000000, // SUB
-				0, // RSB not possible
-				0x0B000000, // ADD
-				0x1A000000, // ADC (no shift!)
-				0x5A000000, // SBC (no shift!)
-				0, // RSC not possible
-				0, // TST not possible, carry and overflow flags not identical
-				0, // TEQ not possible
-				0x6B00001F, // CMP (SUBS with rd = wzr)
-				0x2B00001F, // CMN (ADDS with rd = wzr)
-				0x2A000000, // ORR
-				0x2A0003E0, // MOV (ORR with rn = wzr)
-				0x0A200000, // BIC
-				0x2A2003E0, // MVN (ORN with rn = wzr)
-			};
-
-			uint32_t instruction = opmap[i.data_proc.op];
-
-			if(i.data_proc.s)
-				instruction |= 1 << 29;
-
-			if(i.data_proc.op < OP_TST || i.data_proc.op > OP_CMN)
-				instruction |= mapreg(i.data_proc.rd);
-
-			if(i.data_proc.op != OP_MOV && i.data_proc.op != OP_MVN)
-			{
-				if(i.data_proc.rn != PC)
-					instruction |= mapreg(i.data_proc.rn) << 5;
-				else
+				if (i.data_proc.s && !(i.data_proc.op == OP_ADD || i.data_proc.op == OP_SUB || i.data_proc.op == OP_CMP || i.data_proc.op == OP_CMN))
 				{
-					emit_mov_imm(W1, pc + 8);
-					instruction |= W1 << 5;
+					/* We can't translate the S-bit that easily,
+						 as the barrel shifter output does not influence
+						 the carry flag anymore. */
+					goto unimpl;
 				}
-			}
 
-			if(!i.data_proc.imm)
-			{
-				instruction |= mapreg(i.data_proc.rm) << 16;
-				instruction |= i.data_proc.shift << 22;
-				instruction |= i.data_proc.shift_imm << 10;
-			}
-			else
-			{
-				// TODO: Could be optimized further,
-				// some AArch64 ops support immediate values
-
-				uint32_t immed = i.data_proc.immed_8;
-				uint8_t count = i.data_proc.rotate_imm << 1;
-				if(count)
-					immed = (immed >> count) | (immed << (32 - count));
-
-				if(i.data_proc.op == OP_MOV)
+				if (i.data_proc.op == OP_RSB)
 				{
-					emit_mov_imm(mapreg(i.data_proc.rd), immed);
+					// RSB is not possible on AArch64, so try to convert it to SUB
+					if (!i.data_proc.imm && !i.data_proc.reg_shift && i.data_proc.shift == SH_LSL && i.data_proc.shift_imm == 0)
+					{
+						// Swap rm and rn, change op to SUB
+						unsigned int tmp = i.data_proc.rm;
+						i.data_proc.rm = i.data_proc.rn;
+						i.data_proc.rn = tmp;
+						i.data_proc.op = OP_SUB;
+					}
+					else
+						goto unimpl;
+				}
+
+				if (i.data_proc.op == OP_RSC || i.data_proc.op == OP_TEQ)
+					goto unimpl;
+
+				if (!i.data_proc.imm && i.data_proc.shift == SH_ROR)
+				{
+					if (i.data_proc.shift_imm == 0)
+						goto unimpl; // RRX (encoded as ror #0) is not supported anywhere
+
+					if (i.data_proc.op == OP_ADD || i.data_proc.op == OP_SUB || i.data_proc.op == OP_CMP || i.data_proc.op == OP_CMN)
+						goto unimpl; // ADD/SUB(S) do not support ROR.
+				}
+
+				// Using pc is not supported
+				if (i.data_proc.rd == PC || (!i.data_proc.imm && i.data_proc.rm == PC))
+					goto unimpl;
+
+				// AArch64 ADC and SBC do not support a shifted reg
+				if ((i.data_proc.op == OP_ADC || i.data_proc.op == OP_SBC) && (i.data_proc.shift != SH_LSL || i.data_proc.shift_imm != 0))
+					goto unimpl;
+
+				// Shortcut for simple register mov (mov rd, rm)
+				if ((i.raw & 0xFFF0FF0) == 0x1a00000)
+				{
+					emit_mov_reg(mapreg(i.data_proc.rd), mapreg(i.data_proc.rm));
 					goto instruction_translated;
 				}
 
-				if(immed <= 0xFFF
-				   && (i.data_proc.op == OP_ADD || i.data_proc.op == OP_SUB
-				       || i.data_proc.op == OP_CMP || i.data_proc.op == OP_CMN))
+				static const uint32_t opmap[] =
+						{
+								0x0A000000, // AND
+								0x4A000000, // EOR
+								0x4B000000, // SUB
+								0,					// RSB not possible
+								0x0B000000, // ADD
+								0x1A000000, // ADC (no shift!)
+								0x5A000000, // SBC (no shift!)
+								0,					// RSC not possible
+								0,					// TST not possible, carry and overflow flags not identical
+								0,					// TEQ not possible
+								0x6B00001F, // CMP (SUBS with rd = wzr)
+								0x2B00001F, // CMN (ADDS with rd = wzr)
+								0x2A000000, // ORR
+								0x2A0003E0, // MOV (ORR with rn = wzr)
+								0x0A200000, // BIC
+								0x2A2003E0, // MVN (ORN with rn = wzr)
+						};
+
+				uint32_t instruction = opmap[i.data_proc.op];
+
+				if (i.data_proc.s)
+					instruction |= 1 << 29;
+
+				if (i.data_proc.op < OP_TST || i.data_proc.op > OP_CMN)
+					instruction |= mapreg(i.data_proc.rd);
+
+				if (i.data_proc.op != OP_MOV && i.data_proc.op != OP_MVN)
 				{
-					/* Those instructions support a normal 12bit (optionally shifted left by 12) immediate.
-					   This is not the case for logical instructions, they use awfully complicated useless
-					   terrible garbage called "bitmask operand" that not even binutils can encode properly. */
-					instruction &= ~(0x1E000000);
-					instruction |= 1 << 28 | (immed << 10);
+					if (i.data_proc.rn != PC)
+						instruction |= mapreg(i.data_proc.rn) << 5;
+					else
+					{
+						emit_mov_imm(W1, pc + 8);
+						instruction |= W1 << 5;
+					}
+				}
+
+				if (!i.data_proc.imm)
+				{
+					instruction |= mapreg(i.data_proc.rm) << 16;
+					instruction |= i.data_proc.shift << 22;
+					instruction |= i.data_proc.shift_imm << 10;
 				}
 				else
 				{
-					emit_mov_imm(W0, immed);
-					/* All those operations are nops (or with 0)
-					instruction |= W0 << 16;
-					instruction |= SH_LSL << 22;
-					instruction |= 0 << 10;*/
+					// TODO: Could be optimized further,
+					// some AArch64 ops support immediate values
+
+					uint32_t immed = i.data_proc.immed_8;
+					uint8_t count = i.data_proc.rotate_imm << 1;
+					if (count)
+						immed = (immed >> count) | (immed << (32 - count));
+
+					if (i.data_proc.op == OP_MOV)
+					{
+						emit_mov_imm(mapreg(i.data_proc.rd), immed);
+						goto instruction_translated;
+					}
+
+					if (immed <= 0xFFF && (i.data_proc.op == OP_ADD || i.data_proc.op == OP_SUB || i.data_proc.op == OP_CMP || i.data_proc.op == OP_CMN))
+					{
+						/* Those instructions support a normal 12bit (optionally shifted left by 12) immediate.
+							 This is not the case for logical instructions, they use awfully complicated useless
+							 terrible garbage called "bitmask operand" that not even binutils can encode properly. */
+						instruction &= ~(0x1E000000);
+						instruction |= 1 << 28 | (immed << 10);
+					}
+					else
+					{
+						emit_mov_imm(W0, immed);
+						/* All those operations are nops (or with 0)
+						instruction |= W0 << 16;
+						instruction |= SH_LSL << 22;
+						instruction |= 0 << 10;*/
+					}
 				}
-			}
-
-			emit(instruction);
-		}
-		else if((i.raw & 0xFF000F0) == 0x7F000F0)
-			goto unimpl; // undefined
-		else if((i.raw & 0xC000000) == 0x4000000)
-		{
-			// Memory access: LDR, STRB, etc.
-			// User mode access not implemented
-			if(!i.mem_proc.p && i.mem_proc.w)
-				goto unimpl;
-
-			if(i.mem_proc.not_imm && (i.mem_proc.rm == PC || (i.mem_proc.shift == SH_ROR && i.mem_proc.shift_imm == 0)))
-				goto unimpl;
-
-			if((i.mem_proc.rd == i.mem_proc.rn || i.mem_proc.rn == PC) && (!i.mem_proc.p || i.mem_proc.w))
-				goto unimpl; // Writeback into PC not implemented
-
-			bool offset_is_zero = !i.mem_proc.not_imm && i.mem_proc.immed == 0;
-
-			// Address into w0
-			if(i.mem_proc.rn != PC)
-				emit_mov_reg(W0, mapreg(i.mem_proc.rn));
-			else if(i.mem_proc.not_imm)
-				emit_mov_imm(W0, pc + 8);
-			else // Address known
-			{
-				int offset = i.mem_proc.u ? i.mem_proc.immed :
-				                            -i.mem_proc.immed;
-
-				emit_mov_imm(W0, pc + 8 + offset);
-				offset_is_zero = true;
-			}
-
-			// Skip offset calculation
-			if(offset_is_zero)
-				goto no_offset;
-
-			// Offset into w25
-			if(!i.mem_proc.not_imm) // Immediate offset
-				emit_mov_imm(W25, i.mem_proc.immed);
-			else // Register offset, shifted
-			{
-				uint32_t instruction = 0x2a0003f9; // orr w25, wzr, wX, <shift>, #<amount>
-				instruction |= mapreg(i.mem_proc.rm) << 16;
-				instruction |= i.mem_proc.shift << 22;
-				instruction |= i.mem_proc.shift_imm << 10;
 
 				emit(instruction);
 			}
-
-			// Get final address..
-			if(i.mem_proc.p)
+			else if ((i.raw & 0xFF000F0) == 0x7F000F0)
+				goto unimpl; // undefined
+			else if ((i.raw & 0xC000000) == 0x4000000)
 			{
-				// ..into r0
-				if(i.mem_proc.u)
-					emit(0x0b190000); // add w0, w0, w25
-				else
-					emit(0x4b190000); // sub w0, w0, w25
+				// Memory access: LDR, STRB, etc.
+				// User mode access not implemented
+				if (!i.mem_proc.p && i.mem_proc.w)
+					goto unimpl;
 
-				// It has to be stored AFTER the memory access, to be able
-				// to perform the access again after an abort.
-				if(i.mem_proc.w) // Writeback: final address into w25
-					emit_mov_reg(W25, W0);
-			}
-			else
-			{
-				// ..into w25
-				if(i.mem_proc.u)
-					emit(0x0b190019); // add w25, w0, w25
+				if (i.mem_proc.not_imm && (i.mem_proc.rm == PC || (i.mem_proc.shift == SH_ROR && i.mem_proc.shift_imm == 0)))
+					goto unimpl;
+
+				if ((i.mem_proc.rd == i.mem_proc.rn || i.mem_proc.rn == PC) && (!i.mem_proc.p || i.mem_proc.w))
+					goto unimpl; // Writeback into PC not implemented
+
+				bool offset_is_zero = !i.mem_proc.not_imm && i.mem_proc.immed == 0;
+
+				// Address into w0
+				if (i.mem_proc.rn != PC)
+					emit_mov_reg(W0, mapreg(i.mem_proc.rn));
+				else if (i.mem_proc.not_imm)
+					emit_mov_imm(W0, pc + 8);
+				else // Address known
+				{
+					int offset = i.mem_proc.u ? i.mem_proc.immed : -i.mem_proc.immed;
+
+					emit_mov_imm(W0, pc + 8 + offset);
+					offset_is_zero = true;
+				}
+
+				// Skip offset calculation
+				if (offset_is_zero)
+					goto no_offset;
+
+				// Offset into w25
+				if (!i.mem_proc.not_imm) // Immediate offset
+					emit_mov_imm(W25, i.mem_proc.immed);
+				else // Register offset, shifted
+				{
+					uint32_t instruction = 0x2a0003f9; // orr w25, wzr, wX, <shift>, #<amount>
+					instruction |= mapreg(i.mem_proc.rm) << 16;
+					instruction |= i.mem_proc.shift << 22;
+					instruction |= i.mem_proc.shift_imm << 10;
+
+					emit(instruction);
+				}
+
+				// Get final address..
+				if (i.mem_proc.p)
+				{
+					// ..into r0
+					if (i.mem_proc.u)
+						emit(0x0b190000); // add w0, w0, w25
+					else
+						emit(0x4b190000); // sub w0, w0, w25
+
+					// It has to be stored AFTER the memory access, to be able
+					// to perform the access again after an abort.
+					if (i.mem_proc.w) // Writeback: final address into w25
+						emit_mov_reg(W25, W0);
+				}
 				else
-					emit(0x4b190019); // sub w25, w0, w25
-			}
+				{
+					// ..into w25
+					if (i.mem_proc.u)
+						emit(0x0b190019); // add w25, w0, w25
+					else
+						emit(0x4b190019); // sub w25, w0, w25
+				}
 
 			no_offset:
 			if(i.mem_proc.l)
@@ -785,9 +774,14 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 			mprotect(translate_buffer, INSN_BUFFER_SIZE, PROT_READ | PROT_EXEC);
 		#endif
 
-		// No virtual instruction got translated, just drop everything
-		translate_current = translate_buffer_inst_start;
-		return;
+		#if defined(__APPLE__) && !defined(IS_IOS_BUILD)
+					// Switch back to executable mode for MAP_JIT (no-op elsewhere).
+					os_jit_write_protect(1);
+		#endif
+
+			// No virtual instruction got translated, just drop everything
+			translate_current = translate_buffer_inst_start;
+			return;
 	}
 
 	if(!jumps_away)
@@ -837,6 +831,8 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 		mprotect(translate_buffer, INSN_BUFFER_SIZE, PROT_READ | PROT_EXEC);
 		sys_cache_control(1 /* kCacheFunctionPrepareForExecution */, jump_table_start[0], (code_end-jump_table_start[0])*4);
 	#else
+		// Switch back to executable mode for MAP_JIT (no-op elsewhere).
+		os_jit_write_protect(1);
 		__builtin___clear_cache((char*)jump_table_start[0], (char*)code_end);
 	#endif
 }
