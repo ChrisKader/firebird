@@ -439,6 +439,12 @@ bool memory_initialize(uint32_t sdram_size)
         apb_set_map(0x02, serial_cx_read, serial_cx_write);
         add_reset_proc(serial_cx_reset);
         apb_set_map(0x03, fastboot_cx_read, fastboot_cx_write);
+        /*
+         * Clear fastboot RAM on cold boot only (not soft reset).
+         * This RAM persists across soft resets to pass boot parameters,
+         * but should start clean on a fresh emulator start.
+         */
+        fastboot_cx_reset();
         apb_set_map(0x05, touchpad_cx_read, touchpad_cx_write);
         add_reset_proc(touchpad_cx_reset);
 

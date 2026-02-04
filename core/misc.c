@@ -241,8 +241,16 @@ void timer_reset() {
     sched.items[SCHED_TIMERS].proc = timer_event;
 }
 
-/* 90030000: 4KiB of some kind of memory */
+/*
+ * 90030000: 4KiB "fastboot" RAM.
+ * Persists across soft resets (warm boot) but cleared on cold boot.
+ * Also saved/restored in snapshots (see misc_suspend/misc_resume).
+ */
 static fastboot_state fastboot;
+
+void fastboot_cx_reset(void) {
+    memset(&fastboot, 0, sizeof(fastboot));
+}
 
 uint32_t fastboot_cx_read(uint32_t addr) {
     if((addr & 0xFFFF) >= 0x1000)
@@ -254,8 +262,6 @@ void fastboot_cx_write(uint32_t addr, uint32_t value) {
     if((addr & 0xFFFF) >= 0x1000)
         return bad_write_word(addr, value);
 
-    // TODO: This isn't cleared on resets, but should be cleared
-    // eventually, probably on restarts?
     fastboot.mem[(addr & 0xFFF) >> 2] = value;
 }
 

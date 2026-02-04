@@ -3,6 +3,7 @@
 #ifndef _H_MISC
 #define _H_MISC
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -102,6 +103,7 @@ typedef struct fastboot_state {
 
 uint32_t fastboot_cx_read(uint32_t addr);
 void fastboot_cx_write(uint32_t addr, uint32_t value);
+void fastboot_cx_reset(void);
 
 uint32_t spi_cx_read(uint32_t addr);
 void spi_cx_write(uint32_t addr, uint32_t value);
