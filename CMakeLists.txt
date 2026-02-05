@@ -410,7 +410,7 @@ install(TARGETS firebird-emu
 
 qt_generate_deploy_qml_app_script(
     TARGET firebird-emu
-    FILENAME_VARIABLE deploy_script
+    OUTPUT_SCRIPT deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
     DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
     MACOS_BUNDLE_POST_BUILD
