@@ -22,6 +22,7 @@ extern struct aladdin_pmu_state aladdin_pmu;
 void aladdin_pmu_write(uint32_t addr, uint32_t value);
 uint32_t aladdin_pmu_read(uint32_t addr);
 void aladdin_pmu_reset(void);
+void aladdin_pmu_set_wakeup_reason(uint32_t reason);
 
 uint32_t memc_ddr_read(uint32_t addr);
 void memc_ddr_write(uint32_t addr, uint32_t value);

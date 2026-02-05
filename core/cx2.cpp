@@ -10,9 +10,17 @@
 /* 90140000 */
 struct aladdin_pmu_state aladdin_pmu;
 
+// Wakeup reason at PMU+0x00. Value 0x040000 = wakeupOnKey.
+static uint32_t wakeup_reason = 0x040000;
+
+void aladdin_pmu_set_wakeup_reason(uint32_t reason) {
+	wakeup_reason = reason;
+}
+
 void aladdin_pmu_reset(void) {
 	memset(&aladdin_pmu, 0, sizeof(aladdin_pmu));
 	aladdin_pmu.clocks = 0x21020303;
+	wakeup_reason = 0x040000;
 	aladdin_pmu.disable[0] = 0;
 	aladdin_pmu.noidea[0] = 0x1A;
 	aladdin_pmu.noidea[1] = 0x101;
@@ -40,8 +48,8 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 	{
 		switch (addr & 0xFF)
 		{
-		case 0x00: return 0x040000; // Wakeup reason
-		case 0x04: return 0; // No idea
+		case 0x00: return wakeup_reason;
+		case 0x04: return 0;
 		case 0x08: return 0x2000;
 		case 0x20: return aladdin_pmu.disable[0];
 		case 0x24: return aladdin_pmu.int_state;
@@ -51,15 +59,26 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		case 0xC4: return aladdin_pmu.int_enable;
 		}
 	}
-	else if(offset == 0x808) // efuse
-		return 0x0021DB19; // TODO: Taken from CX II CAS, same on other models?
-	else if(offset == 0x80C) // also efuse
-		return asic_user_flags << 20; // Has to match the 80E0 field in OS images
-	else if(offset == 0x810)
-		/* Bit 8 clear when ON key pressed */
-		return 0x11 | ((keypad.key_map[0] & 1<<9) ? 0 : 0x100);
 	else if(offset >= 0x800 && offset < 0x900)
-		return aladdin_pmu.noidea[(offset & 0xFF) >> 2];
+	{
+		if(offset == 0x808)
+			return 0x0021DB19; // efuse
+		else if(offset == 0x80C)
+			return asic_user_flags << 20;
+		else if(offset == 0x810)
+			return 0x11 | ((keypad.key_map[0] & 1<<9) ? 0 : 0x100);
+		else if(offset == 0x858)
+		{
+			// USB PHY status register
+			// PHY is ready when enabled via PMU+0x20 bit 10 (0x400)
+			if(aladdin_pmu.disable[0] & 0x400)
+				return 0x3C; // Both USB PHYs ready
+			else
+				return 0;
+		}
+		else
+			return aladdin_pmu.noidea[(offset & 0xFF) >> 2];
+	}
 
 	return bad_read_word(addr);
 }
@@ -81,8 +100,10 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 				cpu_events |= EVENT_SLEEP;
 				event_clear(SCHED_TIMERS);
 				event_clear(SCHED_TIMER_FAST);
-				// Without this, the clocks are wrong
+				// Reset clocks but preserve int_enable for wake-on-key
+				uint32_t saved_int_enable = aladdin_pmu.int_enable;
 				aladdin_pmu_reset();
+				aladdin_pmu.int_enable = saved_int_enable;
 			}
 			else
 				aladdin_pmu.disable[0] = value;
