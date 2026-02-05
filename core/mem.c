@@ -456,6 +456,7 @@ bool memory_initialize(uint32_t sdram_size)
             apb_set_map(0x08, unknown_9008_read, unknown_9008_write);
             apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word);
             apb_set_map(0x12, memc_ddr_read, memc_ddr_write);
+            add_reset_proc(memc_ddr_reset);
             apb_set_map(0x13, bad_read_word, cx2_backlight_write);
             add_reset_proc(cx2_backlight_reset);
             apb_set_map(0x14, aladdin_pmu_read, aladdin_pmu_write);

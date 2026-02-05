@@ -25,6 +25,7 @@ void aladdin_pmu_reset(void);
 
 uint32_t memc_ddr_read(uint32_t addr);
 void memc_ddr_write(uint32_t addr, uint32_t value);
+void memc_ddr_reset(void);
 
 typedef struct cx2_backlight_state {
     uint32_t pwm_period, pwm_value;

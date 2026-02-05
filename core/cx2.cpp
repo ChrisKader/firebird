@@ -113,13 +113,21 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 	bad_write_word(addr, value);
 }
 
-/* 90120000: FTDDR3030 */
+/* 90120000: FTDDR3030 DDR memory controller */
+static bool ddr_initialized = false;
+
+void memc_ddr_reset(void)
+{
+	ddr_initialized = false;
+}
+
 uint32_t memc_ddr_read(uint32_t addr)
 {
 	switch(addr & 0xFFFF)
 	{
 	case 0x04:
-		return 0x102;
+		// Return 0 if not initialized yet, 0x102 after initialization
+		return ddr_initialized ? 0x102 : 0;
 	case 0x10:
 		return 3; // Size
 	case 0x28:
@@ -133,8 +141,11 @@ uint32_t memc_ddr_read(uint32_t addr)
 void memc_ddr_write(uint32_t addr, uint32_t value)
 {
 	uint16_t offset = addr;
-	if(offset < 0x40)
-		return; // Config data - don't care
+	if(offset < 0x40) {
+		// Config data write - mark DDR as initialized
+		ddr_initialized = true;
+		return;
+	}
 
 	switch(addr & 0xFFFF)
 	{
