@@ -20,8 +20,6 @@
 #include <QWidgetAction>
 #include <QIcon>
 #include <QToolButton>
-#include <QTableWidget>
-#include <QTableWidgetItem>
 #include <QRegularExpression>
 #include <QHeaderView>
 #include <QColor>
@@ -36,6 +34,7 @@
 #include <QResizeEvent>
 #include <QUrl>
 #include <QFontDatabase>
+#include <QClipboard>
 #include <QCloseEvent>
 #include <QDir>
 #include <QFileInfo>
@@ -53,10 +52,18 @@
 #include "qmlbridge.h"
 #include "qtframebuffer.h"
 #include "qtkeypadbridge.h"
+#include "disassemblywidget.h"
+#include "registerwidget.h"
+#include "hexviewwidget.h"
+#include "breakpointwidget.h"
+#include "watchpointwidget.h"
+#include "portmonitorwidget.h"
+#include "stackwidget.h"
+#include "keyhistorywidget.h"
 
 MainWindow *main_window;
 // Change this if you change the UI
-static const constexpr int WindowStateVersion = 1;
+static const constexpr int WindowStateVersion = 3;
 
 namespace
 {
@@ -208,8 +215,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 #endif
 
     ui->setupUi(this);
-    stack_table = ui->stackTable;
-
     // Make the central content fill the full area between header and status bar
     if (ui->mainLayout)
     {
@@ -457,6 +462,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     statusLayout->addStretch(1);
 
+    status_bar_debug_label = new QLabel(status_bar_tray);
+    status_bar_debug_label->setObjectName(QStringLiteral("statusDebugLabel"));
+    status_bar_debug_label->setContentsMargins(0, 0, 0, 0);
+    status_bar_debug_label->setAlignment(Qt::AlignVCenter | Qt::AlignRight);
+    status_bar_debug_label->setVisible(false);
+    statusLayout->addWidget(status_bar_debug_label, 0, Qt::AlignVCenter);
+
     status_bar_speed_label = new QLabel(status_bar_tray);
     status_bar_speed_label->setObjectName(QStringLiteral("statusSpeedLabel"));
     status_bar_speed_label->setContentsMargins(0, 0, 0, 0);
@@ -591,6 +603,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Menu "Tools"
     connect(ui->buttonScreenshot, SIGNAL(clicked()), this, SLOT(screenshot()));
     connect(ui->actionScreenshot, SIGNAL(triggered()), this, SLOT(screenshot()));
+    ui->actionScreenshot->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_C));
+    {
+        auto *saveScreenshotAction = new QAction(tr("Save Screenshot..."), this);
+        saveScreenshotAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S));
+        connect(saveScreenshotAction, &QAction::triggered, this, &MainWindow::screenshotToFile);
+        ui->menuTools->insertAction(ui->actionRecord_GIF, saveScreenshotAction);
+    }
     connect(ui->actionRecord_GIF, SIGNAL(triggered()), this, SLOT(recordGIF()));
     connect(ui->actionConnect, SIGNAL(triggered()), this, SLOT(connectUSB()));
     connect(ui->buttonUSB, SIGNAL(clicked(bool)), this, SLOT(connectUSB()));
@@ -607,6 +626,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->actionSuspend, SIGNAL(triggered()), this, SLOT(suspend()));
     connect(ui->actionResume_from_file, SIGNAL(triggered()), this, SLOT(resumeFromFile()));
     connect(ui->actionSuspend_to_file, SIGNAL(triggered()), this, SLOT(suspendToFile()));
+
+    // Snapshot slots 1-9
+    {
+        ui->menuState->addSeparator();
+        auto *saveSlotMenu = ui->menuState->addMenu(tr("Save to Slot"));
+        auto *loadSlotMenu = ui->menuState->addMenu(tr("Load from Slot"));
+        for (int i = 1; i <= 9; i++) {
+            auto *saveAction = saveSlotMenu->addAction(tr("Slot &%1").arg(i));
+            saveAction->setShortcut(QKeySequence(Qt::CTRL | static_cast<Qt::Key>(Qt::Key_0 + i)));
+            connect(saveAction, &QAction::triggered, this, [this, i]() { saveStateSlot(i); });
+
+            auto *loadAction = loadSlotMenu->addAction(tr("Slot &%1").arg(i));
+            loadAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | static_cast<Qt::Key>(Qt::Key_0 + i)));
+            connect(loadAction, &QAction::triggered, this, [this, i]() { loadStateSlot(i); });
+        }
+    }
 
     // Menu "Flash"
     connect(ui->actionSave, SIGNAL(triggered()), this, SLOT(saveFlash()));
@@ -649,19 +684,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     monospace.setStyleHint(QFont::Monospace);
     ui->debugConsole->setFont(monospace);
     ui->serialConsole->setFont(monospace);
-    if (stack_table)
-    {
-        stack_table->setFont(monospace);
-        stack_table->setColumnCount(2);
-        stack_table->setHorizontalHeaderLabels({tr("Address"), tr("Instruction")});
-        stack_table->horizontalHeader()->setStretchLastSection(true);
-        stack_table->horizontalHeader()->setHighlightSections(false);
-        stack_table->verticalHeader()->setVisible(false);
-        stack_table->setSelectionMode(QAbstractItemView::NoSelection);
-        stack_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
-        stack_table->setAlternatingRowColors(true);
-        stack_table->setFocusPolicy(Qt::NoFocus);
-    }
+    ui->debugConsole->setMaximumBlockCount(5000);
+    ui->serialConsole->setMaximumBlockCount(5000);
 
     // Without this line, Qt prints warning messages...
     qRegisterMetaType<QVector<int>>();
@@ -952,8 +976,6 @@ void MainWindow::applyWidgetTheme()
         view->setAutoFillBackground(true);
     }
 
-    if (stack_table)
-        stack_table->setAlternatingRowColors(true);
 }
 
 MainWindow::~MainWindow()
@@ -1191,6 +1213,7 @@ void MainWindow::debugInputRequested(bool b)
     if (b)
     {
         raiseDebugger();
+        refreshDebuggerWidgets();
         ui->lineEdit->setFocus();
     }
 }
@@ -1205,6 +1228,7 @@ void MainWindow::debuggerEntered(bool entered)
     if (entered)
     {
         raiseDebugger();
+        refreshDebuggerWidgets();
         ui->lineEdit->setFocus();
     }
 }
@@ -1222,84 +1246,6 @@ void MainWindow::debugCommand()
     ui->lineEdit->clear();
 }
 
-void MainWindow::requestDisassembly()
-{
-    disasm_entries.clear();
-    refreshDisassemblyTable();
-    emit debuggerCommand(QStringLiteral("u"));
-}
-
-bool MainWindow::appendDisassemblyLine(const QString &line)
-{
-    // Be permissive: accept lines like "00011c8c: e3510000    cmp r3,00000000" (with tabs/spaces)
-    QString cleaned = line.trimmed();
-    if (cleaned.startsWith(QLatin1Char('>')))
-        cleaned.remove(0, 1);
-    int colon = cleaned.indexOf(QLatin1Char(':'));
-    if (colon <= 0)
-        return false;
-
-    QString addr = cleaned.left(colon).trimmed();
-    QString text = cleaned.mid(colon + 1).trimmed();
-
-    bool ok = false;
-    addr.toUInt(&ok, 16);
-    if (!ok)
-        return false;
-
-    DisasmEntry entry;
-    entry.address = addr.toUpper();
-    entry.text = text;
-    if (entry.text.contains(QStringLiteral("<<")))
-    {
-        entry.is_current = true;
-        entry.text.replace(QStringLiteral("<<"), QStringLiteral(" "));
-        entry.text = entry.text.trimmed();
-    }
-
-    if (disasm_entries.size() > 200)
-        disasm_entries.removeFirst();
-    disasm_entries.push_back(entry);
-    refreshDisassemblyTable();
-    return true;
-}
-
-void MainWindow::refreshDisassemblyTable()
-{
-    if (!stack_table)
-        return;
-
-    stack_table->setUpdatesEnabled(false);
-    stack_table->setRowCount(disasm_entries.size());
-    stack_table->setColumnCount(2);
-    stack_table->horizontalHeader()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
-    stack_table->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-
-    int row = 0;
-    const WidgetTheme &theme = currentWidgetTheme();
-    for (const auto &entry : disasm_entries)
-    {
-        auto *addrItem = new QTableWidgetItem(entry.address);
-        auto *textItem = new QTableWidgetItem(entry.text);
-        addrItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        textItem->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
-        addrItem->setForeground(theme.text);
-        textItem->setForeground(theme.text);
-        stack_table->setItem(row, 0, addrItem);
-        stack_table->setItem(row, 1, textItem);
-        if (entry.is_current)
-        {
-            addrItem->setBackground(theme.selection);
-            textItem->setBackground(theme.selection);
-            addrItem->setForeground(theme.selectionText);
-            textItem->setForeground(theme.selectionText);
-        }
-        ++row;
-    }
-    stack_table->resizeColumnsToContents();
-    stack_table->setUpdatesEnabled(true);
-}
-
 void MainWindow::setDebuggerActive(bool active)
 {
     debugger_active = active;
@@ -1308,6 +1254,17 @@ void MainWindow::setDebuggerActive(bool active)
         debugger_toggle_button->setCheckable(true);
         debugger_toggle_button->setChecked(active);
         debugger_toggle_button->setToolTip(active ? tr("Continue (send 'c')") : tr("Enter debugger"));
+    }
+    if (status_bar_debug_label)
+    {
+        status_bar_debug_label->setVisible(active);
+        if (active)
+        {
+            status_bar_debug_label->setText(QStringLiteral("  DEBUGGER  "));
+            status_bar_debug_label->setStyleSheet(
+                QStringLiteral("QLabel { background-color: #cc2222; color: white; "
+                               "border-radius: 3px; padding: 1px 6px; font-weight: bold; font-size: 10px; }"));
+        }
     }
 }
 
@@ -1453,6 +1410,13 @@ void MainWindow::raiseDebugger()
         dock_debugger->setVisible(true);
         dock_debugger->raise();
     }
+    if (m_disasmDock)
+    {
+        m_disasmDock->setVisible(true);
+        m_disasmDock->raise();
+    }
+    if (m_registerDock)
+        m_registerDock->setVisible(true);
 }
 
 void MainWindow::convertTabsToDocks()
@@ -1591,9 +1555,151 @@ void MainWindow::convertTabsToDocks()
     if (!vert_targets.isEmpty())
         content_window->resizeDocks(vert_targets, vert_sizes, Qt::Vertical);
 
+    /* Create the CEmu-style debugger docks (Disassembly, Registers, Memory, Breakpoints) */
+    createDebuggerDocks(docks_menu);
+
     setUIEditMode(editmode_toggle->isChecked());
 
     ui->tabWidget->setHidden(true);
+}
+
+void MainWindow::createDebuggerDocks(QMenu *docks_menu)
+{
+    auto makeDock = [&](const QString &title, QWidget *widget, const QString &objName,
+                        Qt::DockWidgetArea area) -> DockWidget * {
+        auto *dw = new DockWidget(title, content_window);
+        dw->hideTitlebar(true);
+        dw->setObjectName(objName);
+        dw->setWidget(widget);
+        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+        dw->setFeatures(QDockWidget::DockWidgetClosable |
+                        QDockWidget::DockWidgetMovable |
+                        QDockWidget::DockWidgetFloatable);
+        content_window->addDockWidget(area, dw);
+
+        QAction *action = dw->toggleViewAction();
+        docks_menu->addAction(action);
+
+        return dw;
+    };
+
+    /* Create widgets */
+    m_disasmWidget = new DisassemblyWidget(this);
+    m_registerWidget = new RegisterWidget(this);
+    m_hexWidget = new HexViewWidget(this);
+    m_breakpointWidget = new BreakpointWidget(this);
+    m_watchpointWidget = new WatchpointWidget(this);
+    m_portMonitorWidget = new PortMonitorWidget(this);
+    m_stackWidget = new StackWidget(this);
+    m_keyHistoryWidget = new KeyHistoryWidget(this);
+
+    m_disasmWidget->setIconFont(material_icon_font);
+
+    /* Create docks — debug docks on the right, utility docks on bottom-right */
+    docks_menu->addSeparator();
+
+    m_disasmDock = makeDock(tr("Disassembly"), m_disasmWidget,
+                            QStringLiteral("dockDisasm"), Qt::RightDockWidgetArea);
+    m_registerDock = makeDock(tr("Registers"), m_registerWidget,
+                              QStringLiteral("dockRegisters"), Qt::RightDockWidgetArea);
+    m_stackDock = makeDock(tr("Stack"), m_stackWidget,
+                            QStringLiteral("dockStack"), Qt::RightDockWidgetArea);
+
+    /* Tab Registers and Stack together */
+    content_window->tabifyDockWidget(m_registerDock, m_stackDock);
+    m_registerDock->raise();
+
+    m_hexDock = makeDock(tr("Memory"), m_hexWidget,
+                         QStringLiteral("dockMemory"), Qt::BottomDockWidgetArea);
+    m_breakpointDock = makeDock(tr("Breakpoints"), m_breakpointWidget,
+                                QStringLiteral("dockBreakpoints"), Qt::BottomDockWidgetArea);
+    m_watchpointDock = makeDock(tr("Watchpoints"), m_watchpointWidget,
+                                QStringLiteral("dockWatchpoints"), Qt::BottomDockWidgetArea);
+    m_portMonitorDock = makeDock(tr("Port Monitor"), m_portMonitorWidget,
+                                 QStringLiteral("dockPortMonitor"), Qt::BottomDockWidgetArea);
+    m_keyHistoryDock = makeDock(tr("Key History"), m_keyHistoryWidget,
+                                QStringLiteral("dockKeyHistory"), Qt::BottomDockWidgetArea);
+
+    /* Tab together: Memory, Breakpoints, Watchpoints, Port Monitor */
+    content_window->tabifyDockWidget(m_hexDock, m_breakpointDock);
+    content_window->tabifyDockWidget(m_breakpointDock, m_watchpointDock);
+    content_window->tabifyDockWidget(m_watchpointDock, m_portMonitorDock);
+    content_window->tabifyDockWidget(m_portMonitorDock, m_keyHistoryDock);
+    m_hexDock->raise();
+
+    /* ── Connect signals ─────────────────────────────────── */
+
+    /* Disassembly -> debugger commands */
+    connect(m_disasmWidget, &DisassemblyWidget::debugCommand,
+            this, &MainWindow::debuggerCommand);
+
+    /* Disassembly breakpoint toggle -> refresh breakpoint/watchpoint lists */
+    connect(m_disasmWidget, &DisassemblyWidget::breakpointToggled,
+            this, [this](uint32_t, bool) {
+                m_breakpointWidget->refresh();
+                m_watchpointWidget->refresh();
+            });
+
+    /* Disassembly address select -> navigate hex view */
+    connect(m_disasmWidget, &DisassemblyWidget::addressSelected,
+            this, [this](uint32_t addr) {
+                m_hexWidget->goToAddress(addr);
+                m_hexDock->show();
+                m_hexDock->raise();
+            });
+
+    /* Hex view -> navigate to disassembly */
+    connect(m_hexWidget, &HexViewWidget::gotoDisassembly,
+            this, [this](uint32_t addr) {
+                m_disasmWidget->goToAddress(addr);
+                m_disasmDock->show();
+                m_disasmDock->raise();
+            });
+
+    /* Breakpoint/Watchpoint double-click -> navigate disassembly */
+    connect(m_breakpointWidget, &BreakpointWidget::goToAddress,
+            this, [this](uint32_t addr) {
+                m_disasmWidget->goToAddress(addr);
+                m_disasmDock->show();
+                m_disasmDock->raise();
+            });
+    connect(m_watchpointWidget, &WatchpointWidget::goToAddress,
+            this, [this](uint32_t addr) {
+                m_hexWidget->goToAddress(addr);
+                m_hexDock->show();
+                m_hexDock->raise();
+            });
+
+    /* Port monitor -> navigate to hex view */
+    connect(m_portMonitorWidget, &PortMonitorWidget::goToAddress,
+            this, [this](uint32_t addr) {
+                m_hexWidget->goToAddress(addr);
+                m_hexDock->show();
+                m_hexDock->raise();
+            });
+
+    /* Stack -> navigate to disassembly (for return addresses) */
+    connect(m_stackWidget, &StackWidget::goToAddress,
+            this, [this](uint32_t addr) {
+                m_disasmWidget->goToAddress(addr);
+                m_disasmDock->show();
+                m_disasmDock->raise();
+            });
+
+    /* Key history: feed keypresses from QtKeypadBridge */
+    connect(&qt_keypad_bridge, &QtKeypadBridge::keyStateChanged,
+            m_keyHistoryWidget, &KeyHistoryWidget::addEntry);
+}
+
+void MainWindow::refreshDebuggerWidgets()
+{
+    if (m_disasmWidget) m_disasmWidget->refresh();
+    if (m_registerWidget) m_registerWidget->refresh();
+    if (m_hexWidget) m_hexWidget->refresh();
+    if (m_breakpointWidget) m_breakpointWidget->refresh();
+    if (m_watchpointWidget) m_watchpointWidget->refresh();
+    if (m_portMonitorWidget) m_portMonitorWidget->refresh();
+    if (m_stackWidget) m_stackWidget->refresh();
 }
 
 void MainWindow::retranslateDocks()
@@ -1611,6 +1717,22 @@ void MainWindow::retranslateDocks()
             dw->setWindowTitle(tr("Serial Monitor"));
         else if (dw->widget() == ui->tabDebugger)
             dw->setWindowTitle(tr("Debugger"));
+        else if (dw->widget() == m_disasmWidget)
+            dw->setWindowTitle(tr("Disassembly"));
+        else if (dw->widget() == m_registerWidget)
+            dw->setWindowTitle(tr("Registers"));
+        else if (dw->widget() == m_hexWidget)
+            dw->setWindowTitle(tr("Memory"));
+        else if (dw->widget() == m_breakpointWidget)
+            dw->setWindowTitle(tr("Breakpoints"));
+        else if (dw->widget() == m_watchpointWidget)
+            dw->setWindowTitle(tr("Watchpoints"));
+        else if (dw->widget() == m_portMonitorWidget)
+            dw->setWindowTitle(tr("Port Monitor"));
+        else if (dw->widget() == m_stackWidget)
+            dw->setWindowTitle(tr("Stack"));
+        else if (dw->widget() == m_keyHistoryWidget)
+            dw->setWindowTitle(tr("Key History"));
     }
 }
 
@@ -1621,6 +1743,13 @@ void MainWindow::showSpeed(double value)
 }
 
 void MainWindow::screenshot()
+{
+    QImage image = renderFramebuffer();
+    QApplication::clipboard()->setImage(image);
+    showStatusMsg(tr("Screenshot copied to clipboard"));
+}
+
+void MainWindow::screenshotToFile()
 {
     QImage image = renderFramebuffer();
 
@@ -1786,6 +1915,36 @@ void MainWindow::suspendToFile()
     QString snapshot = QFileDialog::getSaveFileName(this, tr("Select snapshot to suspend to"));
     if (!snapshot.isEmpty())
         suspendToPath(snapshot);
+}
+
+static QString stateSlotPath(int slot)
+{
+    QString snapshot_path = the_qml_bridge ? the_qml_bridge->getSnapshotPath() : QString();
+    QString dir;
+    if (!snapshot_path.isEmpty())
+        dir = QFileInfo(snapshot_path).absolutePath();
+    else
+        dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    return dir + QDir::separator() + QStringLiteral("slot_%1.fbsnapshot").arg(slot);
+}
+
+void MainWindow::saveStateSlot(int slot)
+{
+    QString path = stateSlotPath(slot);
+    suspendToPath(path);
+    showStatusMsg(tr("Saving state to slot %1...").arg(slot));
+}
+
+void MainWindow::loadStateSlot(int slot)
+{
+    QString path = stateSlotPath(slot);
+    if (!QFileInfo::exists(path))
+    {
+        showStatusMsg(tr("Slot %1 is empty").arg(slot));
+        return;
+    }
+    resumeFromPath(path);
 }
 
 void MainWindow::saveFlash()

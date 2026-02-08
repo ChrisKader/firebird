@@ -12,6 +12,8 @@ Rectangle {
     readonly property color accent: FBUI.Theme.accent
     readonly property color accentMuted: FBUI.Theme.accentMuted
 
+    SvgPaths { id: svgPaths }
+
     color: FBUI.Theme.background
 
     ColumnLayout {
@@ -32,36 +34,44 @@ Rectangle {
         NBigButton {
             id: nButton1
             text: "esc"
+            svgPath: svgPaths.esc
             Layout.fillWidth: true
             keymap_id: 73
+
+            SvgIcon {
+                width: 33
+                height: 11
+                pathData: svgPaths.undo
+                fillColor: rectangle1.accent
+                padding: 0.15
+                anchors.bottom: parent.top
+                anchors.bottomMargin: 0
+            }
         }
 
         NBigButton {
             id: nButton2
             text: "pad"
+            svgPath: svgPaths.scratchpad
             Layout.fillWidth: true
             keymap_id: 65
 
-            Text {
+            SvgIcon {
                 id: text6
-                x: 0
-                y: -11
                 width: 33
                 height: 11
-                color: rectangle1.accent
-                text: "save"
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 9
-                anchors.bottomMargin: 0
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
+                pathData: svgPaths.save
+                fillColor: rectangle1.accent
+                padding: 0.15
                 anchors.bottom: parent.top
+                anchors.bottomMargin: 0
             }
         }
 
         NBigButton {
             id: nButton3
             text: "tab"
+            svgPath: svgPaths.tab
             Layout.fillWidth: true
             keymap_id: 75
         }
@@ -84,8 +94,19 @@ Rectangle {
         NBigButton {
             id: nButton4
             text: "⌂on"
+            svgPath: svgPaths.home
             Layout.fillWidth: true
             keymap_id: 9
+
+            SvgIcon {
+                width: 33
+                height: 11
+                pathData: svgPaths.pageBarOff
+                fillColor: rectangle1.accent
+                padding: 0.15
+                anchors.bottom: parent.top
+                anchors.bottomMargin: 0
+            }
 
             onClicked: {
                 if(!Emu.isRunning)
@@ -103,40 +124,36 @@ Rectangle {
         NBigButton {
             id: nButton5
             text: "doc"
+            svgPath: svgPaths.doc
             Layout.fillWidth: true
             keymap_id: 69
 
-            Text {
+            SvgIcon {
                 id: text7
-                x: 0
-                y: -11
                 width: 33
                 height: 11
-                color: rectangle1.accent
-                text: "+page"
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 9
-                anchors.bottomMargin: 0
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
+                pathData: svgPaths.addPage
+                fillColor: rectangle1.accent
+                padding: 0.15
                 anchors.bottom: parent.top
+                anchors.bottomMargin: 0
             }
         }
 
         NBigButton {
             id: nButton6
             text: "menu"
+            svgPath: svgPaths.menu
             Layout.fillWidth: true
             keymap_id: 71
 
-            Image {
-                source: "qrc:/keyimages/resources/keyimages/context_menu.png"
+            SvgIcon {
+                pathData: svgPaths.contextMenu
+                fillColor: rectangle1.accent
+                width: 20
                 height: 10
                 anchors.bottom: nButton6.top
                 anchors.horizontalCenter: parent.horizontalCenter
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
             }
         }
     }
@@ -173,22 +190,18 @@ Rectangle {
             id: nButton11
             Layout.preferredWidth: 33
             text: "shift"
+            svgPath: svgPaths.shift
             keymap_id: 85
 
-            Text {
+            SvgIcon {
                 id: text5
-                x: 0
-                y: -11
                 width: 33
                 height: 11
-                color: rectangle1.accent
-                text: "CAPS"
+                pathData: svgPaths.caps
+                fillColor: rectangle1.accent
+                padding: 0.15
                 anchors.bottom: parent.top
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 9
                 anchors.bottomMargin: 0
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
             }
         }
 
@@ -196,44 +209,43 @@ Rectangle {
             id: nButton12
             Layout.preferredWidth: 33
             text: "var"
+            svgPath: svgPaths.varKey
             Layout.fillWidth: false
             border.width: 1
             clip: false
             keymap_id: 56
             Layout.column: 2
 
-            Text {
+            SvgIcon {
                 id: text4
-                x: 0
-                y: -11
                 width: 33
                 height: 11
-                color: rectangle1.accent
-                text: "sto→"
+                pathData: svgPaths.store
+                fillColor: rectangle1.accent
+                padding: 0.15
                 anchors.bottom: parent.top
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 9
                 anchors.bottomMargin: 0
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
             }
         }
 
         NNumButton {
             id: nNumButton1
             text: "7"
+            svgPath: svgPaths.num7
             keymap_id: 40
         }
 
         NNumButton {
             id: nNumButton2
             text: "8"
+            svgPath: svgPaths.num8
             keymap_id: 72
         }
 
         NNumButton {
             id: nNumButton3
             text: "9"
+            svgPath: svgPaths.num9
             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
             keymap_id: 36
         }
@@ -241,86 +253,85 @@ Rectangle {
         NNumButton {
             id: nNumButton4
             text: "4"
+            svgPath: svgPaths.num4
             keymap_id: 29
         }
 
         NNumButton {
             id: nNumButton5
             text: "5"
+            svgPath: svgPaths.num5
             keymap_id: 61
         }
 
         NNumButton {
             id: nNumButton6
             text: "6"
+            svgPath: svgPaths.num6
             keymap_id: 25
         }
 
         NNumButton {
             id: nNumButton7
             text: "1"
+            svgPath: svgPaths.num1
             keymap_id: 18
         }
 
         NNumButton {
             id: nNumButton8
             text: "2"
+            svgPath: svgPaths.num2
             keymap_id: 70
         }
 
         NNumButton {
             id: nNumButton9
             text: "3"
+            svgPath: svgPaths.num3
             keymap_id: 14
         }
 
         NNumButton {
             id: nNumButton10
             text: "0"
+            svgPath: svgPaths.num0
             keymap_id: 7
         }
 
         NNumButton {
             id: nNumButton11
             text: "."
+            svgPath: svgPaths.decimal
             keymap_id: 59
 
-            Text {
+            SvgIcon {
                 id: text3
-                x: 0
-                y: -11
                 width: 33
                 height: 11
-                color: rectangle1.accent
-                text: "capture"
+                pathData: svgPaths.capture
+                fillColor: rectangle1.accent
+                padding: 0.15
                 anchors.bottom: parent.top
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 9
                 anchors.bottomMargin: 0
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
             }
         }
 
         NNumButton {
             id: nNumButton12
             text: "(-)"
+            svgPath: svgPaths.negative
             keymap_id: 3
 
-            Text {
+            SvgIcon {
                 id: text2
-                x: 0
-                y: -11
                 width: 33
                 height: 11
-                color: rectangle1.accent
-                text: "ans"
+                pathData: svgPaths.ans
+                fillColor: rectangle1.accent
+                padding: 0.15
                 anchors.bottom: parent.top
-                horizontalAlignment: Text.AlignHCenter
-                font.pixelSize: 9
                 anchors.bottomMargin: 0
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
             }
         }
     }
@@ -329,6 +340,7 @@ Rectangle {
         id: nButton7
         width: 33
         text: "ctrl"
+        svgPath: svgPaths.ctrl
         anchors.top: gridLayout1.top
         anchors.topMargin: 0
         keymap_id: 86
@@ -345,26 +357,22 @@ Rectangle {
         x: 230
         width: 33
         text: "del"
+        svgPath: svgPaths.del
         anchors.top: gridLayout1.top
         anchors.topMargin: 0
         keymap_id: 64
         anchors.right: parent.right
         anchors.rightMargin: 5
 
-        Text {
+        SvgIcon {
             id: text9
-            x: 0
-            y: -11
             width: 33
             height: 11
-            color: rectangle1.accent
-            text: "clear"
-            horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: 9
-            anchors.bottomMargin: 0
-            font.bold: true
-            verticalAlignment: Text.AlignVCenter
+            pathData: svgPaths.clear
+            fillColor: rectangle1.accent
+            padding: 0.15
             anchors.bottom: parent.top
+            anchors.bottomMargin: 0
         }
     }
 
@@ -382,54 +390,47 @@ Rectangle {
         columnSpacing: 10
         columns: 9
 
-        NAlphaButton { Layout.preferredWidth: 21; text: "EE" ;keymap_id: 30 }
-        NAlphaButton { text: "A" ;keymap_id: 50 }
-        NAlphaButton { text: "B" ;keymap_id: 49 }
-        NAlphaButton { text: "C" ;keymap_id: 48 }
-        NAlphaButton { text: "D" ;keymap_id: 46 }
-        NAlphaButton { text: "E" ;keymap_id: 45 }
-        NAlphaButton { text: "F" ;keymap_id: 44 }
-        NAlphaButton { text: "G" ;keymap_id: 39 }
-        NAlphaButton { Layout.preferredWidth: 21; text: "?!▸";keymap_id: 8 }
-        NAlphaButton { Layout.preferredWidth: 21; text: "π▸";keymap_id: 19 }
-        NAlphaButton { text: "H" ;keymap_id: 38 }
-        NAlphaButton { text: "I" ;keymap_id: 37 }
-        NAlphaButton { text: "J" ;keymap_id: 35 }
-        NAlphaButton { text: "K" ;keymap_id: 34 }
-        NAlphaButton { text: "L" ;keymap_id: 33 }
-        NAlphaButton { text: "M" ;keymap_id: 28 }
-        NAlphaButton { text: "N" ;keymap_id: 27 }
-        NAlphaButton { Layout.preferredWidth: 21; text: "";keymap_id: 66;
-            Image {
-                source: "qrc:/keyimages/resources/keyimages/flag.png"
-                anchors.fill: parent
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-            }
-        }
-        NAlphaButton { Layout.preferredWidth: 21; text: "," ;keymap_id: 87 }
-        NAlphaButton { text: "O" ;keymap_id: 26 }
-        NAlphaButton { text: "P" ;keymap_id: 24 }
-        NAlphaButton { text: "Q" ;keymap_id: 23 }
-        NAlphaButton { text: "R" ;keymap_id: 22 }
-        NAlphaButton { text: "S" ;keymap_id: 17 }
-        NAlphaButton { id: nAlphaButtonT; text: "T" ;keymap_id: 16 }
-        NAlphaButton { id: nAlphaButtonU; text: "U" ;keymap_id: 15 }
-        NAlphaButton { Layout.preferredWidth: 21; text: "↵";keymap_id: 0 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "EE"; svgPath: svgPaths.ee; keymap_id: 30 }
+        NAlphaButton { text: "A"; svgPath: svgPaths.letterA; keymap_id: 50 }
+        NAlphaButton { text: "B"; svgPath: svgPaths.letterB; keymap_id: 49 }
+        NAlphaButton { text: "C"; svgPath: svgPaths.letterC; keymap_id: 48 }
+        NAlphaButton { text: "D"; svgPath: svgPaths.letterD; keymap_id: 46 }
+        NAlphaButton { text: "E"; svgPath: svgPaths.letterE; keymap_id: 45 }
+        NAlphaButton { text: "F"; svgPath: svgPaths.letterF; keymap_id: 44 }
+        NAlphaButton { text: "G"; svgPath: svgPaths.letterG; keymap_id: 39 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "?!▸"; svgPath: svgPaths.punctuation; keymap_id: 8 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "π▸"; svgPath: svgPaths.pi; keymap_id: 19 }
+        NAlphaButton { text: "H"; svgPath: svgPaths.letterH; keymap_id: 38 }
+        NAlphaButton { text: "I"; svgPath: svgPaths.letterI; keymap_id: 37 }
+        NAlphaButton { text: "J"; svgPath: svgPaths.letterJ; keymap_id: 35 }
+        NAlphaButton { text: "K"; svgPath: svgPaths.letterK; keymap_id: 34 }
+        NAlphaButton { text: "L"; svgPath: svgPaths.letterL; keymap_id: 33 }
+        NAlphaButton { text: "M"; svgPath: svgPaths.letterM; keymap_id: 28 }
+        NAlphaButton { text: "N"; svgPath: svgPaths.letterN; keymap_id: 27 }
+        NAlphaButton { Layout.preferredWidth: 21; text: ""; svgPath: svgPaths.flag; keymap_id: 66 }
+        NAlphaButton { Layout.preferredWidth: 21; text: ","; svgPath: svgPaths.comma; keymap_id: 87 }
+        NAlphaButton { text: "O"; svgPath: svgPaths.letterO; keymap_id: 26 }
+        NAlphaButton { text: "P"; svgPath: svgPaths.letterP; keymap_id: 24 }
+        NAlphaButton { text: "Q"; svgPath: svgPaths.letterQ; keymap_id: 23 }
+        NAlphaButton { text: "R"; svgPath: svgPaths.letterR; keymap_id: 22 }
+        NAlphaButton { text: "S"; svgPath: svgPaths.letterS; keymap_id: 17 }
+        NAlphaButton { id: nAlphaButtonT; text: "T"; svgPath: svgPaths.letterT; keymap_id: 16 }
+        NAlphaButton { id: nAlphaButtonU; text: "U"; svgPath: svgPaths.letterU; keymap_id: 15 }
+        NAlphaButton { Layout.preferredWidth: 21; text: "↵"; svgPath: svgPaths.returnKey; keymap_id: 0 }
         Rectangle {
             color: "#00000000"
             Layout.preferredWidth: 15
             Layout.preferredHeight: 15
         }
-        NAlphaButton { text: "V" ;keymap_id: 13 }
-        NAlphaButton { text: "W" ;keymap_id: 12 }
-        NAlphaButton { text: "X" ;keymap_id: 11 }
-        NAlphaButton { text: "Y" ;keymap_id: 6 }
-        NAlphaButton { text: "Z" ;keymap_id: 5 }
+        NAlphaButton { text: "V"; svgPath: svgPaths.letterV; keymap_id: 13 }
+        NAlphaButton { text: "W"; svgPath: svgPaths.letterW; keymap_id: 12 }
+        NAlphaButton { text: "X"; svgPath: svgPaths.letterX; keymap_id: 11 }
+        NAlphaButton { text: "Y"; svgPath: svgPaths.letterY; keymap_id: 6 }
+        NAlphaButton { text: "Z"; svgPath: svgPaths.letterZ; keymap_id: 5 }
 
         NAlphaButton {
             text: "space"
+            svgPath: svgPaths.space
             Layout.fillWidth: true
             keymap_id: 4
             Layout.columnSpan: 2
@@ -443,22 +444,23 @@ Rectangle {
         anchors.topMargin: 0
         topText1: "|≠≥>"
         topText2: ""
+        topSvgPath1: svgPaths.inequality
         id1: 51
         id2: 20
         anchors.left: parent.left
         anchors.leftMargin: 5
         text2: "trig"
         text1: "="
+        svgPath1: svgPaths.equal
+        svgPath2: svgPaths.trig
 
-        Image {
-            source: "qrc:/keyimages/resources/keyimages/questionmark.png"
-            width: nDualButton1.button2.width * .55
+        SvgIcon {
+            pathData: svgPaths.hintsQuestion
+            fillColor: rectangle1.accent
+            width: 14; height: 14
+            padding: 0
             anchors.bottom: nDualButton1.button2.top
-            anchors.left: nDualButton1.button2.left
-            anchors.leftMargin: nDualButton1.button2.width / 4
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            mipmap: true
+            anchors.horizontalCenter: nDualButton1.button2.horizontalCenter
         }
     }
 
@@ -467,6 +469,8 @@ Rectangle {
         x: 5
         topText1: "<sup>n<sup>√x"
         topText2: "√"
+        topSvgPath1: svgPaths.nthRoot
+        topSvgPath2: svgPaths.sqrt
         anchors.top: nDualButton1.bottom
         anchors.topMargin: 0
         id1: 53
@@ -475,6 +479,8 @@ Rectangle {
         anchors.leftMargin: 5
         text2: "x<sup>2</sup>"
         text1: "^"
+        svgPath1: svgPaths.caret
+        svgPath2: svgPaths.xSquared
     }
 
     NDualButton {
@@ -482,6 +488,8 @@ Rectangle {
         x: 5
         topText2: "log"
         topText1: "ln"
+        topSvgPath1: svgPaths.ln
+        topSvgPath2: svgPaths.log
         anchors.top: nDualButton2.bottom
         anchors.topMargin: 0
         id1: 42
@@ -490,12 +498,16 @@ Rectangle {
         anchors.leftMargin: 5
         text2: "10<sup>x</sup>"
         text1: "e<sup>x</sup>"
+        svgPath1: svgPaths.eToTheX
+        svgPath2: svgPaths.tenToTheX
     }
 
     NDualButton {
         id: nDualButton4
         topText2: "{ }"
         topText1: "[ ]"
+        topSvgPath1: svgPaths.brackets
+        topSvgPath2: svgPaths.braces
         anchors.top: nDualButton3.bottom
         anchors.topMargin: 0
         id1: 60
@@ -504,6 +516,8 @@ Rectangle {
         anchors.leftMargin: 5
         text2: ")"
         text1: "("
+        svgPath1: svgPaths.parenLeft
+        svgPath2: svgPaths.parenRight
     }
 
     NDualButton {
@@ -513,27 +527,16 @@ Rectangle {
         anchors.topMargin: 0
         topText2: "∞β°"
         topText1: ":="
+        topSvgPath1: svgPaths.define
+        topSvgPath2: svgPaths.symbolTemplate
         id1: 63
         id2: 62
         anchors.right: parent.right
         anchors.rightMargin: 5
         text2: ""
         text1: ""
-
-        Image {
-                source: "qrc:/keyimages/resources/keyimages/templates.png"
-                anchors.fill: nDualButton5.button1
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-        }
-        Image {
-                source: "qrc:/keyimages/resources/keyimages/catalog.png"
-                anchors.fill: nDualButton5.button2
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                mipmap: true
-        }
+        svgPath1: svgPaths.templates
+        svgPath2: svgPaths.catalog
     }
 
     NDualButton {
@@ -541,6 +544,8 @@ Rectangle {
         x: 210
         topText2: "÷"
         topText1: "\"□\""
+        topSvgPath1: svgPaths.mathBox
+        topSvgPath2: svgPaths.fractionTemplate
         anchors.top: nDualButton5.bottom
         anchors.topMargin: 0
         id1: 52
@@ -549,6 +554,8 @@ Rectangle {
         anchors.rightMargin: 5
         text2: "÷"
         text1: "×"
+        svgPath1: svgPaths.multiply
+        svgPath2: svgPaths.divide
     }
 
     NDualButton {
@@ -564,27 +571,25 @@ Rectangle {
         anchors.rightMargin: 5
         text2: "‒"
         text1: "+"
+        svgPath1: svgPaths.plus
+        svgPath2: svgPaths.minus
 
-        Image {
-            source: "qrc:/keyimages/resources/keyimages/contrast_plus.png"
-            width: nDualButton7.button1.width * .5
+        SvgIcon {
+            pathData: svgPaths.contrastUp
+            fillColor: rectangle1.accent
+            width: 8; height: 8
+            padding: 0
             anchors.bottom: nDualButton7.button1.top
-            anchors.left: nDualButton7.button1.left
-            anchors.leftMargin: nDualButton7.button1.width / 4
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            mipmap: true
+            anchors.horizontalCenter: nDualButton7.button1.horizontalCenter
         }
 
-        Image {
-            source: "qrc:/keyimages/resources/keyimages/contrast_minus.png"
-            width: nDualButton7.button2.width * .5
+        SvgIcon {
+            pathData: svgPaths.contrastDown
+            fillColor: rectangle1.accent
+            width: 8; height: 8
+            padding: 0
             anchors.bottom: nDualButton7.button2.top
-            anchors.left: nDualButton7.button2.left
-            anchors.leftMargin: nDualButton7.button2.width / 4
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            mipmap: true
+            anchors.horizontalCenter: nDualButton7.button2.horizontalCenter
         }
     }
 
@@ -596,23 +601,19 @@ Rectangle {
         width: 50
         height: 20
         text: "enter"
+        svgPath: svgPaths.enter
         anchors.top: nDualButton7.bottom
         anchors.topMargin: 10
 
-        Text {
+        SvgIcon {
             id: text1
-            x: 0
-            y: -12
             width: 50
             height: 11
-            color: rectangle1.accent
-            text: "≈"
-            font.bold: true
+            pathData: svgPaths.approximate
+            fillColor: rectangle1.accent
+            padding: 0.15
             anchors.bottom: nButton8.top
             anchors.bottomMargin: 1
-            verticalAlignment: Text.AlignVCenter
-            horizontalAlignment: Text.AlignHCenter
-            font.pixelSize: 12
         }
     }
 

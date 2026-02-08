@@ -114,10 +114,24 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 			aladdin_pmu_update_int();
 			return;
 		case 0x30:
+		{
 			aladdin_pmu.clocks = value;
+			/* Recalculate clock rates from PLL multiplier.
+			 * Reset value 0x21020303: upper byte 0x21 = 33, and 33 * 12 MHz = 396 MHz.
+			 * Extract multiplier and compute new rates. */
+			uint32_t mult = (value >> 24) & 0x3F;
+			if (mult > 0) {
+				uint32_t base = mult * 12000000u;
+				uint32_t new_rates[3];
+				new_rates[CLOCK_CPU] = base;
+				new_rates[CLOCK_AHB] = base / 2;
+				new_rates[CLOCK_APB] = base / 4;
+				sched_set_clocks(3, new_rates);
+			}
 			aladdin_pmu.int_state |= 1;
 			aladdin_pmu_update_int();
 			return;
+		}
 		case 0x50: aladdin_pmu.disable[1] = value; return;
 		case 0x60: aladdin_pmu.disable[2] = value; return;
 		case 0xC4: aladdin_pmu.int_enable = value; return;

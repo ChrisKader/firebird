@@ -451,8 +451,8 @@ bool memory_initialize(uint32_t sdram_size)
         if(emulate_cx2)
         {
             apb_set_map(0x04, cx2_lcd_spi_read, cx2_lcd_spi_write);
-            // Second serial port - for now use the same state
-            apb_set_map(0x07, serial_cx_read, serial_cx_write);
+            apb_set_map(0x07, serial_cx2_read, serial_cx2_write);
+            add_reset_proc(serial_cx2_reset);
             apb_set_map(0x08, unknown_9008_read, unknown_9008_write);
             apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word);
             apb_set_map(0x12, memc_ddr_read, memc_ddr_write);
@@ -1008,6 +1008,7 @@ bool memory_suspend(emu_snapshot *snapshot)
             && serial_suspend(snapshot)
             && interrupt_suspend(snapshot)
             && serial_cx_suspend(snapshot)
+            && serial_cx2_suspend(snapshot)
             && cx2_suspend(snapshot)
             && usb_cx2_suspend(snapshot);
 }
@@ -1030,6 +1031,7 @@ bool memory_resume(const emu_snapshot *snapshot)
             && serial_resume(snapshot)
             && interrupt_resume(snapshot)
             && serial_cx_resume(snapshot)
+            && serial_cx2_resume(snapshot)
             && cx2_resume(snapshot)
             && usb_cx2_resume(snapshot);
 }

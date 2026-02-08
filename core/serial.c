@@ -166,8 +166,10 @@ bool serial_cx_suspend(emu_snapshot *snapshot)
     return snapshot_write(snapshot, &serial_cx, sizeof(serial_cx));
 }
 
+static serial_cx_state serial_cx2; /* forward declaration for shared interrupt */
 static inline void serial_cx_int_check() {
-    int_set(INT_SERIAL, serial_cx.int_status & serial_cx.int_mask);
+    int_set(INT_SERIAL, (serial_cx.int_status & serial_cx.int_mask)
+                      | (serial_cx2.int_status & serial_cx2.int_mask));
 }
 void serial_cx_reset() {
     if (xmodem_file) {
@@ -188,13 +190,18 @@ uint32_t serial_cx_read(uint32_t addr) {
             serial_cx_int_check();
             xmodem_next_char();
             return byte;
+        case 0x004: return 0; /* UARTRSR */
         case 0x018: return 0x90 & ~(serial_cx.rx << 4);
+        case 0x020: return 0; /* UARTILPR */
         case 0x024: return 0;
         case 0x028: return 0;
         case 0x02C: return 0;
-        case 0x040: return serial_cx.int_status & serial_cx.int_mask;
         case 0x030: return serial_cx.cr;
-        case 0x038: return 0;
+        case 0x034: return 0; /* UARTIFLS */
+        case 0x038: return serial_cx.int_mask;
+        case 0x03C: return serial_cx.int_status;
+        case 0x040: return serial_cx.int_status & serial_cx.int_mask;
+        case 0x048: return 0; /* UARTDMACR */
         case 0xFE0: return 0x11;
         case 0xFE4: return 0x10;
         case 0xFE8: return 0x34;
@@ -208,13 +215,23 @@ uint32_t serial_cx_read(uint32_t addr) {
 }
 void serial_cx_write(uint32_t addr, uint32_t value) {
     switch (addr & 0xFFFF) {
-        case 0x000: serial_byte_out(value); return;
-        case 0x004: return;
+        case 0x000:
+            serial_byte_out(value);
+            /* Note: On real PL011, TXIS is a level signal reflecting FIFO
+             * fill state — it's asserted whenever the FIFO is at or below
+             * the trigger level. Since we have no FIFO (bytes are consumed
+             * instantly), we cannot simply latch TXIS here or it causes an
+             * interrupt storm. Proper TXIS would need a deferred timer to
+             * simulate FIFO drain. For now, firmware uses polling TX. */
+            return;
+        case 0x004: return; /* UARTRSR write-to-clear */
+        case 0x020: return; /* UARTILPR */
         case 0x024: return;
         case 0x028: return;
         case 0x02C: return;
         case 0x030: serial_cx.cr = value; return;
         case 0x034: return;
+        case 0x048: return; /* UARTDMACR */
         case 0x038:
             serial_cx.int_mask = value & 0x7FF;
             serial_cx_int_check();
@@ -222,6 +239,90 @@ void serial_cx_write(uint32_t addr, uint32_t value) {
         case 0x044:
             serial_cx.int_status &= ~value;
             serial_cx_int_check();
+            return;
+    }
+    bad_write_word(addr, value);
+}
+
+/* Second PL011 UART for CX2 (0x90070000) — independent state
+ * (serial_cx2 is defined above, near serial_cx_int_check) */
+
+bool serial_cx2_resume(const emu_snapshot *snapshot)
+{
+    return snapshot_read(snapshot, &serial_cx2, sizeof(serial_cx2));
+}
+
+bool serial_cx2_suspend(emu_snapshot *snapshot)
+{
+    return snapshot_write(snapshot, &serial_cx2, sizeof(serial_cx2));
+}
+
+static inline void serial_cx2_int_check() {
+    /* Second UART shares INT_SERIAL — real hardware may have a separate line,
+     * but sharing is safe since the OS checks both UART status registers. */
+    int_set(INT_SERIAL, (serial_cx.int_status & serial_cx.int_mask)
+                      | (serial_cx2.int_status & serial_cx2.int_mask));
+}
+
+void serial_cx2_reset() {
+    memset(&serial_cx2, 0, sizeof serial_cx2);
+    serial_cx2.cr = 0x300;
+}
+
+uint32_t serial_cx2_read(uint32_t addr) {
+    switch (addr & 0xFFFF) {
+        case 0x000:
+            if (!(serial_cx2.rx & 1))
+                error("Attempted to read empty RBR (UART2)");
+            uint8_t byte = serial_cx2.rx_char;
+            serial_cx2.rx = 0;
+            serial_cx2.int_status &= ~0x10;
+            serial_cx2_int_check();
+            return byte;
+        case 0x004: return 0; /* UARTRSR */
+        case 0x018: return 0x90 & ~(serial_cx2.rx << 4);
+        case 0x020: return 0; /* UARTILPR */
+        case 0x024: return 0;
+        case 0x028: return 0;
+        case 0x02C: return 0;
+        case 0x030: return serial_cx2.cr;
+        case 0x034: return 0; /* UARTIFLS */
+        case 0x038: return serial_cx2.int_mask;
+        case 0x03C: return serial_cx2.int_status;
+        case 0x040: return serial_cx2.int_status & serial_cx2.int_mask;
+        case 0x048: return 0; /* UARTDMACR */
+        case 0xFE0: return 0x11;
+        case 0xFE4: return 0x10;
+        case 0xFE8: return 0x34;
+        case 0xFEC: return 0x00;
+        case 0xFF0: return 0x0d;
+        case 0xFF4: return 0xf0;
+        case 0xFF8: return 0x05;
+        case 0xFFC: return 0xb1;
+    }
+    return bad_read_word(addr);
+}
+
+void serial_cx2_write(uint32_t addr, uint32_t value) {
+    switch (addr & 0xFFFF) {
+        case 0x000:
+            serial_byte_out(value);
+            return;
+        case 0x004: return;
+        case 0x020: return;
+        case 0x024: return;
+        case 0x028: return;
+        case 0x02C: return;
+        case 0x030: serial_cx2.cr = value; return;
+        case 0x034: return;
+        case 0x048: return;
+        case 0x038:
+            serial_cx2.int_mask = value & 0x7FF;
+            serial_cx2_int_check();
+            return;
+        case 0x044:
+            serial_cx2.int_status &= ~value;
+            serial_cx2_int_check();
             return;
     }
     bad_write_word(addr, value);

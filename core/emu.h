@@ -88,7 +88,7 @@ typedef void (*debug_input_cb)(const char *input);
 void gui_debugger_request_input(debug_input_cb callback);
 
 #define SNAPSHOT_SIG 0xCAFEBEE0
-#define SNAPSHOT_VER 3
+#define SNAPSHOT_VER 4
 
 // Passed to resume/suspend functions.
 // Use snapshot_(read/write) to access stream contents.

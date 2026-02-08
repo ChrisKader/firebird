@@ -6,13 +6,22 @@
 #include <QLabel>
 #include <QQuickWidget>
 #include <QStringList>
-#include <QList>
 #include <functional>
 
 #include "emuthread.h"
 #include "fbaboutdialog.h"
 #include "lcdwidget.h"
 #include "qmlbridge.h"
+
+class DisassemblyWidget;
+class RegisterWidget;
+class HexViewWidget;
+class BreakpointWidget;
+class WatchpointWidget;
+class PortMonitorWidget;
+class StackWidget;
+class KeyHistoryWidget;
+class DockWidget;
 
 namespace Ui {
 class MainWindow;
@@ -69,6 +78,7 @@ public slots:
 
     //Menu "Tools"
     void screenshot();
+    void screenshotToFile();
     void recordGIF();
     void connectUSB();
     void usblinkChanged(bool state);
@@ -82,6 +92,8 @@ public slots:
     void suspend();
     void resumeFromFile();
     void suspendToFile();
+    void saveStateSlot(int slot);
+    void loadStateSlot(int slot);
 
     //Menu "Flash"
     void saveFlash();
@@ -132,7 +144,9 @@ private:
     bool resumeFromPath(QString path);
 
     void convertTabsToDocks();
+    void createDebuggerDocks(QMenu *docks_menu);
     void retranslateDocks();
+    void refreshDebuggerWidgets();
 
     void updateUIActionState(bool emulation_running);
     void raiseDebugger();
@@ -149,9 +163,6 @@ private:
     // and emu_thread configured appropriately.
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
-    void requestDisassembly();
-    bool appendDisassemblyLine(const QString &line);
-    void refreshDisassemblyTable();
     void applyWidgetTheme();
 
 protected:
@@ -170,6 +181,7 @@ private:
     // Used to show a status message permanently
     QLabel status_label;
     QLabel *status_bar_speed_label = nullptr;
+    QLabel *status_bar_debug_label = nullptr;
     QWidget *status_bar_tray = nullptr;
     QToolButton *status_dark_button = nullptr;
 
@@ -213,14 +225,25 @@ private:
     // Debugger toggle state/button
     bool debugger_active = false;
     QToolButton *debugger_toggle_button = nullptr;
-    struct DisasmEntry {
-        QString address;
-        QString text;
-        bool is_current = false;
-    };
-    QList<DisasmEntry> disasm_entries;
-    QTableWidget *stack_table = nullptr;
     std::function<void()> updatePlayPauseButtonFn;
+
+    /* CEmu-style debugger docks */
+    DisassemblyWidget *m_disasmWidget = nullptr;
+    RegisterWidget *m_registerWidget = nullptr;
+    HexViewWidget *m_hexWidget = nullptr;
+    BreakpointWidget *m_breakpointWidget = nullptr;
+    WatchpointWidget *m_watchpointWidget = nullptr;
+    PortMonitorWidget *m_portMonitorWidget = nullptr;
+    StackWidget *m_stackWidget = nullptr;
+    KeyHistoryWidget *m_keyHistoryWidget = nullptr;
+    DockWidget *m_disasmDock = nullptr;
+    DockWidget *m_registerDock = nullptr;
+    DockWidget *m_hexDock = nullptr;
+    DockWidget *m_breakpointDock = nullptr;
+    DockWidget *m_watchpointDock = nullptr;
+    DockWidget *m_portMonitorDock = nullptr;
+    DockWidget *m_stackDock = nullptr;
+    DockWidget *m_keyHistoryDock = nullptr;
 };
 
 // Used as global instance by EmuThread and friends

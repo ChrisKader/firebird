@@ -97,6 +97,12 @@ uint32_t serial_cx_read(uint32_t addr);
 void serial_cx_write(uint32_t addr, uint32_t value);
 void serial_byte_in(uint8_t byte);
 
+bool serial_cx2_suspend(emu_snapshot *snapshot);
+bool serial_cx2_resume(const emu_snapshot *snapshot);
+void serial_cx2_reset(void);
+uint32_t serial_cx2_read(uint32_t addr);
+void serial_cx2_write(uint32_t addr, uint32_t value);
+
 typedef struct fastboot_state {
     uint32_t mem[0x1000 / sizeof(uint32_t)];
 } fastboot_state;

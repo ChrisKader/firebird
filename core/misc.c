@@ -130,7 +130,7 @@ uint32_t gpio_read(uint32_t addr) {
     return bad_read_word(addr);
 }
 void gpio_write(uint32_t addr, uint32_t value) {
-    int port = addr >> 6 & 3;
+    int port = addr >> 6 & 7;
     uint32_t change;
     switch (addr & 0x3F) {
         /* Interrupt handling not implemented */
@@ -320,6 +320,14 @@ uint32_t watchdog_read(uint32_t addr) {
         case 0x010: return watchdog.interrupt;
         case 0x014: return watchdog.control & watchdog.interrupt;
         case 0xC00: return watchdog.locked;
+        case 0xFE0: return 0x05;
+        case 0xFE4: return 0x18;
+        case 0xFE8: return 0x14;
+        case 0xFEC: return 0x00;
+        case 0xFF0: return 0x0D;
+        case 0xFF4: return 0xF0;
+        case 0xFF8: return 0x05;
+        case 0xFFC: return 0xB1;
         default:
             return bad_read_word(addr);
     }
@@ -400,6 +408,10 @@ uint32_t rtc_read(uint32_t addr) {
         case 0xFE4: return 0x10;
         case 0xFE8: return 0x04;
         case 0xFEC: return 0x00;
+        case 0xFF0: return 0x0D;
+        case 0xFF4: return 0xF0;
+        case 0xFF8: return 0x05;
+        case 0xFFC: return 0xB1;
     }
     return bad_read_word(addr);
 }

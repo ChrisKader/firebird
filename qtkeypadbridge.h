@@ -9,11 +9,16 @@
 
 class QtKeypadBridge : public QObject
 {
+    Q_OBJECT
+
 public:
     static void keyPressEvent(QKeyEvent *event);
     static void keyReleaseEvent(QKeyEvent *event);
 
     virtual bool eventFilter(QObject *obj, QEvent *event);
+
+signals:
+    void keyStateChanged(const QString &keyName, bool pressed);
 };
 
 extern QtKeypadBridge qt_keypad_bridge;

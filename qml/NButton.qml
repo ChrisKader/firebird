@@ -16,6 +16,7 @@ Rectangle {
     property color active_font_color: FBUI.Theme.textOnAccent
     property color border_color: FBUI.Theme.border
     property alias text: label.text
+    property string svgPath: ""
     property bool active: pressed || mouseArea.containsMouse
     property bool pressed: false
     // Pressing the right mouse button "locks" the button in enabled state
@@ -49,6 +50,7 @@ Rectangle {
 
     Text {
         id: label
+        visible: root.svgPath === ""
         text: "Foo"
         anchors.fill: parent
         anchors.centerIn: parent
@@ -59,6 +61,13 @@ Rectangle {
         textFormat: text.indexOf(">") == -1 ? Text.PlainText : Text.RichText
         verticalAlignment: Text.AlignVCenter
         horizontalAlignment: Text.AlignHCenter
+    }
+
+    SvgIcon {
+        visible: root.svgPath !== ""
+        anchors.fill: parent
+        pathData: root.svgPath
+        fillColor: root.active ? root.active_font_color : root.font_color
     }
 
     // This is needed to support pressing multiple buttons at once on multitouch

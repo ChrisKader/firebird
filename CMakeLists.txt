@@ -22,6 +22,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/cpudefs.h
     core/cx2.cpp core/cx2.h
     core/debug.cpp core/debug.h
+    core/debug_api.cpp core/debug_api.h
     core/des.c core/des.h
     core/disasm.c core/disasm.h
     core/emu.cpp core/emu.h
@@ -47,6 +48,14 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/usblink.c core/usblink.h
     core/usblink_cx2.cpp core/usblink_cx2.h
     core/usblink_queue.cpp core/usblink_queue.h
+    disassemblywidget.cpp disassemblywidget.h
+    registerwidget.cpp registerwidget.h
+    hexviewwidget.cpp hexviewwidget.h
+    breakpointwidget.cpp breakpointwidget.h
+    watchpointwidget.cpp watchpointwidget.h
+    portmonitorwidget.cpp portmonitorwidget.h
+    stackwidget.cpp stackwidget.h
+    keyhistorywidget.cpp keyhistorywidget.h
     dockwidget.cpp dockwidget.h
     emuthread.cpp emuthread.h
     fbaboutdialog.cpp fbaboutdialog.h
@@ -71,6 +80,8 @@ qt_add_qml_module(firebird-emu
         qml/NNumButton.qml
         qml/Touchpad.qml
         qml/NDualButton.qml
+        qml/SvgPaths.qml
+        qml/SvgIcon.qml
         qml/MobileUI.qml
         qml/SidebarButton.qml
         qml/ConfigPagesModel.qml

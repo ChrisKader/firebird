@@ -11,6 +11,8 @@ Rectangle {
     border.width: 2
     border.color: FBUI.Theme.border
 
+    SvgPaths { id: svgPaths }
+
     Rectangle {
         id: rectangle1
         x: 29
@@ -22,6 +24,83 @@ Rectangle {
         border.color: FBUI.Theme.borderStrong
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
+
+        SvgIcon {
+            pathData: svgPaths.touchpadGrab
+            fillColor: FBUI.Theme.textMuted
+            width: 20; height: 20
+            padding: 0
+            anchors.centerIn: parent
+        }
+    }
+
+    // Touchpad secondary navigation icons (blue, at border edge)
+    // On the real calculator these sit at/just outside the touchpad rim.
+    SvgIcon {
+        pathData: svgPaths.touchpadUp
+        fillColor: FBUI.Theme.accent
+        width: 16; height: 7
+        padding: 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.top; anchors.bottomMargin: 1
+    }
+    SvgIcon {
+        pathData: svgPaths.touchpadDown
+        fillColor: FBUI.Theme.accent
+        width: 16; height: 7
+        padding: 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.bottom; anchors.topMargin: 1
+    }
+    SvgIcon {
+        pathData: svgPaths.touchpadLeft
+        fillColor: FBUI.Theme.accent
+        width: 7; height: 16
+        padding: 0
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.left; anchors.rightMargin: 1
+    }
+    SvgIcon {
+        pathData: svgPaths.touchpadRight
+        fillColor: FBUI.Theme.accent
+        width: 7; height: 16
+        padding: 0
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: parent.right; anchors.leftMargin: 1
+    }
+
+    // Touchpad arrow indicators (inside touchpad, near edges)
+    SvgIcon {
+        pathData: svgPaths.arrowUp
+        fillColor: FBUI.Theme.textMuted
+        width: 8; height: 5
+        padding: 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top; anchors.topMargin: 6
+    }
+    SvgIcon {
+        pathData: svgPaths.arrowDown
+        fillColor: FBUI.Theme.textMuted
+        width: 8; height: 5
+        padding: 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom; anchors.bottomMargin: 6
+    }
+    SvgIcon {
+        pathData: svgPaths.arrowLeft
+        fillColor: FBUI.Theme.textMuted
+        width: 5; height: 8
+        padding: 0
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.left: parent.left; anchors.leftMargin: 6
+    }
+    SvgIcon {
+        pathData: svgPaths.arrowRight
+        fillColor: FBUI.Theme.textMuted
+        width: 5; height: 8
+        padding: 0
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.right: parent.right; anchors.rightMargin: 6
     }
 
     Rectangle {

@@ -8,6 +8,83 @@
 
 QtKeypadBridge qt_keypad_bridge;
 
+static const char *keyIdToName(unsigned int id)
+{
+    switch (id) {
+    case keymap::ret:    return "ret";
+    case keymap::enter:  return "enter";
+    case keymap::neg:    return "(-)"  ;
+    case keymap::space:  return "space";
+    case keymap::on:     return "on";
+    case keymap::esc:    return "esc";
+    case keymap::pad:    return "pad";
+    case keymap::tab:    return "tab";
+    case keymap::doc:    return "doc";
+    case keymap::menu:   return "menu";
+    case keymap::ctrl:   return "ctrl";
+    case keymap::shift:  return "shift";
+    case keymap::var:    return "var";
+    case keymap::del:    return "del";
+    case keymap::ee:     return "EE";
+    case keymap::pi:     return "pi";
+    case keymap::comma:  return ",";
+    case keymap::punct:  return "?!";
+    case keymap::flag:   return "flag";
+    case keymap::n0:     return "0";
+    case keymap::n1:     return "1";
+    case keymap::n2:     return "2";
+    case keymap::n3:     return "3";
+    case keymap::n4:     return "4";
+    case keymap::n5:     return "5";
+    case keymap::n6:     return "6";
+    case keymap::n7:     return "7";
+    case keymap::n8:     return "8";
+    case keymap::n9:     return "9";
+    case keymap::dot:    return ".";
+    case keymap::equ:    return "=";
+    case keymap::trig:   return "trig";
+    case keymap::pow:    return "^";
+    case keymap::squ:    return "x^2";
+    case keymap::exp:    return "e^x";
+    case keymap::pow10:  return "10^x";
+    case keymap::pleft:  return "(";
+    case keymap::pright: return ")";
+    case keymap::metrix: return "sto";
+    case keymap::cat:    return "cat";
+    case keymap::mult:   return "*";
+    case keymap::div:    return "/";
+    case keymap::plus:   return "+";
+    case keymap::minus:  return "-";
+    case keymap::aa:     return "a";
+    case keymap::ab:     return "b";
+    case keymap::ac:     return "c";
+    case keymap::ad:     return "d";
+    case keymap::ae:     return "e";
+    case keymap::af:     return "f";
+    case keymap::ag:     return "g";
+    case keymap::ah:     return "h";
+    case keymap::ai:     return "i";
+    case keymap::aj:     return "j";
+    case keymap::ak:     return "k";
+    case keymap::al:     return "l";
+    case keymap::am:     return "m";
+    case keymap::an:     return "n";
+    case keymap::ao:     return "o";
+    case keymap::ap:     return "p";
+    case keymap::aq:     return "q";
+    case keymap::ar:     return "r";
+    case keymap::as:     return "s";
+    case keymap::at:     return "t";
+    case keymap::au:     return "u";
+    case keymap::av:     return "v";
+    case keymap::aw:     return "w";
+    case keymap::ax:     return "x";
+    case keymap::ay:     return "y";
+    case keymap::az:     return "z";
+    default:             return "??";
+    }
+}
+
 void setKeypad(unsigned int keymap_id, bool state)
 {
     int col = keymap_id % KEYPAD_COLS, row = keymap_id / KEYPAD_COLS;
@@ -16,6 +93,9 @@ void setKeypad(unsigned int keymap_id, bool state)
 
     ::keypad_set_key(row, col, state);
     the_qml_bridge->notifyButtonStateChanged(row, col, state);
+
+    emit qt_keypad_bridge.keyStateChanged(
+        QString::fromLatin1(keyIdToName(keymap_id)), state);
 }
 
 static QHash<int, int> pressed_keys;
@@ -213,18 +293,22 @@ void QtKeypadBridge::keyPressEvent(QKeyEvent *event)
     case Qt::Key_Down:
         keypad.touchpad_x = TOUCHPAD_X_MAX / 2;
         keypad.touchpad_y = 0;
+        emit qt_keypad_bridge.keyStateChanged(QStringLiteral("down"), true);
         break;
     case Qt::Key_Up:
         keypad.touchpad_x = TOUCHPAD_X_MAX / 2;
         keypad.touchpad_y = TOUCHPAD_Y_MAX;
+        emit qt_keypad_bridge.keyStateChanged(QStringLiteral("up"), true);
         break;
     case Qt::Key_Left:
         keypad.touchpad_y = TOUCHPAD_Y_MAX / 2;
         keypad.touchpad_x = 0;
+        emit qt_keypad_bridge.keyStateChanged(QStringLiteral("left"), true);
         break;
     case Qt::Key_Right:
         keypad.touchpad_y = TOUCHPAD_Y_MAX / 2;
         keypad.touchpad_x = TOUCHPAD_X_MAX;
+        emit qt_keypad_bridge.keyStateChanged(QStringLiteral("right"), true);
         break;
     default:
         keyToKeypad(event);
@@ -252,22 +336,34 @@ void QtKeypadBridge::keyReleaseEvent(QKeyEvent *event)
     case Qt::Key_Down:
         if(keypad.touchpad_x == TOUCHPAD_X_MAX / 2
             && keypad.touchpad_y == 0)
+        {
             keypad.touchpad_contact = keypad.touchpad_down = false;
+            emit qt_keypad_bridge.keyStateChanged(QStringLiteral("down"), false);
+        }
         break;
     case Qt::Key_Up:
         if(keypad.touchpad_x == TOUCHPAD_X_MAX / 2
             && keypad.touchpad_y == TOUCHPAD_Y_MAX)
+        {
             keypad.touchpad_contact = keypad.touchpad_down = false;
+            emit qt_keypad_bridge.keyStateChanged(QStringLiteral("up"), false);
+        }
         break;
     case Qt::Key_Left:
         if(keypad.touchpad_y == TOUCHPAD_Y_MAX / 2
             && keypad.touchpad_x == 0)
+        {
             keypad.touchpad_contact = keypad.touchpad_down = false;
+            emit qt_keypad_bridge.keyStateChanged(QStringLiteral("left"), false);
+        }
         break;
     case Qt::Key_Right:
         if(keypad.touchpad_y == TOUCHPAD_Y_MAX / 2
             && keypad.touchpad_x == TOUCHPAD_X_MAX)
+        {
             keypad.touchpad_contact = keypad.touchpad_down = false;
+            emit qt_keypad_bridge.keyStateChanged(QStringLiteral("right"), false);
+        }
         break;
     default:
         keyToKeypad(event);

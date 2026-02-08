@@ -209,12 +209,9 @@ uint32_t disasm_arm_insn(uint32_t pc) {
     return disasm_arm_insn2(pc, pc_ptr);
 }
 
-uint32_t disasm_arm_insn2(uint32_t pc, uint32_t *pc_ptr) {
-    char buf[80];
-
-    uint32_t insn = *pc_ptr;
-    char *out = buf + sprintf(buf, "%08x: %08x\t", pc, insn);
-
+/* Internal: format ARM mnemonic+operands into out (no address prefix).
+ * Returns out pointer past the last character written. */
+static char *format_arm_mnemonic(uint32_t pc, uint32_t insn, char *out) {
     int i;
 
     const struct arm_insn *t = table;
@@ -427,19 +424,37 @@ uint32_t disasm_arm_insn2(uint32_t pc, uint32_t *pc_ptr) {
         }
     }
     *out = '\0';
+    return out;
+}
+
+uint32_t disasm_arm_insn2(uint32_t pc, uint32_t *pc_ptr) {
+    char buf[80];
+
+    uint32_t insn = *pc_ptr;
+    char *out = buf + sprintf(buf, "%08x: %08x\t", pc, insn);
+    format_arm_mnemonic(pc, insn, out);
+
     gui_debug_printf(buf);
     gui_debug_printf("\n");
     return 4;
 }
 
-uint32_t disasm_thumb_insn(uint32_t pc) {
-    char buf[80];
-    uint16_t *pc_ptr = virt_mem_ptr(pc, 2);
+uint32_t disasm_arm_insn_buf(uint32_t pc, char *buf, int buf_size, uint32_t *raw_out) {
+    if (buf_size < 64)
+        return 0;
+    uint32_t *pc_ptr = virt_mem_ptr(pc, 4);
     if (!pc_ptr)
         return 0;
+    *raw_out = *pc_ptr;
+    format_arm_mnemonic(pc, *pc_ptr, buf);
+    return 4;
+}
 
-    uint16_t insn = *pc_ptr;
-    char *out = buf + sprintf(buf, "%08x: %04x    \t", pc, insn);
+/* Internal: format Thumb mnemonic+operands into out.
+ * *insn_io is the first halfword on entry; for BL pairs it gets
+ * updated to the combined 32-bit value. Returns instruction size (2 or 4). */
+static uint32_t format_thumb_mnemonic(uint32_t pc, uint16_t *insn_io, char *out) {
+    uint16_t insn = *insn_io;
 
     if (insn < 0x1800) {
         static const char name[][4] = { "lsl", "lsr", "asr" };
@@ -473,10 +488,11 @@ uint32_t disasm_thumb_insn(uint32_t pc) {
         sprintf(out, "%s\t%s", (insn & 0x80) ? "blx" : "bx", reg_name[insn >> 3 & 15]);
     } else if (insn < 0x5000) {
         int addr = ((pc + 4) & -4) + ((insn & 0xFF) << 2);
-        out += sprintf(out, "ldr\tr%d,[%08x]", insn >> 8 & 7, addr);
+        char *p = out;
+        p += sprintf(p, "ldr\tr%d,[%08x]", insn >> 8 & 7, addr);
         uint32_t *ptr = virt_mem_ptr(addr, 4);
         if (ptr)
-            sprintf(out, " = %08x", *ptr);
+            sprintf(p, " = %08x", *ptr);
     } else if (insn < 0x6000) {
         static const char name[][6] = {
             "str", "strh", "strb", "ldrsb",
@@ -504,20 +520,21 @@ uint32_t disasm_thumb_insn(uint32_t pc) {
     } else if (insn < 0xB400) {
         goto invalid;
     } else if (insn < 0xB600) {
-        out = strcpy2(out, "push\t");
-        do_reglist(out, (insn & 0xFF) | (insn & 0x100) << (14 - 8));
+        char *p = strcpy2(out, "push\t");
+        do_reglist(p, (insn & 0xFF) | (insn & 0x100) << (14 - 8));
     } else if (insn < 0xBC00) {
         goto invalid;
     } else if (insn < 0xBE00) {
-        out = strcpy2(out, "pop\t");
-        do_reglist(out, (insn & 0xFF) | (insn & 0x100) << (15 - 8));
+        char *p = strcpy2(out, "pop\t");
+        do_reglist(p, (insn & 0xFF) | (insn & 0x100) << (15 - 8));
     } else if (insn < 0xBF00) {
         sprintf(out, "bkpt\t%02x", insn & 0xFF);
     } else if (insn < 0xC000) {
         goto invalid;
     } else if (insn < 0xD000) {
-        out += sprintf(out, "%smia\tr%d!,", (insn & 0x800) ? "ld" : "st", insn >> 8 & 7);
-        do_reglist(out, insn & 0xFF);
+        char *p = out;
+        p += sprintf(p, "%smia\tr%d!,", (insn & 0x800) ? "ld" : "st", insn >> 8 & 7);
+        do_reglist(p, insn & 0xFF);
     } else if (insn < 0xDE00) {
         sprintf(out, "b%s\t%08x", condcode[insn >> 8 & 15], pc + 4 + ((int8_t)insn << 1));
     } else if (insn < 0xDF00) {
@@ -532,20 +549,61 @@ invalid:
     } else if (insn < 0xF800) {
         int32_t target = (int32_t)insn << 21 >> 9;
         /* Check next instruction to see if this is part of a BL or BLX pair */
-        pc_ptr = virt_mem_ptr(pc + 2, 2);
-        if (pc_ptr && ((insn = *pc_ptr) & 0xE800) == 0xE800) {
+        uint16_t *next_ptr = virt_mem_ptr(pc + 2, 2);
+        if (next_ptr && ((*next_ptr) & 0xE800) == 0xE800) {
+            uint16_t insn2 = *next_ptr;
             /* It is; show both instructions combined as one */
-            target += pc + 4 + ((insn & 0x7FF) << 1);
-            if (!(insn & 0x1000)) target &= ~3;
-            sprintf(out - 5, "%04x\t%s\t%08x", insn,
-                    (insn & 0x1000) ? "bl" : "blx", target);
-            gui_debug_printf("%s\n", buf);
+            target += pc + 4 + ((insn2 & 0x7FF) << 1);
+            if (!(insn2 & 0x1000)) target &= ~3;
+            sprintf(out, "%s\t%08x", (insn2 & 0x1000) ? "bl" : "blx", target);
+            *insn_io = insn2; /* update for raw output */
             return 4;
         }
         sprintf(out, "(add\tlr,pc,%08x)", target);
     } else {
         sprintf(out, "(bl\tlr + %03x)", (insn & 0x7FF) << 1);
     }
-    gui_debug_printf("%s\n", buf);
     return 2;
+}
+
+uint32_t disasm_thumb_insn(uint32_t pc) {
+    char buf[80];
+    uint16_t *pc_ptr = virt_mem_ptr(pc, 2);
+    if (!pc_ptr)
+        return 0;
+
+    uint16_t insn = *pc_ptr;
+    /* Format mnemonic into a temp area first */
+    char mnemonic[64];
+    uint32_t size = format_thumb_mnemonic(pc, &insn, mnemonic);
+
+    if (size == 4) {
+        /* BL pair: show both halfwords in the prefix.
+         * insn was updated by format_thumb_mnemonic to the 2nd halfword. */
+        sprintf(buf, "%08x: %04x%04x\t%s", pc, (unsigned)*pc_ptr, (unsigned)insn, mnemonic);
+    } else {
+        sprintf(buf, "%08x: %04x    \t%s", pc, (unsigned)*pc_ptr, mnemonic);
+    }
+
+    gui_debug_printf("%s\n", buf);
+    return size;
+}
+
+uint32_t disasm_thumb_insn_buf(uint32_t pc, char *buf, int buf_size, uint32_t *raw_out) {
+    if (buf_size < 64)
+        return 0;
+    uint16_t *pc_ptr = virt_mem_ptr(pc, 2);
+    if (!pc_ptr)
+        return 0;
+
+    uint16_t insn = *pc_ptr;
+    uint32_t size = format_thumb_mnemonic(pc, &insn, buf);
+
+    if (size == 4) {
+        /* BL pair: raw is both halfwords combined */
+        *raw_out = ((uint32_t)*pc_ptr << 16) | insn;
+    } else {
+        *raw_out = insn;
+    }
+    return size;
 }

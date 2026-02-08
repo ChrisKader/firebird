@@ -5,8 +5,12 @@ Rectangle {
     id: rectangle3
     property alias text1: nbutton1.text
     property alias text2: nbutton2.text
+    property alias svgPath1: nbutton1.svgPath
+    property alias svgPath2: nbutton2.svgPath
     property alias topText1: textTop1.text
     property alias topText2: textTop2.text
+    property string topSvgPath1: ""
+    property string topSvgPath2: ""
     property alias button1: nbutton1
     property alias button2: nbutton2
     property alias id1: nbutton1.keymap_id
@@ -72,11 +76,25 @@ Rectangle {
         height: 13
         color: FBUI.Theme.accent
         text: "aa"
+        visible: topSvgPath1 === ""
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         z: -1
         font.pixelSize: 8
         font.bold: true
+        opacity: 0.9
+    }
+
+    SvgIcon {
+        x: 0
+        y: -2
+        width: 25
+        height: 13
+        visible: topSvgPath1 !== ""
+        pathData: topSvgPath1
+        fillColor: FBUI.Theme.accent
+        padding: 0.15
+        z: -1
         opacity: 0.9
     }
 
@@ -88,11 +106,25 @@ Rectangle {
         height: 13
         color: FBUI.Theme.accent
         text: "bb"
+        visible: topSvgPath2 === ""
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.pixelSize: 8
         z: -2
         font.bold: true
+        opacity: 0.9
+    }
+
+    SvgIcon {
+        x: 25
+        y: -2
+        width: 25
+        height: 13
+        visible: topSvgPath2 !== ""
+        pathData: topSvgPath2
+        fillColor: FBUI.Theme.accent
+        padding: 0.15
+        z: -2
         opacity: 0.9
     }
 }
