@@ -29,6 +29,8 @@ typedef struct lcd_state {
     uint16_t palette[256];
 } lcd_state;
 
+extern lcd_state lcd;
+
 void lcd_draw_frame(uint8_t *buffer);
 void lcd_cx_draw_frame(uint16_t *buffer);
 

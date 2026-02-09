@@ -12,6 +12,7 @@
 #include "emu.h"
 #include "translate.h"
 #include "debug.h"
+#include "debug_api.h"
 #include "mmu.h"
 #include "gdbstub.h"
 #include "usblink_queue.h"
@@ -30,7 +31,7 @@ bool do_translate = true;
 uint32_t product = 0x0E0, features = 0, asic_user_flags = 0;
 bool turbo_mode = false;
 
-bool exiting, debug_on_start, debug_on_warn, print_on_warn;
+bool exiting, debug_on_start, debug_on_warn, print_on_warn, debug_suppress_warn;
 BootOrder boot_order = ORDER_DEFAULT;
 std::string path_boot1, path_flash;
 
@@ -75,6 +76,8 @@ void emuprintf(const char *format, ...) {
 }
 
 void warn(const char *fmt, ...) {
+    if (debug_suppress_warn)
+        return;
     if (!print_on_warn && !debug_on_warn)
         return;
 
@@ -237,19 +240,24 @@ bool emu_start(unsigned int port_gdb, unsigned int port_rdbg, const char *snapsh
         sched.items[SCHED_THROTTLE].clock = CLOCK_27M;
         sched.items[SCHED_THROTTLE].proc = throttle_interval_event;
 
-        // TODO: Max length
+        // Ensure NUL-termination within the fixed-size header fields
+        snapshot.header.path_boot1[sizeof(snapshot.header.path_boot1) - 1] = '\0';
+        snapshot.header.path_flash[sizeof(snapshot.header.path_flash) - 1] = '\0';
         path_boot1 = std::string(snapshot.header.path_boot1);
         path_flash = std::string(snapshot.header.path_flash);
 
         // Resume components
         uint32_t sdram_size, dummy;
+        uint32_t snap_ver = snapshot.header.version;
+        debug_clear_metadata(); /* Clear stale bp metadata before loading */
         if(snapshot.header.sig != SNAPSHOT_SIG
-                || snapshot.header.version != SNAPSHOT_VER
+                || (snap_ver != 4 && snap_ver != SNAPSHOT_VER)
                 || !flash_resume(&snapshot)
                 || !flash_read_settings(&sdram_size, &product, &features, &asic_user_flags)
                 || !cpu_resume(&snapshot)
                 || !memory_resume(&snapshot)
                 || !sched_resume(&snapshot)
+                || (snap_ver >= 5 && !debug_resume(&snapshot))
                 // Verify that EOF is next
                 || gzread(gzf, &dummy, sizeof(dummy)) != 0
                 || !gzeof(gzf))
@@ -428,7 +436,8 @@ bool emu_suspend(const char *file)
             || !flash_suspend(&snapshot)
             || !cpu_suspend(&snapshot)
             || !memory_suspend(&snapshot)
-            || !sched_suspend(&snapshot))
+            || !sched_suspend(&snapshot)
+            || !debug_suspend(&snapshot))
     {
         gzclose(gzf);
         return false;

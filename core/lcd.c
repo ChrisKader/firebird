@@ -9,7 +9,7 @@
 #include "mem.h"
 #include "lcd.h"
 
-static lcd_state lcd;
+lcd_state lcd;
 
 /* Draw the current screen into a 4bpp bitmap. (SetDIBitsToDevice
  * supports either orientation, but some programs can't paste right-side-up bitmaps) */

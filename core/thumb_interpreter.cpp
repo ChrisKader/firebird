@@ -1,12 +1,12 @@
 #include "asmcode.h"
 #include "cpu.h"
 #include "debug.h"
+#include "debug_api.h"
 #include "emu.h"
 #include "mem.h"
 #include "mmu.h"
 
 static uint32_t shift(int type, uint32_t res, uint32_t count, int setcc) {
-    //TODO: Verify!
     if (count == 0) {
         /* For all types, a count of 0 does nothing and does not affect carry. */
         return res;
@@ -91,13 +91,20 @@ void cpu_thumb_loop() {
         }
 
         if (flags & (RF_EXEC_BREAKPOINT | RF_EXEC_DEBUG_NEXT)) {
-            if (flags & RF_EXEC_BREAKPOINT)
+            if (flags & RF_EXEC_BREAKPOINT) {
+                debug_increment_hit_count(arm.reg[15]);
+                if (!debug_evaluate_condition(arm.reg[15]))
+                    goto skip_debugger;
                 gui_debug_printf("Breakpoint at 0x%08x\n", arm.reg[15]);
+            }
             enter_debugger:
-            uint32_t pc = arm.reg[15];
-            debugger(DBG_EXEC_BREAKPOINT, 0);
-            if(arm.reg[15] != pc)
-                continue; // Debugger changed PC
+            {
+                uint32_t pc = arm.reg[15];
+                debugger(DBG_EXEC_BREAKPOINT, 0);
+                if(arm.reg[15] != pc)
+                    continue; // Debugger changed PC
+            }
+            skip_debugger:;
         }
 
         arm.reg[15] += 2;

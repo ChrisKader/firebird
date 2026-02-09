@@ -35,6 +35,10 @@ typedef struct gpio_state {
         union gpio_reg invert;
         union gpio_reg sticky;
         union gpio_reg unknown_24;
+        union gpio_reg int_status;
+        union gpio_reg int_mask;
+        union gpio_reg int_edge;
+        union gpio_reg prev_input;
 } gpio_state;
 extern gpio_state gpio;
 
@@ -60,6 +64,8 @@ struct timerpair {
 typedef struct timer_state {
     struct timerpair pairs[3];
 } timer_state;
+
+extern timer_state timer_classic;
 
 uint32_t timer_read(uint32_t addr);
 void timer_write(uint32_t addr, uint32_t value);
@@ -122,6 +128,8 @@ typedef struct watchdog_state {
     uint8_t locked;
 } watchdog_state;
 
+extern watchdog_state watchdog;
+
 void watchdog_reset();
 uint32_t watchdog_read(uint32_t addr);
 void watchdog_write(uint32_t addr, uint32_t value);
@@ -166,6 +174,8 @@ struct cx_timer {
 typedef struct timer_cx_state {
     struct cx_timer timer[3][2];
 } timer_cx_state;
+
+extern timer_cx_state timer_cx;
 
 uint32_t timer_cx_read(uint32_t addr);
 void timer_cx_write(uint32_t addr, uint32_t value);

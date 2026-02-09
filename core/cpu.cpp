@@ -13,6 +13,7 @@
 #include "cpu.h"
 #include "cpudefs.h"
 #include "debug.h"
+#include "debug_api.h"
 #include "emu.h"
 #include "mem.h"
 #include "mmu.h"
@@ -46,14 +47,6 @@ void cpu_arm_loop()
 
         uint32_t *flags_ptr = &RAM_FLAGS(p);
 
-        /* Force use of capTIvate on 5.2.0.722 CX II CAS
-        if(arm.reg[15] == 0x100114D4)
-        {
-            *flags_ptr |= RF_CODE_NO_TRANSLATE;
-            features = 1;
-            arm.reg[0] = features; // captivate
-        }*/
-
         // Check for pending events
         if(cpu_events)
         {
@@ -73,14 +66,19 @@ void cpu_arm_loop()
             }
             else
             {
-                if(*flags_ptr & RF_EXEC_BREAKPOINT)
+                if(*flags_ptr & RF_EXEC_BREAKPOINT) {
+                    debug_increment_hit_count(arm.reg[15]);
+                    if(!debug_evaluate_condition(arm.reg[15]))
+                        goto skip_debugger;
                     gui_debug_printf("Breakpoint at 0x%08x\n", arm.reg[15]);
+                }
                 enter_debugger:
                 uint32_t pc = arm.reg[15];
                 debugger(DBG_EXEC_BREAKPOINT, 0);
                 if(arm.reg[15] != pc)
                     continue; // Debugger changed PC
             }
+            skip_debugger:;
         }
 #ifndef NO_TRANSLATION
         else if(do_translate && !(*flags_ptr & DONT_TRANSLATE) && (*flags_ptr & RF_CODE_EXECUTED))
@@ -200,12 +198,6 @@ void * FASTCALL read_instruction(uint32_t addr)
     return ptr;
 #endif
 }
-
-/*void cpu_thumb_loop()
-{
-    //TODO
-    assert(false);
-}*/
 
 // Update cpu_events
 void cpu_int_check()

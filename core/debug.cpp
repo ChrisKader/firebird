@@ -29,6 +29,7 @@
 #include "translate.h"
 #include "usblink_queue.h"
 #include "gdbstub.h"
+#include "debug_api.h"
 #include "os/os.h"
 
 std::string ln_target_folder;
@@ -329,6 +330,10 @@ int process_debug_cmd(char *cmdline) {
         return 1;
     } else if (!strcasecmp(cmd, "n")) {
         set_debug_next((uint32_t*) virt_mem_ptr(arm.reg[15] & ~3, 4) + 1);
+        return 1;
+    } else if (!strcasecmp(cmd, "finish")) {
+        debug_step_out();
+        gui_debug_printf("Running until return to 0x%08x\n", arm.reg[14]);
         return 1;
     } else if (!strcasecmp(cmd, "d")) {
         char *arg = strtok(NULL, " \n\r");

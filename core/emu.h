@@ -36,7 +36,7 @@ extern uint32_t cpu_events __asm__("cpu_events");
 #define EVENT_SLEEP 32
 
 // Settings
-extern bool exiting, debug_on_start, debug_on_warn, print_on_warn;
+extern bool exiting, debug_on_start, debug_on_warn, print_on_warn, debug_suppress_warn;
 extern BootOrder boot_order;
 extern bool do_translate;
 extern uint32_t product, features, asic_user_flags;
@@ -52,6 +52,13 @@ extern uint32_t product, features, asic_user_flags;
 #define emulate_cx (product >= 0x0F0)
 #define emulate_cx2 (product >= 0x1C0)
 extern bool turbo_mode;
+
+/* Hardware configuration overrides (GUI-settable).
+ * -1 = use defaults; >= 0 = override value. */
+extern int16_t adc_battery_level_override;  /* 0-930 ADC raw value */
+extern int8_t  adc_charging_override;       /* 0 = not charging, 1 = charging */
+extern int16_t lcd_brightness_override;     /* 0-255 */
+extern int16_t adc_keypad_type_override;    /* -1 = default (73) */
 
 enum { LOG_CPU, LOG_IO, LOG_FLASH, LOG_INTS, LOG_ICOUNT, LOG_USB, LOG_GDB, MAX_LOG };
 #define LOG_TYPE_TBL "CIFQ#UG"
@@ -88,7 +95,7 @@ typedef void (*debug_input_cb)(const char *input);
 void gui_debugger_request_input(debug_input_cb callback);
 
 #define SNAPSHOT_SIG 0xCAFEBEE0
-#define SNAPSHOT_VER 4
+#define SNAPSHOT_VER 5
 
 // Passed to resume/suspend functions.
 // Use snapshot_(read/write) to access stream contents.

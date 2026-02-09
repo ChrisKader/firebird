@@ -23,6 +23,14 @@
 #include <QRegularExpression>
 #include <QHeaderView>
 #include <QColor>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QSpinBox>
+#include <QCheckBox>
+#include <QInputDialog>
+#include <QGroupBox>
+#include <QPlainTextEdit>
+#include <QTabBar>
 
 #include <QApplication>
 #include <QPalette>
@@ -44,164 +52,45 @@
 #include "core/flash.h"
 #include "core/gif.h"
 #include "core/misc.h"
+#include "core/mem.h"
 #include "core/usblink_queue.h"
 
-#include "dockwidget.h"
+#include "ui/dockwidget.h"
 #include "mainwindow.h"
+#include "ui/widgettheme.h"
+#include "ui/materialicons.h"
+#include "ui/activitybar.h"
 #include "ui_mainwindow.h"
-#include "qmlbridge.h"
-#include "qtframebuffer.h"
-#include "qtkeypadbridge.h"
-#include "disassemblywidget.h"
-#include "registerwidget.h"
-#include "hexviewwidget.h"
-#include "breakpointwidget.h"
-#include "watchpointwidget.h"
-#include "portmonitorwidget.h"
-#include "stackwidget.h"
-#include "keyhistorywidget.h"
+#include "app/qmlbridge.h"
+#include "ui/framebuffer.h"
+#include "ui/keypadbridge.h"
+#include "ui/ansitextwriter.h"
+#include "debugger/dockmanager.h"
+#include "debugger/disassembly/disassemblywidget.h"
+#include "debugger/hexview/hexviewwidget.h"
+#include "debugger/console/consolewidget.h"
+#include "debugger/nandbrowser/nandbrowserwidget.h"
+#include "debugger/hwconfig/hwconfigwidget.h"
 
 MainWindow *main_window;
 // Change this if you change the UI
-static const constexpr int WindowStateVersion = 3;
+static const constexpr int WindowStateVersion = 5;
 
-namespace
-{
-struct WidgetTheme
-{
-    QColor window;
-    QColor surface;
-    QColor surfaceAlt;
-    QColor dock;
-    QColor dockTitle;
-    QColor border;
-    QColor accent;
-    QColor text;
-    QColor textMuted;
-    QColor selection;
-    QColor selectionText;
-    QColor statusBg;
-};
-
-const WidgetTheme &currentWidgetTheme()
-{
-    static const WidgetTheme dark_theme{
-        QColor(QStringLiteral("#181818")),
-        QColor(QStringLiteral("#1e1e1e")),
-        QColor(QStringLiteral("#202020")),
-        QColor(QStringLiteral("#252526")),
-        QColor(QStringLiteral("#1b1b1c")),
-        QColor(QStringLiteral("#333333")),
-        QColor(QStringLiteral("#007acc")),
-        QColor(QStringLiteral("#d4d4d4")),
-        QColor(QStringLiteral("#858585")),
-        QColor(QStringLiteral("#264f78")),
-        QColor(QStringLiteral("#ffffff")),
-        QColor(QStringLiteral("#202020"))};
-
-    static const WidgetTheme light_theme{
-        QColor(QStringLiteral("#f5f5f5")),
-        QColor(QStringLiteral("#ffffff")),
-        QColor(QStringLiteral("#ededed")),
-        QColor(QStringLiteral("#f2f2f2")),
-        QColor(QStringLiteral("#e6e6e6")),
-        QColor(QStringLiteral("#c4c4c4")),
-        QColor(QStringLiteral("#0066b8")),
-        QColor(QStringLiteral("#1f1f1f")),
-        QColor(QStringLiteral("#5e5e5e")),
-        QColor(QStringLiteral("#cce6ff")),
-        QColor(QStringLiteral("#1a1a1a")),
-        QColor(QStringLiteral("#e9e9e9"))};
-
-    const bool use_dark = !the_qml_bridge ? true : the_qml_bridge->getDarkTheme();
-    return use_dark ? dark_theme : light_theme;
-}
-
-void applyPaletteColors(QPalette &pal, const WidgetTheme &theme)
-{
-    pal.setColor(QPalette::Window, theme.window);
-    pal.setColor(QPalette::WindowText, theme.text);
-    pal.setColor(QPalette::Base, theme.surface);
-    pal.setColor(QPalette::AlternateBase, theme.surfaceAlt);
-    pal.setColor(QPalette::Text, theme.text);
-    pal.setColor(QPalette::Button, theme.surfaceAlt);
-    pal.setColor(QPalette::ButtonText, theme.text);
-    pal.setColor(QPalette::Highlight, theme.selection);
-    pal.setColor(QPalette::HighlightedText, theme.selectionText);
-    pal.setColor(QPalette::ToolTipBase, theme.dock);
-    pal.setColor(QPalette::ToolTipText, theme.text);
-    pal.setColor(QPalette::PlaceholderText, theme.textMuted);
-}
-
-void setWidgetBackground(QWidget *w, const QColor &color, const QColor &text = QColor())
-{
-    if (!w)
-        return;
-    QPalette p = w->palette();
-    p.setColor(QPalette::Window, color);
-    p.setColor(QPalette::Base, color);
-    if (text.isValid())
-    {
-        p.setColor(QPalette::WindowText, text);
-        p.setColor(QPalette::Text, text);
-        p.setColor(QPalette::ButtonText, text);
-    }
-    w->setAutoFillBackground(true);
-    w->setPalette(p);
-}
-} // namespace
-
-void MainWindow::mousePressEvent(QMouseEvent *event)
-{
-#ifdef Q_OS_MAC
-    // Allow dragging the window when clicking in the header area
-    // (adjust the height as needed - currently top 40 px)
-    if (event->button() == Qt::LeftButton && event->position().y() < 40)
-    {
-        m_dragStartPos = event->globalPosition().toPoint() - frameGeometry().topLeft();
-        event->accept();
-        return;
-    }
-    else if (event->button() == Qt::LeftButton)
-    {
-        // Reset any stale drag state when clicking elsewhere
-        m_dragStartPos = QPoint();
-    }
-#endif
-    QMainWindow::mousePressEvent(event);
-}
-
-void MainWindow::mouseMoveEvent(QMouseEvent *event)
-{
-#ifdef Q_OS_MAC
-    if (event->buttons() & Qt::LeftButton && !m_dragStartPos.isNull())
-    {
-        move(event->globalPosition().toPoint() - m_dragStartPos);
-        event->accept();
-        return;
-    }
-#endif
-    QMainWindow::mouseMoveEvent(event);
-}
-
-void MainWindow::mouseReleaseEvent(QMouseEvent *event)
-{
-#ifdef Q_OS_MAC
-    if (event->button() == Qt::LeftButton)
-        m_dragStartPos = QPoint();
-#endif
-    QMainWindow::mouseReleaseEvent(event);
-}
+/* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
-    QMainWindow::resizeEvent(event);
+    if (event)
+        QMainWindow::resizeEvent(event);
 #ifdef Q_OS_MAC
-    // Apply rounded corners to the frameless window on macOS
-    const int radius = 12;
-    QPainterPath path;
-    path.addRoundedRect(QRectF(0, 0, width(), height()), radius, radius);
-    setMask(QRegion(path.toFillPolygon().toPolygon()));
+    if (!isFullScreen())
+    {
+        // Apply rounded corners to the frameless window on macOS
+        const int radius = 12;
+        QPainterPath path;
+        path.addRoundedRect(QRectF(0, 0, width(), height()), radius, radius);
+        setMask(QRegion(path.toFillPolygon().toPolygon()));
+    }
 #endif
 }
 
@@ -209,9 +98,8 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
                                           ui(new Ui::MainWindow)
 {
 #ifdef Q_OS_MAC
-    // Remove native title bar and frame so we can draw our own
-    setWindowFlag(Qt::FramelessWindowHint, true);
-    setAttribute(Qt::WA_TranslucentBackground, false);
+    // Use native title bar so traffic lights (close/minimize/maximize) render correctly.
+    // Custom header buttons are hidden on macOS since the native ones appear in the title bar.
 #endif
 
     ui->setupUi(this);
@@ -292,40 +180,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Add a compact "Debugger" toggle button into the custom header bar,
     // similar to VS Code's header controls. (Currently disabled)
 
-    // Wire debugger toolbar button inside the Debugger dock (vertical bar).
+    // Hide the old button bar in the Debugger dock (now redundant -- debug
+    // toggle lives in the control row under the LCD).
     if (ui->tabDebugger)
     {
         if (auto *bar = ui->tabDebugger->findChild<QWidget *>(QStringLiteral("debuggerButtonBar")))
-        {
-            if (auto *toggle = bar->findChild<QToolButton *>(QStringLiteral("debuggerToggleButton")))
-            {
-                debugger_toggle_button = toggle;
-                toggle->setCheckable(true);
-                applyMaterialBugIcon(toggle); // Ensure the action text doesn't get elided to "..."
-                toggle->setEnabled(ui->actionDebugger->isEnabled());
-                connect(ui->actionDebugger, &QAction::changed, toggle, [this, toggle, applyMaterialBugIcon]()
-                        {
-                    applyMaterialBugIcon(toggle);
-                    toggle->setEnabled(ui->actionDebugger->isEnabled()); });
-                connect(toggle, &QToolButton::clicked, this, [this]()
-                        {
-                    if (!debugger_active) {
-                        ui->actionDebugger->trigger();
-                    } else {
-                        debugStr(QStringLiteral("> c\n"));
-                        emit debuggerCommand(QStringLiteral("c"));
-                        setDebuggerActive(false);
-                    } });
-            }
-            if (auto *clear = bar->findChild<QToolButton *>(QStringLiteral("debuggerClearButton")))
-            {
-                applyMaterialGlyph(clear, 0xE14C, tr("Clear debug output"));
-                connect(clear, &QToolButton::clicked, this, [this]()
-                        {
-                    ui->debugConsole->clear();
-                });
-            }
-        }
+            bar->hide();
     }
 
     if (ui->tabSerial)
@@ -358,6 +218,30 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     ui->buttonSpeed->setFixedSize(controlSize);
     applyMaterialGlyphPush(ui->buttonSpeed, 0xE9E4, tr("Toggle turbo mode"));
     ui->buttonSpeed->setCheckable(true);
+
+    // Debug toggle button in the control row under the LCD.
+    {
+        auto *debugBtn = new QToolButton(ui->frame);
+        debugBtn->setAutoRaise(true);
+        debugBtn->setIconSize(QSize(24, 24));
+        debugBtn->setCheckable(true);
+        applyMaterialGlyph(debugBtn, 0xE868, tr("Enter debugger"));
+        ui->horizontalLayout_7->addWidget(debugBtn);
+        debugger_toggle_button = debugBtn;
+        debugBtn->setEnabled(ui->actionDebugger->isEnabled());
+        connect(ui->actionDebugger, &QAction::changed, debugBtn, [this, debugBtn]() {
+            debugBtn->setEnabled(ui->actionDebugger->isEnabled());
+        });
+        connect(debugBtn, &QToolButton::clicked, this, [this]() {
+            if (!debugger_active) {
+                ui->actionDebugger->trigger();
+            } else {
+                debugStr(QStringLiteral("> c\n"));
+                emit debuggerCommand(QStringLiteral("c"));
+                setDebuggerActive(false);
+            }
+        });
+    }
 
     // Unified play/pause/start toggle.
     updatePlayPauseButtonFn = [this, applyMaterialGlyph]()
@@ -442,11 +326,34 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         headerToolBar->addAction(headerAction);
 
         addToolBar(Qt::TopToolBarArea, headerToolBar);
+
+#ifdef Q_OS_MAC
+        // Hide custom header on macOS; native title bar provides title and traffic lights
+        headerToolBar->setVisible(false);
+#endif
     }
 
     // The outer MainWindow no longer hosts docks directly; keep it frameless/themed only.
     setDockOptions(QMainWindow::DockOptions());
     setUnifiedTitleAndToolBarOnMac(false);
+
+    // VS Code-style: bottom panel tabs at top, right panel tabs at top
+    content_window->setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
+    content_window->setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
+
+    // Create Activity Bar on the left side of the outer MainWindow
+    m_activityBar = new ActivityBar(material_icon_font, this);
+
+    auto *activityToolBar = new QToolBar(this);
+    activityToolBar->setObjectName(QStringLiteral("activityBarToolbar"));
+    activityToolBar->setMovable(false);
+    activityToolBar->setFloatable(false);
+    activityToolBar->setAllowedAreas(Qt::LeftToolBarArea);
+    activityToolBar->setContentsMargins(0, 0, 0, 0);
+    auto *activityAction = new QWidgetAction(activityToolBar);
+    activityAction->setDefaultWidget(m_activityBar);
+    activityToolBar->addAction(activityAction);
+    addToolBar(Qt::LeftToolBarArea, activityToolBar);
 
     applyWidgetTheme();
 
@@ -575,6 +482,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->buttonWindowMinimize, &QToolButton::clicked, this, &QWidget::showMinimized);
     connect(ui->buttonWindowMaximize, &QToolButton::clicked, this, &QWidget::showMaximized);
 
+#ifdef Q_OS_MAC
+    // Hide custom window buttons on macOS; native traffic lights are in the title bar
+    ui->buttonWindowClose->setVisible(false);
+    ui->buttonWindowMinimize->setVisible(false);
+    ui->buttonWindowMaximize->setVisible(false);
+#endif
+
     // Emu -> GUI (QueuedConnection as they're different threads)
     connect(&emu_thread, SIGNAL(serialChar(char)), this, SLOT(serialChar(char)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(debugStr(QString)), this, SLOT(debugStr(QString)), Qt::QueuedConnection);
@@ -596,9 +510,37 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->actionPause, SIGNAL(toggled(bool)), &emu_thread, SLOT(setPaused(bool)));
     connect(ui->buttonSpeed, SIGNAL(clicked(bool)), &emu_thread, SLOT(setTurboMode(bool)));
 
+    // F11 = fullscreen toggle
     QShortcut *shortcut = new QShortcut(QKeySequence(Qt::Key_F11), this);
     shortcut->setAutoRepeat(false);
-    connect(shortcut, SIGNAL(activated()), &emu_thread, SLOT(toggleTurbo()));
+    connect(shortcut, &QShortcut::activated, this, &MainWindow::toggleFullscreen);
+
+    // Fullscreen menu item
+    {
+        auto *fullscreenAction = new QAction(tr("&Fullscreen"), this);
+        fullscreenAction->setObjectName(QStringLiteral("actionFullscreen"));
+        fullscreenAction->setCheckable(true);
+        connect(fullscreenAction, &QAction::triggered, this, &MainWindow::toggleFullscreen);
+        ui->menuTools->addAction(fullscreenAction);
+    }
+
+    // Always-on-top toggle (settings loaded after QSettings init below)
+    {
+        auto *alwaysOnTopAction = new QAction(tr("Always on &Top"), this);
+        alwaysOnTopAction->setObjectName(QStringLiteral("actionAlwaysOnTop"));
+        alwaysOnTopAction->setCheckable(true);
+        connect(alwaysOnTopAction, &QAction::toggled, this, &MainWindow::toggleAlwaysOnTop);
+        ui->menuTools->addAction(alwaysOnTopAction);
+    }
+
+    // Focus-pause toggle (settings loaded after QSettings init below)
+    {
+        auto *focusPauseAction = new QAction(tr("Pause on &Focus Loss"), this);
+        focusPauseAction->setObjectName(QStringLiteral("actionFocusPause"));
+        focusPauseAction->setCheckable(true);
+        connect(focusPauseAction, &QAction::toggled, this, &MainWindow::toggleFocusPause);
+        ui->menuTools->addAction(focusPauseAction);
+    }
 
     // Menu "Tools"
     connect(ui->buttonScreenshot, SIGNAL(clicked()), this, SLOT(screenshot()));
@@ -647,9 +589,93 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->actionSave, SIGNAL(triggered()), this, SLOT(saveFlash()));
     connect(ui->actionCreate_flash, SIGNAL(triggered()), this, SLOT(createFlash()));
 
+    // ROM/RAM export/import
+    {
+        ui->menuFlash->addSeparator();
+        auto *exportROM = ui->menuFlash->addAction(tr("Export Flash Image..."));
+        connect(exportROM, &QAction::triggered, this, [this]() {
+            QString path = QFileDialog::getSaveFileName(this, tr("Export Flash Image"), QString(),
+                                                         tr("Binary files (*.bin);;All files (*)"));
+            if (path.isEmpty()) return;
+            if (flash_save_as(path.toStdString().c_str()) != 0)
+                QMessageBox::warning(this, tr("Export Failed"), tr("Could not write flash image."));
+            else
+                showStatusMsg(tr("Flash image exported"));
+        });
+
+        auto *exportRAM = ui->menuFlash->addAction(tr("Export RAM Image..."));
+        connect(exportRAM, &QAction::triggered, this, [this]() {
+            QString path = QFileDialog::getSaveFileName(this, tr("Export RAM Image"), QString(),
+                                                         tr("Binary files (*.bin);;All files (*)"));
+            if (path.isEmpty()) return;
+            QFile f(path);
+            if (!f.open(QIODevice::WriteOnly)) {
+                QMessageBox::warning(this, tr("Export Failed"), tr("Could not write file."));
+                return;
+            }
+            // SDRAM region from mem_areas[1]
+            uint32_t ram_size = mem_areas[1].size;
+            uint8_t *ram_ptr = (uint8_t *)phys_mem_ptr(mem_areas[1].base, ram_size);
+            if (ram_ptr)
+                f.write(reinterpret_cast<char *>(ram_ptr), ram_size);
+            showStatusMsg(tr("RAM image exported (%1 MB)").arg(ram_size / (1024 * 1024)));
+        });
+
+        ui->menuFlash->addSeparator();
+        auto *nandBrowserAction = ui->menuFlash->addAction(tr("NAND Browser..."));
+        connect(nandBrowserAction, &QAction::triggered, this, [this]() {
+            if (m_dock_nand) {
+                m_dock_nand->setVisible(true);
+                m_dock_nand->raise();
+            }
+            if (m_activityBar) m_activityBar->setActive(QStringLiteral("nand"));
+        });
+
+        auto *importRAM = ui->menuFlash->addAction(tr("Import RAM Image..."));
+        connect(importRAM, &QAction::triggered, this, [this]() {
+            QString path = QFileDialog::getOpenFileName(this, tr("Import RAM Image"), QString(),
+                                                         tr("Binary files (*.bin);;All files (*)"));
+            if (path.isEmpty()) return;
+            QFile f(path);
+            if (!f.open(QIODevice::ReadOnly)) {
+                QMessageBox::warning(this, tr("Import Failed"), tr("Could not read file."));
+                return;
+            }
+            QByteArray data = f.readAll();
+            uint32_t ram_size = mem_areas[1].size;
+            uint32_t copy_size = qMin((uint32_t)data.size(), ram_size);
+            uint8_t *ram_ptr = (uint8_t *)phys_mem_ptr(mem_areas[1].base, copy_size);
+            if (ram_ptr) {
+                memcpy(ram_ptr, data.constData(), copy_size);
+                showStatusMsg(tr("RAM image imported (%1 bytes)").arg(copy_size));
+            }
+        });
+    }
+
     // Menu "About"
     connect(ui->actionAbout_Firebird, SIGNAL(triggered(bool)), this, SLOT(showAbout()));
     connect(ui->actionAbout_Qt, SIGNAL(triggered(bool)), qApp, SLOT(aboutQt()));
+
+    /* -- Set Material icons on menu actions -------------------- */
+    {
+        using namespace MaterialIcons;
+        const QColor fg = palette().color(QPalette::WindowText);
+        auto mi = [&](ushort cp) { return fromCodepoint(material_icon_font, cp, fg); };
+
+        ui->actionRestart->setIcon(mi(CP::Play));
+        ui->actionReset->setIcon(mi(CP::Refresh));
+        ui->actionDebugger->setIcon(mi(CP::BugReport));
+        ui->actionConfiguration->setIcon(mi(CP::Settings));
+        ui->actionPause->setIcon(mi(CP::Pause));
+        ui->actionScreenshot->setIcon(mi(CP::Screenshot));
+        ui->actionConnect->setIcon(mi(CP::USB));
+        ui->actionRecord_GIF->setIcon(mi(CP::Image));
+        ui->actionLCD_Window->setIcon(mi(CP::Display));
+        ui->actionResume->setIcon(mi(CP::Play));
+        ui->actionSuspend->setIcon(mi(CP::Save));
+        ui->actionSave->setIcon(mi(CP::Save));
+        ui->actionCreate_flash->setIcon(mi(CP::Add));
+    }
 
     // Lang switch
     QStringList translations = QDir(QStringLiteral(":/i18n/i18n/")).entryList();
@@ -707,13 +733,38 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     updateUIActionState(false);
 
+    // Load settings for window management actions
+    if (auto *aot = findChild<QAction *>(QStringLiteral("actionAlwaysOnTop")))
+        aot->setChecked(settings->value(QStringLiteral("alwaysOnTop"), false).toBool());
+    if (auto *fp = findChild<QAction *>(QStringLiteral("actionFocusPause"))) {
+        focus_pause_enabled = settings->value(QStringLiteral("focusPause"), false).toBool();
+        fp->setChecked(focus_pause_enabled);
+    }
+
     // Load settings
     convertTabsToDocks();
     retranslateDocks();
     setExtLCD(settings->value(QStringLiteral("extLCDVisible")).toBool());
     lcd.restoreGeometry(settings->value(QStringLiteral("extLCDGeometry")).toByteArray());
     restoreGeometry(settings->value(QStringLiteral("windowGeometry")).toByteArray());
-    content_window->restoreState(settings->value(QStringLiteral("windowState")).toByteArray(), WindowStateVersion);
+
+    // Try to restore state; if version mismatch, apply default layout
+    if (!content_window->restoreState(settings->value(QStringLiteral("windowState")).toByteArray(), WindowStateVersion))
+        resetDockLayout();
+
+    // Restore activity bar state
+    if (m_activityBar) {
+        QString activeEntry = settings->value(QStringLiteral("activityBarActive"),
+                                               QStringLiteral("files")).toString();
+        m_activityBar->setActive(activeEntry);
+    }
+    m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
+
+    // Restore HW config overrides
+    adc_battery_level_override = (int16_t)settings->value(QStringLiteral("hwBatteryOverride"), -1).toInt();
+    adc_charging_override = (int8_t)settings->value(QStringLiteral("hwChargingOverride"), -1).toInt();
+    lcd_brightness_override = (int16_t)settings->value(QStringLiteral("hwBrightnessOverride"), -1).toInt();
+    adc_keypad_type_override = (int16_t)settings->value(QStringLiteral("hwKeypadTypeOverride"), -1).toInt();
 
     refillKitMenus();
 
@@ -774,220 +825,160 @@ void MainWindow::applyWidgetTheme()
 {
     const WidgetTheme &theme = currentWidgetTheme();
 
-    QPalette pal = qApp->palette();
+    /* Fusion is the only Qt style that fully respects qApp->setPalette().
+     * The macOS native style ignores palette for most widgets.
+     * CEmu uses the same approach. */
+    static bool fusionSet = false;
+    if (!fusionSet) {
+        qApp->setStyle(QStringLiteral("Fusion"));
+        fusionSet = true;
+    }
+
+    /* Build palette and apply globally. Fusion handles the rest. */
+    QPalette pal;
     applyPaletteColors(pal, theme);
+    pal.setColor(QPalette::Disabled, QPalette::WindowText, theme.textMuted);
+    pal.setColor(QPalette::Disabled, QPalette::Text, theme.textMuted);
+    pal.setColor(QPalette::Disabled, QPalette::ButtonText, theme.textMuted);
+    pal.setColor(QPalette::Mid, theme.border);
+    pal.setColor(QPalette::Dark, theme.border);
+    pal.setColor(QPalette::Light, theme.surfaceAlt);
+    pal.setColor(QPalette::Midlight, theme.surfaceAlt);
+    pal.setColor(QPalette::Shadow, theme.window);
     qApp->setPalette(pal);
-    setPalette(pal);
 
-    setWidgetBackground(this, theme.window, theme.text);
-    setWidgetBackground(content_window, theme.window, theme.text);
-    setWidgetBackground(ui->frame, theme.surface, theme.text);
-    setWidgetBackground(ui->headerBar, theme.surfaceAlt, theme.text);
-
+    /* Frame border removal */
     if (auto *frame = qobject_cast<QFrame *>(ui->frame))
-    {
-        frame->setFrameShape(QFrame::StyledPanel);
-        frame->setFrameShadow(QFrame::Plain);
-        frame->setLineWidth(1);
-        frame->setMidLineWidth(0);
-        frame->setStyleSheet(QStringLiteral(
-            "QFrame#frame {"
-            " border: none;"
-            " }"));
-    }
+        frame->setFrameShape(QFrame::NoFrame);
 
-    if (ui->lcdView)
-    {
-        ui->lcdView->setStyleSheet(QStringLiteral(
-            "QWidget#lcdView {"
-            " border: 1px solid %1;"
-            " background: %2;"
-            " }").arg(theme.border.name(), theme.surface.name()));
-    }
-
-    if (ui->menubar)
-    {
-        QPalette menuPal = ui->menubar->palette();
-        applyPaletteColors(menuPal, theme);
-        ui->menubar->setPalette(menuPal);
-    }
-
-    const auto toolbars = findChildren<QToolBar *>();
-    for (QToolBar *toolbar : toolbars)
-    {
-        QPalette barPal = toolbar->palette();
-        applyPaletteColors(barPal, theme);
-        toolbar->setPalette(barPal);
-        toolbar->setAutoFillBackground(true);
-    }
-
-    if (ui->statusBar)
-    {
-        QPalette statusPal = ui->statusBar->palette();
-        statusPal.setColor(QPalette::Window, theme.statusBg);
-        statusPal.setColor(QPalette::WindowText, theme.textMuted);
-        statusPal.setColor(QPalette::Text, theme.textMuted);
-        statusPal.setColor(QPalette::ButtonText, theme.textMuted);
-        ui->statusBar->setAutoFillBackground(true);
-        ui->statusBar->setPalette(statusPal);
-        ui->statusBar->setStyleSheet(QStringLiteral(
-            "QStatusBar {"
-            " background: %1;"
-            " color: %2;"
-            " border-top: 1px solid %3;"
+    /* VS Code-style comprehensive stylesheet */
+    if (content_window) {
+        QString ss = QStringLiteral(
+            /* Tab bar styling (bottom and right dock areas) */
+            "QTabBar::tab {"
+            "  background: %1;"
+            "  color: %2;"
+            "  padding: 4px 12px;"
+            "  border: none;"
+            "  border-bottom: 2px solid transparent;"
             "}"
-            "QStatusBar::item {"
-            " border: none;"
-            " }")
-                                         .arg(theme.statusBg.name(), theme.textMuted.name(), theme.border.name()));
+            "QTabBar::tab:selected {"
+            "  color: %3;"
+            "  border-bottom: 2px solid %4;"
+            "}"
+            "QTabBar::tab:hover:!selected {"
+            "  color: %3;"
+            "}"
+            /* Thin scrollbars */
+            "QScrollBar:vertical {"
+            "  width: 10px; background: transparent; margin: 0;"
+            "}"
+            "QScrollBar::handle:vertical {"
+            "  background: %5; border-radius: 4px; min-height: 20px;"
+            "}"
+            "QScrollBar::handle:vertical:hover {"
+            "  background: rgba(128,128,128,140);"
+            "}"
+            "QScrollBar:horizontal {"
+            "  height: 10px; background: transparent; margin: 0;"
+            "}"
+            "QScrollBar::handle:horizontal {"
+            "  background: %5; border-radius: 4px; min-width: 20px;"
+            "}"
+            "QScrollBar::handle:horizontal:hover {"
+            "  background: rgba(128,128,128,140);"
+            "}"
+            "QScrollBar::add-line, QScrollBar::sub-line {"
+            "  height: 0; width: 0;"
+            "}"
+            "QScrollBar::add-page, QScrollBar::sub-page {"
+            "  background: transparent;"
+            "}"
+            /* Splitter handle styling */
+            "QSplitter::handle {"
+            "  background: %6;"
+            "}"
+            "QSplitter::handle:hover {"
+            "  background: %7;"
+            "}"
+            /* Input field focus border */
+            "QLineEdit:focus, QSpinBox:focus, QComboBox:focus {"
+            "  border: 1px solid %7;"
+            "}"
+        ).arg(
+            theme.dock.name(),                // %1 tab bg
+            theme.panelTabInactiveFg.name(),  // %2 inactive tab text
+            theme.panelTabActiveFg.name(),    // %3 active tab text
+            theme.panelTabActiveBorder.name(),// %4 active tab border
+            theme.scrollbarThumb.name(),      // %5 scrollbar thumb
+            theme.border.name(),              // %6 splitter
+            theme.accent.name()               // %7 accent
+        );
+        content_window->setStyleSheet(ss);
     }
 
-    auto styleToolButtons = [&](QObject *root) {
-        if (!root)
-            return;
-        const QString normalBg = theme.surfaceAlt.name();
-        const QString pressedBg = theme.surface.name();
-        const QString borderColor = theme.border.name();
-        const QString textColor = theme.text.name();
-        const QString style = QStringLiteral(
-            "QToolButton {"
-            " background:%1;"
-            " border:1px solid %2;"
-            " border-radius:3px;"
-            " padding:4px 6px;"
-            " color:%4;"
-            "}"
-            "QToolButton:pressed, QToolButton:checked {"
-            " background:%3;"
-            "}"
-            "QToolButton:hover {"
-            " background:%3;"
-            "}")
-                                      .arg(normalBg, borderColor, pressedBg, textColor);
-        const auto buttons = root->findChildren<QToolButton *>();
-        for (QToolButton *btn : buttons)
-        {
-            if (btn == status_dark_button)
-                continue; // Status bar uses its own minimal styling
-            btn->setStyleSheet(style);
-            btn->setAutoRaise(false);
+    /* Update activity bar theme */
+    if (m_activityBar)
+        m_activityBar->updateTheme();
+
+    /* Refresh dock icons (color may have changed with theme) and thin title bars */
+    if (m_debugDocks)
+        m_debugDocks->refreshIcons();
+    if (content_window) {
+        const auto dockChildren = content_window->findChildren<DockWidget *>();
+        for (DockWidget *dw : dockChildren) {
+            dw->applyThinBarStyle();
+            dw->refreshTitlebar();  // pick up new icon pixmaps
         }
-    };
-
-    styleToolButtons(this);
-    styleToolButtons(ui->headerBar);
-
-    if (ui->buttonSpeed)
-    {
-        ui->buttonSpeed->setFlat(false);
-        ui->buttonSpeed->setAutoDefault(false);
-        ui->buttonSpeed->setDefault(false);
-        ui->buttonSpeed->setStyleSheet(QStringLiteral(
-            "QPushButton#buttonSpeed {"
-            " background: %1;"
-            " border: 1px solid %2;"
-            " border-radius: 3px;"
-            " padding: 4px 6px;"
-            " color: %3;"
-            "}"
-            "QPushButton#buttonSpeed:hover {"
-            " background: %4;"
-            "}"
-            "QPushButton#buttonSpeed:pressed {"
-            " background: %5;"
-            "}"
-            "QPushButton#buttonSpeed:checked {"
-            " background: %6;"
-            " color: %7;"
-            " border-color: %6;"
-            "}"
-            "QPushButton#buttonSpeed:checked:hover {"
-            " background: %6;"
-            "}"
-            "QPushButton#buttonSpeed:checked:pressed {"
-            " background: %5;"
-            " color: %7;"
-            " border-color: %6;"
-            "}")
-                                           .arg(theme.surfaceAlt.name(),
-                                                theme.border.name(),
-                                                theme.text.name(),
-                                                theme.surface.name(),
-                                                theme.surfaceAlt.name(),
-                                                theme.accent.name(),
-                                                theme.selectionText.name()));
-
-        // Align speed button size with the other control buttons after styling.
-        QSize targetSize = ui->buttonPlayPause->sizeHint();
-        targetSize.setWidth(qMax(targetSize.width(), ui->buttonReset->sizeHint().width()));
-        targetSize.setWidth(qMax(targetSize.width(), ui->buttonScreenshot->sizeHint().width()));
-        targetSize.setWidth(qMax(targetSize.width(), ui->buttonUSB->sizeHint().width()));
-        targetSize.setHeight(qMax(targetSize.height(), ui->buttonReset->sizeHint().height()));
-        targetSize.setHeight(qMax(targetSize.height(), ui->buttonScreenshot->sizeHint().height()));
-        targetSize.setHeight(qMax(targetSize.height(), ui->buttonUSB->sizeHint().height()));
-        ui->buttonSpeed->setFixedSize(targetSize);
     }
 
-    const auto docks = findChildren<DockWidget *>();
-    for (DockWidget *dock : docks)
+    /* Also refresh menu action icons */
     {
-        setWidgetBackground(dock, theme.dock, theme.text);
-        dock->setStyleSheet(QStringLiteral(
-            "QDockWidget {"
-            " border: 1px solid %1;"
-            "}"
-            "QDockWidget::title {"
-            " background: %2;"
-            " margin: 0;"
-            " padding: 0;"
-            " }")
-                                .arg(theme.border.name(), theme.dockTitle.name()));
-        if (auto *title = dock->findChild<QWidget *>(QStringLiteral("dockTitleBar")))
-        {
-            setWidgetBackground(title, theme.dockTitle, theme.text);
-        }
-        if (auto *label = dock->findChild<QLabel *>(QStringLiteral("dockTitleLabel")))
-        {
-            QPalette labelPal = label->palette();
-            labelPal.setColor(QPalette::WindowText, theme.text);
-            labelPal.setColor(QPalette::Text, theme.text);
-            label->setPalette(labelPal);
-        }
-        dock->applyButtonStyle(material_icon_font);
+        using namespace MaterialIcons;
+        const QColor fg = palette().color(QPalette::WindowText);
+        auto mi = [&](ushort cp) { return fromCodepoint(material_icon_font, cp, fg); };
+
+        if (ui->actionRestart)       ui->actionRestart->setIcon(mi(CP::Play));
+        if (ui->actionReset)         ui->actionReset->setIcon(mi(CP::Refresh));
+        if (ui->actionDebugger)      ui->actionDebugger->setIcon(mi(CP::BugReport));
+        if (ui->actionConfiguration) ui->actionConfiguration->setIcon(mi(CP::Settings));
+        if (ui->actionPause)         ui->actionPause->setIcon(mi(CP::Pause));
+        if (ui->actionScreenshot)    ui->actionScreenshot->setIcon(mi(CP::Screenshot));
+        if (ui->actionConnect)       ui->actionConnect->setIcon(mi(CP::USB));
+        if (ui->actionRecord_GIF)    ui->actionRecord_GIF->setIcon(mi(CP::Image));
+        if (ui->actionLCD_Window)    ui->actionLCD_Window->setIcon(mi(CP::Display));
+        if (ui->actionResume)        ui->actionResume->setIcon(mi(CP::Play));
+        if (ui->actionSuspend)       ui->actionSuspend->setIcon(mi(CP::Save));
+        if (ui->actionSave)          ui->actionSave->setIcon(mi(CP::Save));
+        if (ui->actionCreate_flash)  ui->actionCreate_flash->setIcon(mi(CP::Add));
     }
 
-    if (ui->tabDebugger)
-        setWidgetBackground(ui->tabDebugger, theme.surface, theme.text);
-    if (ui->tabSerial)
-        setWidgetBackground(ui->tabSerial, theme.surface, theme.text);
-    if (ui->tabFiles)
-        setWidgetBackground(ui->tabFiles, theme.surface, theme.text);
-
-    const auto itemViews = findChildren<QAbstractItemView *>();
-    for (QAbstractItemView *view : itemViews)
-    {
-        QPalette viewPal = view->palette();
-        viewPal.setColor(QPalette::Base, theme.surface);
-        viewPal.setColor(QPalette::AlternateBase, theme.surfaceAlt);
-        viewPal.setColor(QPalette::Text, theme.text);
-        viewPal.setColor(QPalette::Highlight, theme.selection);
-        viewPal.setColor(QPalette::HighlightedText, theme.selectionText);
-        view->setPalette(viewPal);
-        view->setAutoFillBackground(true);
-    }
-
+    /* Force repaint on custom-painted widgets (they read theme colors directly) */
+    if (m_debugDocks && m_debugDocks->disassembly())
+        m_debugDocks->disassembly()->viewport()->update();
+    if (m_debugDocks && m_debugDocks->hexView())
+        m_debugDocks->hexView()->viewport()->update();
 }
 
 MainWindow::~MainWindow()
 {
-    if (config_dialog)
-        config_dialog->deleteLater();
+    /* config_dialog and flash_dialog are created by QQmlComponent::create()
+     * without a parent, so they must be explicitly deleted.  Use delete
+     * instead of deleteLater -- the event loop may not process deferred
+     * deletes before the QML engine (a child of this window) is destroyed,
+     * which would cause a use-after-free.
+     *
+     * mobileui_component and the other QQmlComponents are children of this
+     * window and will be auto-deleted by ~QWidget(), so we must NOT delete
+     * them here (that would double-free). */
+    delete mobileui_dialog;
+    mobileui_dialog = nullptr;
 
-    if (flash_dialog)
-        flash_dialog->deleteLater();
+    delete config_dialog;
+    config_dialog = nullptr;
 
-    if (mobileui_component)
-        mobileui_component->deleteLater();
+    delete flash_dialog;
+    flash_dialog = nullptr;
 
     // Save external LCD geometry
     settings->setValue(QStringLiteral("extLCDGeometry"), lcd.saveGeometry());
@@ -996,6 +987,17 @@ MainWindow::~MainWindow()
     // Save MainWindow state and geometry
     settings->setValue(QStringLiteral("windowState"), content_window->saveState(WindowStateVersion));
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
+
+    // Save activity bar state
+    if (m_activityBar)
+        settings->setValue(QStringLiteral("activityBarActive"), m_activityBar->activeId());
+    settings->setValue(QStringLiteral("lcdKeypadLinked"), m_lcdKeypadLinked);
+
+    // Save HW config overrides
+    settings->setValue(QStringLiteral("hwBatteryOverride"), (int)adc_battery_level_override);
+    settings->setValue(QStringLiteral("hwChargingOverride"), (int)adc_charging_override);
+    settings->setValue(QStringLiteral("hwBrightnessOverride"), (int)lcd_brightness_override);
+    settings->setValue(QStringLiteral("hwKeypadTypeOverride"), (int)adc_keypad_type_override);
 
     delete settings;
     delete ui;
@@ -1024,6 +1026,19 @@ void MainWindow::changeEvent(QEvent *event)
     }
     else if (eventType == QEvent::LocaleChange)
         switchTranslator(QLocale::system());
+    else if (eventType == QEvent::ActivationChange && focus_pause_enabled)
+    {
+        if (!isActiveWindow() && emu_thread.isRunning() && !ui->actionPause->isChecked())
+        {
+            focus_auto_paused = true;
+            emu_thread.setPaused(true);
+        }
+        else if (isActiveWindow() && focus_auto_paused)
+        {
+            focus_auto_paused = false;
+            emu_thread.setPaused(false);
+        }
+    }
 
     QMainWindow::changeEvent(event);
 }
@@ -1065,141 +1080,21 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 
 void MainWindow::serialChar(const char c)
 {
-    ui->serialConsole->moveCursor(QTextCursor::End);
+    /* Still feed the serial QPlainTextEdit (legacy serial tab, accessible
+     * from Docks menu) so it keeps working for users who need it. */
+    m_serialWriter->processChar(c);
 
-    static char previous = 0;
-    enum EscapeState { EscapeNone, EscapeStart, EscapeCSI };
-    static EscapeState escape_state = EscapeNone;
-    static QByteArray escape_buffer;
-    static bool format_initialized = false;
-    static QTextCharFormat base_format;
-    static QTextCharFormat current_format;
-
-    if (!format_initialized)
-    {
-        base_format = ui->serialConsole->currentCharFormat();
-        current_format = base_format;
-        format_initialized = true;
-    }
-
-    auto applySgr = [&](const QList<int> &params)
-    {
-        if (params.isEmpty())
-        {
-            current_format = base_format;
-            return;
+    /* Buffer complete lines and forward to the Console dock with UART tag.
+     * The Console is now the single unified output for all sources. */
+    if (c == '\n' || c == '\r') {
+        if (!m_serialLineBuf.isEmpty()) {
+            if (m_debugDocks && m_debugDocks->console())
+                m_debugDocks->console()->appendTaggedOutput(
+                    ConsoleTag::Uart, m_serialLineBuf + QStringLiteral("\n"));
+            m_serialLineBuf.clear();
         }
-
-        for (int code : params)
-        {
-            if (code == 0)
-            {
-                current_format = base_format;
-            }
-            else if (code == 1)
-            {
-                current_format.setFontWeight(QFont::Bold);
-            }
-            else if (code == 22)
-            {
-                current_format.setFontWeight(base_format.fontWeight());
-            }
-            else if (code == 39)
-            {
-                current_format.setForeground(base_format.foreground());
-            }
-            else if (code >= 30 && code <= 37)
-            {
-                static const QColor colors[] = {
-                    Qt::black, Qt::red, Qt::green, Qt::yellow,
-                    Qt::blue, Qt::magenta, Qt::cyan, Qt::lightGray};
-                current_format.setForeground(colors[code - 30]);
-            }
-            else if (code >= 90 && code <= 97)
-            {
-                static const QColor bright_colors[] = {
-                    Qt::darkGray, Qt::red, Qt::green, Qt::yellow,
-                    Qt::blue, Qt::magenta, Qt::cyan, Qt::white};
-                current_format.setForeground(bright_colors[code - 90]);
-            }
-        }
-    };
-
-    if (escape_state == EscapeStart)
-    {
-        if (c == '[')
-        {
-            escape_state = EscapeCSI;
-            escape_buffer.clear();
-        }
-        else if (c >= 0x40 && c <= 0x7E)
-        {
-            escape_state = EscapeNone; // Short escape, ignore
-        }
-        else
-        {
-            escape_state = EscapeNone;
-        }
-        previous = 0;
-        return;
-    }
-    if (escape_state == EscapeCSI)
-    {
-        if (c >= 0x40 && c <= 0x7E)
-        {
-            if (c == 'm')
-            {
-                // Parse SGR parameters separated by ';'
-                QList<int> params;
-                if (escape_buffer.isEmpty())
-                    params.append(0);
-                else
-                {
-                    for (const QByteArray &part : escape_buffer.split(';'))
-                        params.append(part.isEmpty() ? 0 : part.toInt());
-                }
-                applySgr(params);
-            }
-            escape_state = EscapeNone;
-            escape_buffer.clear();
-            previous = 0;
-            return;
-        }
-        escape_buffer.append(c);
-        return;
-    }
-    if (c == '\x1B') // ESC starts an ANSI sequence
-    {
-        escape_state = EscapeStart;
-        previous = 0;
-        return;
-    }
-
-    switch (c)
-    {
-    case 0:
-
-    case '\r':
-        previous = c;
-        break;
-
-    case '\b':
-        ui->serialConsole->textCursor().deletePreviousChar();
-        break;
-
-    default:
-        if (previous == '\r' && c != '\n')
-        {
-            ui->serialConsole->moveCursor(QTextCursor::StartOfLine, QTextCursor::MoveAnchor);
-            ui->serialConsole->moveCursor(QTextCursor::End, QTextCursor::KeepAnchor);
-            ui->serialConsole->textCursor().removeSelectedText();
-            previous = 0;
-        }
-        {
-            QTextCursor cursor = ui->serialConsole->textCursor();
-            cursor.insertText(QString(QChar::fromLatin1(c)), current_format);
-            ui->serialConsole->setTextCursor(cursor);
-        }
+    } else {
+        m_serialLineBuf += QLatin1Char(c);
     }
 }
 
@@ -1208,13 +1103,12 @@ void MainWindow::debugInputRequested(bool b)
     setDebuggerActive(b);
     switchUIMode(false);
 
-    ui->lineEdit->setEnabled(b);
-
     if (b)
     {
-        raiseDebugger();
-        refreshDebuggerWidgets();
-        ui->lineEdit->setFocus();
+        if (m_debugDocks) m_debugDocks->raise();
+        if (m_debugDocks) m_debugDocks->refreshAll();
+        if (m_debugDocks && m_debugDocks->console())
+            m_debugDocks->console()->focusInput();
     }
 }
 
@@ -1224,19 +1118,37 @@ void MainWindow::debuggerEntered(bool entered)
         return;
 
     setDebuggerActive(entered);
-    ui->lineEdit->setEnabled(entered);
     if (entered)
     {
-        raiseDebugger();
-        refreshDebuggerWidgets();
-        ui->lineEdit->setFocus();
+        if (m_debugDocks) m_debugDocks->raise();
+        if (m_debugDocks) m_debugDocks->refreshAll();
+        if (m_debugDocks && m_debugDocks->console())
+            m_debugDocks->console()->focusInput();
+    }
+    else
+    {
+        if (m_debugDocks) m_debugDocks->hideAutoShown();
     }
 }
 
 void MainWindow::debugStr(QString str)
 {
-    ui->debugConsole->moveCursor(QTextCursor::End);
-    ui->debugConsole->insertPlainText(str);
+    if (m_debugDocks && m_debugDocks->console()) {
+        if (str.startsWith(QLatin1Char('>'))) {
+            /* Command echo from debug line edit -- plain text, no tag */
+            m_debugDocks->console()->appendOutput(str);
+        } else {
+            /* Debug engine output -- tagged and syntax-highlighted */
+            m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Debug, str);
+        }
+
+        /* Badge: increment debug badge when console dock is not visible */
+        if (m_activityBar && m_debugDocks->consoleDock()
+            && !m_debugDocks->consoleDock()->isVisible()) {
+            m_activityBar->setBadge(QStringLiteral("debug"),
+                                     m_activityBar->badge(QStringLiteral("debug")) + 1);
+        }
+    }
 }
 
 void MainWindow::debugCommand()
@@ -1260,10 +1172,12 @@ void MainWindow::setDebuggerActive(bool active)
         status_bar_debug_label->setVisible(active);
         if (active)
         {
+            const WidgetTheme &t = currentWidgetTheme();
             status_bar_debug_label->setText(QStringLiteral("  DEBUGGER  "));
             status_bar_debug_label->setStyleSheet(
-                QStringLiteral("QLabel { background-color: #cc2222; color: white; "
-                               "border-radius: 3px; padding: 1px 6px; font-weight: bold; font-size: 10px; }"));
+                QStringLiteral("QLabel { background-color: %1; color: %2; "
+                               "border-radius: 3px; padding: 1px 6px; font-weight: bold; font-size: 10px; }")
+                    .arg(t.markerBreakpoint.name(), t.selectionText.name()));
         }
     }
 }
@@ -1403,22 +1317,6 @@ void MainWindow::updateUIActionState(bool emulation_running)
     ui->buttonSpeed->setEnabled(true);
 }
 
-void MainWindow::raiseDebugger()
-{
-    if (dock_debugger)
-    {
-        dock_debugger->setVisible(true);
-        dock_debugger->raise();
-    }
-    if (m_disasmDock)
-    {
-        m_disasmDock->setVisible(true);
-        m_disasmDock->raise();
-    }
-    if (m_registerDock)
-        m_registerDock->setVisible(true);
-}
-
 void MainWindow::convertTabsToDocks()
 {
     // Create "Docks" menu to make closing and opening docks more intuitive
@@ -1431,6 +1329,10 @@ void MainWindow::convertTabsToDocks()
     connect(editmode_toggle, SIGNAL(toggled(bool)), this, SLOT(setUIEditMode(bool)));
 
     docks_menu->addAction(editmode_toggle);
+
+    QAction *resetLayoutAction = new QAction(tr("Reset Layout"), this);
+    connect(resetLayoutAction, &QAction::triggered, this, &MainWindow::resetDockLayout);
+    docks_menu->addAction(resetLayoutAction);
 
     docks_menu->addSeparator();
 
@@ -1473,55 +1375,123 @@ void MainWindow::convertTabsToDocks()
     DockWidget *dock_files = nullptr;
     DockWidget *dock_serial = nullptr;
     DockWidget *dock_keypad = nullptr;
-    DockWidget *dock_debug_anchor = nullptr;
 
-    // Default layout: file transfer on the left, debugger/serial stacked on the right, keypad along the bottom.
+    /* All sidebar docks go in LeftDockWidgetArea, exclusively controlled
+     * by the activity bar.  No tabification -- only ONE is visible at a
+     * time, so the visible dock fills the full left column. */
     for (const auto &pair : dock_pairs)
     {
         QWidget *tab = pair.tab;
         DockWidget *dw = pair.dock;
 
-        if (tab == ui->tabDebugger)
-        {
-            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
-            dock_debug_anchor = dw;
-        }
-        else if (tab == ui->tabSerial)
-        {
-            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
-            dock_serial = dw;
-            if (dock_debug_anchor && dock_debug_anchor != dw)
-                content_window->tabifyDockWidget(dock_debug_anchor, dw);
-            else if (!dock_debug_anchor)
-                dock_debug_anchor = dw;
-        }
-        else if (tab == ui->tabFiles)
-        {
-            content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
-            dock_files = dw;
-        }
-        else if (tab == ui->tab)
-        {
-            content_window->addDockWidget(Qt::BottomDockWidgetArea, dw);
-            dock_keypad = dw;
-        }
-        else
-        {
-            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
-            if (dock_debug_anchor && dock_debug_anchor != dw)
-                content_window->tabifyDockWidget(dock_debug_anchor, dw);
-            if (!dock_debug_anchor)
-                dock_debug_anchor = dw;
-        }
+        if (tab == ui->tabFiles)         dock_files = dw;
+        else if (tab == ui->tabSerial)   dock_serial = dw;
+        else if (tab == ui->tab)         dock_keypad = dw;
+
+        content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
     }
 
-    if (dock_debugger && dock_serial && dock_debugger != dock_serial)
-        content_window->tabifyDockWidget(dock_debugger, dock_serial);
+    /* Store sidebar dock pointers for activity bar wiring */
+    m_dock_files = dock_files;
+    m_dock_serial = dock_serial;
+    m_dock_keypad = dock_keypad;
 
-    if (dock_files && dock_keypad)
-        content_window->tabifyDockWidget(dock_files, dock_keypad);
-    else if (dock_files && dock_serial)
-        content_window->tabifyDockWidget(dock_files, dock_serial);
+    /* Create NAND Browser dock */
+    {
+        m_nandBrowser = new NandBrowserWidget(content_window);
+        auto *dw = new DockWidget(tr("NAND Browser"), content_window);
+        dw->hideTitlebar(true);
+        dw->setObjectName(QStringLiteral("dockNandBrowser"));
+        dw->setWidget(m_nandBrowser);
+        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+        dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+        docks_menu->addAction(dw->toggleViewAction());
+        m_dock_nand = dw;
+        dw->setVisible(false);
+    }
+
+    /* Create Hardware Configuration dock */
+    {
+        m_hwConfig = new HwConfigWidget(content_window);
+        auto *dw = new DockWidget(tr("Hardware Config"), content_window);
+        dw->hideTitlebar(true);
+        dw->setObjectName(QStringLiteral("dockHwConfig"));
+        dw->setWidget(m_hwConfig);
+        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+        dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+        docks_menu->addAction(dw->toggleViewAction());
+        m_dock_hwconfig = dw;
+        dw->setVisible(false);
+    }
+
+    /* Wire Activity Bar entries to sidebar docks.
+     * Serial Monitor is phased out -- the Console dock is now the single
+     * unified output.  Serial tab remains accessible from the Docks menu. */
+    if (m_activityBar) {
+        using namespace MaterialIcons;
+        m_activityBar->addEntry(QStringLiteral("files"),    CP::Folder,    tr("File Transfer"));
+        m_activityBar->addEntry(QStringLiteral("debug"),    CP::BugReport, tr("Debugger"));
+        m_activityBar->addEntry(QStringLiteral("keypad"),   CP::Keyboard,  tr("Keypad"));
+        m_activityBar->addEntry(QStringLiteral("nand"),     CP::Storage,   tr("NAND Browser"));
+        m_activityBar->addEntry(QStringLiteral("hwconfig"), CP::Tune,      tr("Hardware Config"));
+
+        connect(m_activityBar, &ActivityBar::entryClicked, this, [this](const QString &id) {
+            /* Map entry IDs to sidebar docks */
+            QDockWidget *dock = nullptr;
+            if (id == QLatin1String("files"))         dock = m_dock_files;
+            else if (id == QLatin1String("debug"))    dock = dock_debugger;
+            else if (id == QLatin1String("keypad"))   dock = m_dock_keypad;
+            else if (id == QLatin1String("nand"))     dock = m_dock_nand;
+            else if (id == QLatin1String("hwconfig")) dock = m_dock_hwconfig;
+
+            if (!dock) return;
+
+            /* Toggle: if already active and visible, collapse the sidebar;
+             * otherwise hide ALL sidebar docks and show only the selected one. */
+            if (m_activityBar->activeId() == id && dock->isVisible()) {
+                dock->setVisible(false);
+                m_activityBar->setActive(QString());
+            } else {
+                /* Hide every sidebar dock first (includes phased-out serial) */
+                for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
+                                        dock_debugger,
+                                        static_cast<QDockWidget*>(m_dock_serial),
+                                        static_cast<QDockWidget*>(m_dock_keypad),
+                                        static_cast<QDockWidget*>(m_dock_nand),
+                                        static_cast<QDockWidget*>(m_dock_hwconfig)}) {
+                    if (dw) dw->setVisible(false);
+                }
+                dock->setVisible(true);
+                dock->raise();
+                m_activityBar->setActive(id);
+            }
+
+            /* Clear badge on activation */
+            m_activityBar->clearBadge(id);
+
+            /* Refresh HW config when shown */
+            if (id == QLatin1String("hwconfig") && m_hwConfig)
+                m_hwConfig->refresh();
+        });
+
+        /* Start with only the "files" dock visible in the sidebar */
+        m_activityBar->setActive(QStringLiteral("files"));
+        if (dock_debugger) dock_debugger->setVisible(false);
+        if (m_dock_serial) m_dock_serial->setVisible(false);
+        if (m_dock_keypad) m_dock_keypad->setVisible(false);
+    }
+
+    /* -- LCD/Keypad Link ---------------------------------------- */
+    if (m_dock_keypad) {
+        /* We piggyback a small link button onto the keypad dock's title bar.
+         * When "linked" and the external LCD window is visible, undocking the
+         * keypad will make it follow the LCD window position.  */
+        // (Phase 6 hook -- functional link button is minimal: just toggles state
+        //  and updates icon. Actual window-following requires moveEvent tracking
+        //  on the lcd widget which is best added when the feature is actively used.)
+    }
 
     // Hint Qt about corner preferences so the left/bottom docks stay grouped, keeping the LCD central.
     content_window->setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
@@ -1529,182 +1499,27 @@ void MainWindow::convertTabsToDocks()
     content_window->setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
     content_window->setCorner(Qt::BottomRightCorner, Qt::RightDockWidgetArea);
 
-    // Bias initial space to keep the LCD focal and leave reasonable dock columns.
-    QList<QDockWidget *> horiz_targets;
-    QList<int> horiz_sizes;
+    // Bias initial sidebar width to a comfortable default.
     if (dock_files)
-    {
-        horiz_targets << dock_files;
-        horiz_sizes << 260;
-    }
-    if (dock_debugger)
-    {
-        horiz_targets << dock_debugger;
-        horiz_sizes << 320;
-    }
-    if (!horiz_targets.isEmpty())
-        content_window->resizeDocks(horiz_targets, horiz_sizes, Qt::Horizontal);
+        content_window->resizeDocks({dock_files}, {280}, Qt::Horizontal);
 
-    QList<QDockWidget *> vert_targets;
-    QList<int> vert_sizes;
-    if (dock_keypad)
-    {
-        vert_targets << dock_keypad;
-        vert_sizes << 240;
-    }
-    if (!vert_targets.isEmpty())
-        content_window->resizeDocks(vert_targets, vert_sizes, Qt::Vertical);
+    /* Create the CEmu-style debugger docks via DebugDockManager */
+    m_debugDocks = new DebugDockManager(content_window, material_icon_font, this);
+    m_debugDocks->createDocks(docks_menu);
+    connect(m_debugDocks, &DebugDockManager::debugCommand,
+            this, &MainWindow::debuggerCommand);
 
-    /* Create the CEmu-style debugger docks (Disassembly, Registers, Memory, Breakpoints) */
-    createDebuggerDocks(docks_menu);
+    /* Create ANSI text writer for serial console */
+    m_serialWriter = new AnsiTextWriter(ui->serialConsole, this);
 
     setUIEditMode(editmode_toggle->isChecked());
 
     ui->tabWidget->setHidden(true);
 }
 
-void MainWindow::createDebuggerDocks(QMenu *docks_menu)
-{
-    auto makeDock = [&](const QString &title, QWidget *widget, const QString &objName,
-                        Qt::DockWidgetArea area) -> DockWidget * {
-        auto *dw = new DockWidget(title, content_window);
-        dw->hideTitlebar(true);
-        dw->setObjectName(objName);
-        dw->setWidget(widget);
-        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-        dw->setFeatures(QDockWidget::DockWidgetClosable |
-                        QDockWidget::DockWidgetMovable |
-                        QDockWidget::DockWidgetFloatable);
-        content_window->addDockWidget(area, dw);
-
-        QAction *action = dw->toggleViewAction();
-        docks_menu->addAction(action);
-
-        return dw;
-    };
-
-    /* Create widgets */
-    m_disasmWidget = new DisassemblyWidget(this);
-    m_registerWidget = new RegisterWidget(this);
-    m_hexWidget = new HexViewWidget(this);
-    m_breakpointWidget = new BreakpointWidget(this);
-    m_watchpointWidget = new WatchpointWidget(this);
-    m_portMonitorWidget = new PortMonitorWidget(this);
-    m_stackWidget = new StackWidget(this);
-    m_keyHistoryWidget = new KeyHistoryWidget(this);
-
-    m_disasmWidget->setIconFont(material_icon_font);
-
-    /* Create docks — debug docks on the right, utility docks on bottom-right */
-    docks_menu->addSeparator();
-
-    m_disasmDock = makeDock(tr("Disassembly"), m_disasmWidget,
-                            QStringLiteral("dockDisasm"), Qt::RightDockWidgetArea);
-    m_registerDock = makeDock(tr("Registers"), m_registerWidget,
-                              QStringLiteral("dockRegisters"), Qt::RightDockWidgetArea);
-    m_stackDock = makeDock(tr("Stack"), m_stackWidget,
-                            QStringLiteral("dockStack"), Qt::RightDockWidgetArea);
-
-    /* Tab Registers and Stack together */
-    content_window->tabifyDockWidget(m_registerDock, m_stackDock);
-    m_registerDock->raise();
-
-    m_hexDock = makeDock(tr("Memory"), m_hexWidget,
-                         QStringLiteral("dockMemory"), Qt::BottomDockWidgetArea);
-    m_breakpointDock = makeDock(tr("Breakpoints"), m_breakpointWidget,
-                                QStringLiteral("dockBreakpoints"), Qt::BottomDockWidgetArea);
-    m_watchpointDock = makeDock(tr("Watchpoints"), m_watchpointWidget,
-                                QStringLiteral("dockWatchpoints"), Qt::BottomDockWidgetArea);
-    m_portMonitorDock = makeDock(tr("Port Monitor"), m_portMonitorWidget,
-                                 QStringLiteral("dockPortMonitor"), Qt::BottomDockWidgetArea);
-    m_keyHistoryDock = makeDock(tr("Key History"), m_keyHistoryWidget,
-                                QStringLiteral("dockKeyHistory"), Qt::BottomDockWidgetArea);
-
-    /* Tab together: Memory, Breakpoints, Watchpoints, Port Monitor */
-    content_window->tabifyDockWidget(m_hexDock, m_breakpointDock);
-    content_window->tabifyDockWidget(m_breakpointDock, m_watchpointDock);
-    content_window->tabifyDockWidget(m_watchpointDock, m_portMonitorDock);
-    content_window->tabifyDockWidget(m_portMonitorDock, m_keyHistoryDock);
-    m_hexDock->raise();
-
-    /* ── Connect signals ─────────────────────────────────── */
-
-    /* Disassembly -> debugger commands */
-    connect(m_disasmWidget, &DisassemblyWidget::debugCommand,
-            this, &MainWindow::debuggerCommand);
-
-    /* Disassembly breakpoint toggle -> refresh breakpoint/watchpoint lists */
-    connect(m_disasmWidget, &DisassemblyWidget::breakpointToggled,
-            this, [this](uint32_t, bool) {
-                m_breakpointWidget->refresh();
-                m_watchpointWidget->refresh();
-            });
-
-    /* Disassembly address select -> navigate hex view */
-    connect(m_disasmWidget, &DisassemblyWidget::addressSelected,
-            this, [this](uint32_t addr) {
-                m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
-            });
-
-    /* Hex view -> navigate to disassembly */
-    connect(m_hexWidget, &HexViewWidget::gotoDisassembly,
-            this, [this](uint32_t addr) {
-                m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
-            });
-
-    /* Breakpoint/Watchpoint double-click -> navigate disassembly */
-    connect(m_breakpointWidget, &BreakpointWidget::goToAddress,
-            this, [this](uint32_t addr) {
-                m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
-            });
-    connect(m_watchpointWidget, &WatchpointWidget::goToAddress,
-            this, [this](uint32_t addr) {
-                m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
-            });
-
-    /* Port monitor -> navigate to hex view */
-    connect(m_portMonitorWidget, &PortMonitorWidget::goToAddress,
-            this, [this](uint32_t addr) {
-                m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
-            });
-
-    /* Stack -> navigate to disassembly (for return addresses) */
-    connect(m_stackWidget, &StackWidget::goToAddress,
-            this, [this](uint32_t addr) {
-                m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
-            });
-
-    /* Key history: feed keypresses from QtKeypadBridge */
-    connect(&qt_keypad_bridge, &QtKeypadBridge::keyStateChanged,
-            m_keyHistoryWidget, &KeyHistoryWidget::addEntry);
-}
-
-void MainWindow::refreshDebuggerWidgets()
-{
-    if (m_disasmWidget) m_disasmWidget->refresh();
-    if (m_registerWidget) m_registerWidget->refresh();
-    if (m_hexWidget) m_hexWidget->refresh();
-    if (m_breakpointWidget) m_breakpointWidget->refresh();
-    if (m_watchpointWidget) m_watchpointWidget->refresh();
-    if (m_portMonitorWidget) m_portMonitorWidget->refresh();
-    if (m_stackWidget) m_stackWidget->refresh();
-}
-
 void MainWindow::retranslateDocks()
 {
-    // The docks are not handled by mainwindow.ui but got created by
+    // The tab-based docks are not handled by mainwindow.ui but got created by
     // convertTabsToDocks() above, so translation needs to be done manually.
     const auto dockChildren = content_window->findChildren<DockWidget *>();
     for (DockWidget *dw : dockChildren)
@@ -1717,23 +1532,8 @@ void MainWindow::retranslateDocks()
             dw->setWindowTitle(tr("Serial Monitor"));
         else if (dw->widget() == ui->tabDebugger)
             dw->setWindowTitle(tr("Debugger"));
-        else if (dw->widget() == m_disasmWidget)
-            dw->setWindowTitle(tr("Disassembly"));
-        else if (dw->widget() == m_registerWidget)
-            dw->setWindowTitle(tr("Registers"));
-        else if (dw->widget() == m_hexWidget)
-            dw->setWindowTitle(tr("Memory"));
-        else if (dw->widget() == m_breakpointWidget)
-            dw->setWindowTitle(tr("Breakpoints"));
-        else if (dw->widget() == m_watchpointWidget)
-            dw->setWindowTitle(tr("Watchpoints"));
-        else if (dw->widget() == m_portMonitorWidget)
-            dw->setWindowTitle(tr("Port Monitor"));
-        else if (dw->widget() == m_stackWidget)
-            dw->setWindowTitle(tr("Stack"));
-        else if (dw->widget() == m_keyHistoryWidget)
-            dw->setWindowTitle(tr("Key History"));
     }
+    if (m_debugDocks) m_debugDocks->retranslate();
 }
 
 void MainWindow::showSpeed(double value)
@@ -1753,6 +1553,20 @@ void MainWindow::screenshotToFile()
 {
     QImage image = renderFramebuffer();
 
+    // Ask for scale factor
+    QStringList scales = {QStringLiteral("1x (320x240)"), QStringLiteral("2x (640x480)"),
+                          QStringLiteral("3x (960x720)"), QStringLiteral("4x (1280x960)")};
+    bool ok = false;
+    QString choice = QInputDialog::getItem(this, tr("Screenshot Scale"), tr("Select scale factor:"),
+                                           scales, 0, false, &ok);
+    if (!ok)
+        return;
+
+    int scale = scales.indexOf(choice) + 1;
+    if (scale > 1)
+        image = image.scaled(image.width() * scale, image.height() * scale,
+                             Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
     QString filename = QFileDialog::getSaveFileName(this, tr("Save Screenshot"), QString(), tr("PNG images (*.png)"));
     if (filename.isEmpty())
         return;
@@ -1767,7 +1581,6 @@ void MainWindow::recordGIF()
 
     if (path.isEmpty())
     {
-        // TODO: Use QTemporaryFile?
         path = QDir::tempPath() + QDir::separator() + QStringLiteral("firebird_tmp.gif");
 
         gif_start_recording(path.toStdString().c_str(), 3);
@@ -1967,9 +1780,31 @@ void MainWindow::setUIEditMode(bool e)
 {
     settings->setValue(QStringLiteral("uiEditModeEnabled"), e);
 
-    const auto dockChildren = content_window->findChildren<DockWidget *>();
-    for (DockWidget *dw : dockChildren)
-        dw->hideTitlebar(!e);
+    if (m_debugDocks) m_debugDocks->setEditMode(e);
+}
+
+void MainWindow::resetDockLayout()
+{
+    /* Reset sidebar docks: all to LeftDockWidgetArea, only files visible */
+    for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
+                            dock_debugger,
+                            static_cast<QDockWidget*>(m_dock_serial),
+                            static_cast<QDockWidget*>(m_dock_keypad),
+                            static_cast<QDockWidget*>(m_dock_nand),
+                            static_cast<QDockWidget*>(m_dock_hwconfig)}) {
+        if (dw) {
+            dw->setFloating(false);
+            content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+            dw->setVisible(dw == m_dock_files);
+        }
+    }
+    if (m_activityBar)
+        m_activityBar->setActive(QStringLiteral("files"));
+
+    if (m_dock_files)
+        content_window->resizeDocks({m_dock_files}, {280}, Qt::Horizontal);
+
+    if (m_debugDocks) m_debugDocks->resetLayout();
 }
 
 void MainWindow::showAbout()
@@ -1989,20 +1824,24 @@ void MainWindow::started(bool success)
 {
     updateUIActionState(success);
 
-    if (success)
+    if (success) {
         showStatusMsg(tr("Emulation started"));
-    else
+        if (m_hwConfig) m_hwConfig->refresh();
+    } else {
         QMessageBox::warning(this, tr("Could not start the emulation"), tr("Starting the emulation failed.\nAre the paths to boot1 and flash correct?"));
+    }
 }
 
 void MainWindow::resumed(bool success)
 {
     updateUIActionState(success);
 
-    if (success)
+    if (success) {
         showStatusMsg(tr("Emulation resumed from snapshot"));
-    else
+        if (m_hwConfig) m_hwConfig->refresh();
+    } else {
         QMessageBox::warning(this, tr("Could not resume"), tr("Resuming failed.\nTry to fix the issue and try again."));
+    }
 }
 
 void MainWindow::suspended(bool success)
@@ -2200,6 +2039,44 @@ void MainWindow::xmodemSend()
 void MainWindow::switchToMobileUI()
 {
     switchUIMode(true);
+}
+
+void MainWindow::toggleFullscreen()
+{
+    if (isFullScreen())
+    {
+        showNormal();
+#ifdef Q_OS_MAC
+        // Re-apply rounded corners after leaving fullscreen
+        resizeEvent(nullptr);
+#endif
+    }
+    else
+    {
+#ifdef Q_OS_MAC
+        // Clear rounded corner mask in fullscreen
+        clearMask();
+#endif
+        showFullScreen();
+    }
+
+    if (auto *action = findChild<QAction *>(QStringLiteral("actionFullscreen")))
+        action->setChecked(isFullScreen());
+}
+
+void MainWindow::toggleAlwaysOnTop(bool checked)
+{
+    setWindowFlag(Qt::WindowStaysOnTopHint, checked);
+    show();
+    if (settings)
+        settings->setValue(QStringLiteral("alwaysOnTop"), checked);
+}
+
+void MainWindow::toggleFocusPause(bool checked)
+{
+    focus_pause_enabled = checked;
+    if (settings)
+        settings->setValue(QStringLiteral("focusPause"), checked);
 }
 
 bool QQuickWidgetLessBroken::event(QEvent *event)

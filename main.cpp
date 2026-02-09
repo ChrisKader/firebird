@@ -9,10 +9,10 @@
 #include <QWindow>
 #include <QQmlApplicationEngine>
 
-#include "emuthread.h"
-#include "qtframebuffer.h"
-#include "qmlbridge.h"
-#include "kitmodel.h"
+#include "app/emuthread.h"
+#include "ui/framebuffer.h"
+#include "app/qmlbridge.h"
+#include "app/kitmodel.h"
 
 #if !defined(NO_TRANSLATION) && defined(IS_IOS_BUILD)
 #include <unistd.h>
@@ -144,6 +144,13 @@ int main(int argc, char **argv)
     });
 
     int execRet = app.exec();
+
+    /* Ensure the emulator thread is stopped before any stack/global
+     * destructors run.  closeEvent should have done this already, but
+     * if the app exits through a different path (Cmd+Q on macOS, signal,
+     * etc.) the thread might still be alive. QThread::~QThread calls
+     * abort() if the thread is still running. */
+    emu_thread.stop();
 
 #if !defined(NO_TRANSLATION) && defined(IS_IOS_BUILD)
     // New in recent iOS versions: due to some kernel/system bug, if we leave a process

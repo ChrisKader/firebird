@@ -9,7 +9,7 @@ find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick QuickWidgets Widgets)
 qt_standard_project_setup()
 
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
-    consolelineedit.cpp consolelineedit.h
+    # Core emulator
     core/arm_interpreter.cpp
     core/armcode_bin.h
     core/armsnippets.h
@@ -48,26 +48,46 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/usblink.c core/usblink.h
     core/usblink_cx2.cpp core/usblink_cx2.h
     core/usblink_queue.cpp core/usblink_queue.h
-    disassemblywidget.cpp disassemblywidget.h
-    registerwidget.cpp registerwidget.h
-    hexviewwidget.cpp hexviewwidget.h
-    breakpointwidget.cpp breakpointwidget.h
-    watchpointwidget.cpp watchpointwidget.h
-    portmonitorwidget.cpp portmonitorwidget.h
-    stackwidget.cpp stackwidget.h
-    keyhistorywidget.cpp keyhistorywidget.h
-    dockwidget.cpp dockwidget.h
-    emuthread.cpp emuthread.h
-    fbaboutdialog.cpp fbaboutdialog.h
-    keymap.h
-    kitmodel.cpp kitmodel.h
-    lcdwidget.cpp lcdwidget.h
+    # Application infrastructure
+    app/emuthread.cpp app/emuthread.h
+    app/qmlbridge.cpp app/qmlbridge.h
+    app/kitmodel.cpp app/kitmodel.h
+    # Shared UI components
+    ui/dockwidget.cpp ui/dockwidget.h
+    ui/widgettheme.cpp ui/widgettheme.h
+    ui/materialicons.cpp ui/materialicons.h
+    ui/activitybar.cpp ui/activitybar.h
+    ui/lcdwidget.cpp ui/lcdwidget.h
+    ui/framebuffer.cpp ui/framebuffer.h
+    ui/keypadbridge.cpp ui/keypadbridge.h
+    ui/keymap.h
+    ui/consolelineedit.cpp ui/consolelineedit.h
+    ui/ansitextwriter.cpp ui/ansitextwriter.h
+    # Debugger subsystem
+    debugger/dockmanager.cpp debugger/dockmanager.h
+    debugger/disassembly/disassemblywidget.cpp debugger/disassembly/disassemblywidget.h
+    debugger/registers/registerwidget.cpp debugger/registers/registerwidget.h
+    debugger/hexview/hexviewwidget.cpp debugger/hexview/hexviewwidget.h
+    debugger/breakpoints/breakpointwidget.cpp debugger/breakpoints/breakpointwidget.h
+    debugger/watchpoints/watchpointwidget.cpp debugger/watchpoints/watchpointwidget.h
+    debugger/stack/stackwidget.cpp debugger/stack/stackwidget.h
+    debugger/portmonitor/portmonitorwidget.cpp debugger/portmonitor/portmonitorwidget.h
+    debugger/keyhistory/keyhistorywidget.cpp debugger/keyhistory/keyhistorywidget.h
+    debugger/console/consolewidget.cpp debugger/console/consolewidget.h
+    debugger/memvisualizer/memoryvisualizerwidget.cpp debugger/memvisualizer/memoryvisualizerwidget.h
+    debugger/cyclecounter/cyclecounterwidget.cpp debugger/cyclecounter/cyclecounterwidget.h
+    debugger/timermonitor/timermonitorwidget.cpp debugger/timermonitor/timermonitorwidget.h
+    debugger/lcdstate/lcdstatewidget.cpp debugger/lcdstate/lcdstatewidget.h
+    debugger/gotodialog.cpp debugger/gotodialog.h
+    debugger/nandbrowser/nandbrowserwidget.cpp debugger/nandbrowser/nandbrowserwidget.h
+    debugger/hwconfig/hwconfigwidget.cpp debugger/hwconfig/hwconfigwidget.h
+    # Dialogs
+    dialogs/fbaboutdialog.cpp dialogs/fbaboutdialog.h
+    # File transfer
+    transfer/usblinktreewidget.cpp transfer/usblinktreewidget.h
+    # Main window (stays in root for AUTOUIC)
     main.cpp
     mainwindow.cpp mainwindow.h mainwindow.ui
-    qmlbridge.cpp qmlbridge.h
-    qtframebuffer.cpp qtframebuffer.h
-    qtkeypadbridge.cpp qtkeypadbridge.h
-    usblinktreewidget.cpp usblinktreewidget.h
 )
 qt_add_qml_module(firebird-emu
     URI firebird_emu
@@ -116,8 +136,10 @@ qt_add_qml_module(firebird-emu
     NO_RESOURCE_TARGET_PATH
 )
 
+target_include_directories(firebird-emu PRIVATE ${CMAKE_SOURCE_DIR})
+
 target_compile_definitions(firebird-emu PRIVATE
-    
+
     FB_VERSION=1.6
 )
 

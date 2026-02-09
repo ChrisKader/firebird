@@ -11,6 +11,12 @@
 
 // Miscellaneous hardware modules deemed too trivial to get their own files
 
+/* Hardware configuration overrides (GUI-settable, declared in emu.h) */
+int16_t adc_battery_level_override = -1;
+int8_t  adc_charging_override = -1;
+int16_t lcd_brightness_override = -1;
+int16_t adc_keypad_type_override = -1;
+
 /* 8FFF0000 */
 void sdramctl_write_word(uint32_t addr, uint32_t value) {
     switch (addr - 0x8FFF0000) {
@@ -107,19 +113,26 @@ void memctl_cx_write_word(uint32_t addr, uint32_t value) {
 /* 90000000 */
 struct gpio_state gpio;
 
+static void gpio_int_check(void) {
+    uint64_t active = gpio.int_status.w & gpio.int_mask.w;
+    int_set(INT_GPIO, active != 0);
+}
+
 void gpio_reset() {
     memset(&gpio, 0, sizeof gpio);
     gpio.direction.w = 0xFFFFFFFFFFFFFFFF;
     gpio.output.w    = 0x0000000000000000;
 
     gpio.input.w     = 0x00001000071F001F;
+    gpio.prev_input.w = gpio.input.w;
     touchpad_gpio_reset();
 }
 uint32_t gpio_read(uint32_t addr) {
     int port = addr >> 6 & 7;
     switch (addr & 0x3F) {
-        case 0x04: return 0;
-        case 0x08: return 0;
+        case 0x04: return gpio.int_status.b[port];
+        case 0x08: return gpio.int_mask.b[port];
+        case 0x0C: return gpio.int_edge.b[port];
         case 0x10: return gpio.direction.b[port];
         case 0x14: return gpio.output.b[port];
         case 0x18: return gpio.input.b[port] | gpio.output.b[port];
@@ -133,10 +146,17 @@ void gpio_write(uint32_t addr, uint32_t value) {
     int port = addr >> 6 & 7;
     uint32_t change;
     switch (addr & 0x3F) {
-        /* Interrupt handling not implemented */
-        case 0x04: return;
-        case 0x08: return;
-        case 0x0C: return;
+        case 0x04: /* Interrupt status clear */
+            gpio.int_status.b[port] &= ~value;
+            gpio_int_check();
+            return;
+        case 0x08: /* Interrupt mask */
+            gpio.int_mask.b[port] = value;
+            gpio_int_check();
+            return;
+        case 0x0C: /* Edge detect config */
+            gpio.int_edge.b[port] = value;
+            return;
         case 0x10:
             change = (gpio.direction.b[port] ^ value) << (8*port);
             gpio.direction.b[port] = value;
@@ -157,8 +177,8 @@ void gpio_write(uint32_t addr, uint32_t value) {
 }
 
 /* 90010000, 900C0000, 900D0000 */
-static timer_state timer;
-#define ADDR_TO_TP(addr) (&timer.pairs[((addr) >> 16) % 5])
+timer_state timer_classic;
+#define ADDR_TO_TP(addr) (&timer_classic.pairs[((addr) >> 16) % 5])
 
 uint32_t timer_read(uint32_t addr) {
     struct timerpair *tp = ADDR_TO_TP(addr);
@@ -191,7 +211,7 @@ void timer_write(uint32_t addr, uint32_t value) {
     bad_write_word(addr, value);
 }
 static void timer_int_check(struct timerpair *tp) {
-    int_set(INT_TIMER0 + (tp - timer.pairs), tp->int_status & tp->int_mask);
+    int_set(INT_TIMER0 + (tp - timer_classic.pairs), tp->int_status & tp->int_mask);
 }
 void timer_advance(struct timerpair *tp, int ticks) {
     struct timer *t;
@@ -226,16 +246,16 @@ static void timer_event(int index) {
     // TODO: should use seperate schedule item for each timer,
     //       only fired on significant events
     event_repeat(index, 1);
-    timer_advance(&timer.pairs[0], 703);
-    timer_advance(&timer.pairs[1], 1);
-    timer_advance(&timer.pairs[2], 1);
+    timer_advance(&timer_classic.pairs[0], 703);
+    timer_advance(&timer_classic.pairs[1], 1);
+    timer_advance(&timer_classic.pairs[2], 1);
 }
 void timer_reset() {
-    memset(timer.pairs, 0, sizeof timer.pairs);
+    memset(timer_classic.pairs, 0, sizeof timer_classic.pairs);
     int i;
     for (i = 0; i < 3; i++) {
-        timer.pairs[i].timers[0].control = 0x10;
-        timer.pairs[i].timers[1].control = 0x10;
+        timer_classic.pairs[i].timers[0].control = 0x10;
+        timer_classic.pairs[i].timers[1].control = 0x10;
     }
     sched.items[SCHED_TIMERS].clock = CLOCK_32K;
     sched.items[SCHED_TIMERS].proc = timer_event;
@@ -280,7 +300,7 @@ void spi_cx_write(uint32_t addr, uint32_t value) {
 }
 
 /* 90060000 */
-static watchdog_state watchdog;
+watchdog_state watchdog;
 
 static void watchdog_reload() {
     if (watchdog.control & 1) {
@@ -428,7 +448,7 @@ void rtc_write(uint32_t addr, uint32_t value) {
 
 /* 900A0000 */
 uint32_t misc_read(uint32_t addr) {
-    struct timerpair *tp = &timer.pairs[((addr - 0x10) >> 3) & 3];
+    struct timerpair *tp = &timer_classic.pairs[((addr - 0x10) >> 3) & 3];
     static const struct { uint32_t hi, lo; } idreg[4] = {
     { 0x00000000, 0x00000000 },
     { 0x04000001, 0x00010105 },
@@ -469,7 +489,7 @@ uint32_t misc_read(uint32_t addr) {
     return bad_read_word(addr);
 }
 void misc_write(uint32_t addr, uint32_t value) {
-    struct timerpair *tp = &timer.pairs[(addr - 0x10) >> 3 & 3];
+    struct timerpair *tp = &timer_classic.pairs[(addr - 0x10) >> 3 & 3];
     switch (addr & 0x0FFF) {
         case 0x04: return;
         case 0x08: cpu_events |= EVENT_RESET; return;
@@ -570,7 +590,7 @@ void pmu_write(uint32_t addr, uint32_t value) {
 }
 
 /* 90010000, 900C0000(?), 900D0000 */
-static timer_cx_state timer_cx;
+timer_cx_state timer_cx;
 static void timer_cx_event(int index);
 static void timer_cx_fast_event(int index);
 static uint32_t timer_cx_fast_scheduled_ticks = 1;
@@ -1286,9 +1306,12 @@ static uint16_t adc_read_channel(int n) {
         // A value from 0 to 20 indicates normal TI-Nspire keypad.
         // A value from 21 to 42 indicates TI-84+ keypad.
         // A value around 73 indicates a TI-Nspire with touchpad
-        return 73;
+        return (adc_keypad_type_override >= 0)
+            ? (uint16_t)adc_keypad_type_override : 73;
     } else {
-        return 930;
+        // Channels 1-2: battery voltage
+        return (adc_battery_level_override >= 0)
+            ? (uint16_t)adc_battery_level_override : 930;
     }
 }
 void adc_reset() {
@@ -1352,10 +1375,16 @@ void adc_write_word(uint32_t addr, uint32_t value) {
     return;
 }
 
-// Not really implemented
 uint32_t adc_cx2_read_word(uint32_t addr)
 {
-    (void) addr;
+    /* CX2 "ADC" at 0x900B0000 has an unknown register layout.
+     * The OS reads multiple offsets; we don't know which is the data register.
+     * Return 0x6969 for ALL reads by default (~3.5V battery, safe stub).
+     * When battery override is active, offset 0x10 returns the override
+     * value; all other offsets continue returning 0x6969 so the OS doesn't
+     * see unexpected zeros in status/control registers. */
+    if ((addr & 0xFF) == 0x10 && adc_battery_level_override >= 0)
+        return (uint32_t)adc_battery_level_override;
     return 0x6969;
 }
 
@@ -1371,7 +1400,7 @@ bool misc_suspend(emu_snapshot *snapshot)
 {
     return snapshot_write(snapshot, &memctl_cx, sizeof(memctl_cx))
             && snapshot_write(snapshot, &gpio, sizeof(gpio))
-            && snapshot_write(snapshot, &timer, sizeof(timer))
+            && snapshot_write(snapshot, &timer_classic, sizeof(timer_classic))
             && snapshot_write(snapshot, &fastboot, sizeof(fastboot))
             && snapshot_write(snapshot, &watchdog, sizeof(watchdog))
             && snapshot_write(snapshot, &rtc, sizeof(rtc))
@@ -1386,7 +1415,7 @@ bool misc_resume(const emu_snapshot *snapshot)
 {
     bool ok = snapshot_read(snapshot, &memctl_cx, sizeof(memctl_cx))
             && snapshot_read(snapshot, &gpio, sizeof(gpio))
-            && snapshot_read(snapshot, &timer, sizeof(timer))
+            && snapshot_read(snapshot, &timer_classic, sizeof(timer_classic))
             && snapshot_read(snapshot, &fastboot, sizeof(fastboot))
             && snapshot_read(snapshot, &watchdog, sizeof(watchdog))
             && snapshot_read(snapshot, &rtc, sizeof(rtc))

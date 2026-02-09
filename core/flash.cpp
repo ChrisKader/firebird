@@ -934,7 +934,13 @@ bool flash_read_settings(uint32_t *sdram_size, uint32_t *product, uint32_t *feat
 
         auto productField = manufField.subField(0x5100);
         if (!productField.isValid() || productField.sizeOfData() != 2)
-            return false;
+        {
+            /* CX II format detected but product field missing -- default to CX II */
+            *product = 0x1C0;
+            emuprintf("CX II manuf detected but product field (0x5100) missing; defaulting product=0x%x\n", *product);
+            *features = 1;
+            return true;
+        }
 
         *product = (productField.data()[0] << 12) | (productField.data()[1] << 4);
 

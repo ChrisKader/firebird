@@ -8,20 +8,17 @@
 #include <QStringList>
 #include <functional>
 
-#include "emuthread.h"
-#include "fbaboutdialog.h"
-#include "lcdwidget.h"
-#include "qmlbridge.h"
+#include "app/emuthread.h"
+#include "dialogs/fbaboutdialog.h"
+#include "ui/lcdwidget.h"
+#include "app/qmlbridge.h"
 
-class DisassemblyWidget;
-class RegisterWidget;
-class HexViewWidget;
-class BreakpointWidget;
-class WatchpointWidget;
-class PortMonitorWidget;
-class StackWidget;
-class KeyHistoryWidget;
+class DebugDockManager;
+class AnsiTextWriter;
 class DockWidget;
+class ActivityBar;
+class NandBrowserWidget;
+class HwConfigWidget;
 
 namespace Ui {
 class MainWindow;
@@ -68,8 +65,6 @@ public slots:
     //Drag & Drop
     void dropEvent(QDropEvent* event) override;
     void dragEnterEvent(QDragEnterEvent *ev) override;
-    void mouseReleaseEvent(QMouseEvent *event) override;
-
     //Menu "Emulator"
     void restart();
     void openConfiguration();
@@ -86,6 +81,9 @@ public slots:
     void xmodemSend();
     void switchToMobileUI();
     void launchIdaInstantDebugging();
+    void toggleFullscreen();
+    void toggleAlwaysOnTop(bool checked);
+    void toggleFocusPause(bool checked);
 
     //Menu "State"
     bool resume();
@@ -101,6 +99,7 @@ public slots:
 
     //Menu "Docks"
     void setUIEditMode(bool e);
+    void resetDockLayout();
 
     //Menu "About"
     void showAbout();
@@ -144,12 +143,9 @@ private:
     bool resumeFromPath(QString path);
 
     void convertTabsToDocks();
-    void createDebuggerDocks(QMenu *docks_menu);
     void retranslateDocks();
-    void refreshDebuggerWidgets();
 
     void updateUIActionState(bool emulation_running);
-    void raiseDebugger();
 
     void refillKitMenus();
     void updateWindowTitle();
@@ -166,13 +162,9 @@ private:
     void applyWidgetTheme();
 
 protected:
-    void mousePressEvent(QMouseEvent *event) override;
-    void mouseMoveEvent(QMouseEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private:
-    QPoint m_dragStartPos;
-
     Ui::MainWindow *ui = nullptr;
     QMainWindow *content_window = nullptr;
 
@@ -227,23 +219,38 @@ private:
     QToolButton *debugger_toggle_button = nullptr;
     std::function<void()> updatePlayPauseButtonFn;
 
-    /* CEmu-style debugger docks */
-    DisassemblyWidget *m_disasmWidget = nullptr;
-    RegisterWidget *m_registerWidget = nullptr;
-    HexViewWidget *m_hexWidget = nullptr;
-    BreakpointWidget *m_breakpointWidget = nullptr;
-    WatchpointWidget *m_watchpointWidget = nullptr;
-    PortMonitorWidget *m_portMonitorWidget = nullptr;
-    StackWidget *m_stackWidget = nullptr;
-    KeyHistoryWidget *m_keyHistoryWidget = nullptr;
-    DockWidget *m_disasmDock = nullptr;
-    DockWidget *m_registerDock = nullptr;
-    DockWidget *m_hexDock = nullptr;
-    DockWidget *m_breakpointDock = nullptr;
-    DockWidget *m_watchpointDock = nullptr;
-    DockWidget *m_portMonitorDock = nullptr;
-    DockWidget *m_stackDock = nullptr;
-    DockWidget *m_keyHistoryDock = nullptr;
+    // Debug subsystem (owns all 12 debug dock widgets)
+    DebugDockManager *m_debugDocks = nullptr;
+
+    // ANSI escape sequence writer for serial console
+    AnsiTextWriter *m_serialWriter = nullptr;
+
+    // Serial line buffer for forwarding to Console dock
+    QString m_serialLineBuf;
+
+    // Window management
+    bool focus_pause_enabled = false;
+    bool focus_auto_paused = false;
+
+    // VS Code-style Activity Bar
+    ActivityBar *m_activityBar = nullptr;
+
+    // Sidebar docks (wired to activity bar)
+    DockWidget *m_dock_files = nullptr;
+    DockWidget *m_dock_serial = nullptr;
+    DockWidget *m_dock_keypad = nullptr;
+    DockWidget *m_dock_nand = nullptr;
+    DockWidget *m_dock_hwconfig = nullptr;
+
+    // NAND browser & HW config widgets
+    NandBrowserWidget *m_nandBrowser = nullptr;
+    HwConfigWidget *m_hwConfig = nullptr;
+
+    // LCD/Keypad link state
+    bool m_lcdKeypadLinked = false;
+
+    // Badge tracking for serial output
+    int m_serialBadgeCount = 0;
 };
 
 // Used as global instance by EmuThread and friends

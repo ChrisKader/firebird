@@ -58,7 +58,7 @@ static uint32_t shift(uint32_t value, uint8_t shift_type, uint8_t shift_val, boo
             return value >> shift_val;
         case SH_ASR:
             if(setcc) arm.cpsr_c = (value >> (shift_val - 1)) & 1;
-            if(value & (1u << 31)) //TODO: Verify!
+            if(value & (1u << 31)) // Sign-extend: ~(~v >> n) propagates MSB
                 return ~((~value) >> shift_val);
             else
                 return value >> shift_val;
