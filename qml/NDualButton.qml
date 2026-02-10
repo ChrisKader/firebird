@@ -73,7 +73,7 @@ Rectangle {
         x: 0
         y: -2
         width: 25
-        height: 13
+        height: labelSvg1.height
         color: FBUI.Theme.accent
         text: "aa"
         visible: topSvgPath1 === ""
@@ -85,15 +85,14 @@ Rectangle {
         opacity: 0.9
     }
 
-    SvgIcon {
+    SecondaryLabel {
+        id: labelSvg1
+        placement: "none"
         x: 0
         y: -2
         width: 25
-        height: 13
         visible: topSvgPath1 !== ""
         pathData: topSvgPath1
-        fillColor: FBUI.Theme.accent
-        padding: 0.15
         z: -1
         opacity: 0.9
     }
@@ -103,7 +102,7 @@ Rectangle {
         x: 25
         y: -2
         width: 25
-        height: 13
+        height: labelSvg2.height
         color: FBUI.Theme.accent
         text: "bb"
         visible: topSvgPath2 === ""
@@ -115,15 +114,14 @@ Rectangle {
         opacity: 0.9
     }
 
-    SvgIcon {
+    SecondaryLabel {
+        id: labelSvg2
+        placement: "none"
         x: 25
         y: -2
         width: 25
-        height: 13
         visible: topSvgPath2 !== ""
         pathData: topSvgPath2
-        fillColor: FBUI.Theme.accent
-        padding: 0.15
         z: -2
         opacity: 0.9
     }

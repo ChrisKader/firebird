@@ -1,6 +1,7 @@
 #ifndef CX2_H
 #define CX2_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -23,6 +24,7 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value);
 uint32_t aladdin_pmu_read(uint32_t addr);
 void aladdin_pmu_reset(void);
 void aladdin_pmu_set_wakeup_reason(uint32_t reason);
+void aladdin_pmu_set_adc_pending(bool on);
 
 uint32_t memc_ddr_read(uint32_t addr);
 void memc_ddr_write(uint32_t addr, uint32_t value);
@@ -32,6 +34,7 @@ typedef struct cx2_backlight_state {
     uint32_t pwm_period, pwm_value;
 } cx2_backlight_state;
 
+uint32_t cx2_backlight_read(uint32_t addr);
 void cx2_backlight_write(uint32_t addr, uint32_t value);
 void cx2_backlight_reset();
 

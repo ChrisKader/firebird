@@ -22,6 +22,7 @@ class MemoryVisualizerWidget;
 class CycleCounterWidget;
 class TimerMonitorWidget;
 class LCDStateWidget;
+class MMUViewerWidget;
 
 class DebugDockManager : public QObject
 {
@@ -44,6 +45,7 @@ public:
     HexViewWidget *hexView() const { return m_hexWidget; }
     ConsoleWidget *console() const { return m_consoleWidget; }
     DockWidget *consoleDock() const { return m_consoleDock; }
+    WatchpointWidget *watchpoints() const { return m_watchpointWidget; }
 
 signals:
     void debugCommand(QString cmd);
@@ -65,6 +67,7 @@ private:
     CycleCounterWidget *m_cycleCounterWidget = nullptr;
     TimerMonitorWidget *m_timerMonitorWidget = nullptr;
     LCDStateWidget *m_lcdStateWidget = nullptr;
+    MMUViewerWidget *m_mmuViewerWidget = nullptr;
 
     DockWidget *m_disasmDock = nullptr;
     DockWidget *m_registerDock = nullptr;
@@ -79,6 +82,7 @@ private:
     DockWidget *m_cycleCounterDock = nullptr;
     DockWidget *m_timerMonitorDock = nullptr;
     DockWidget *m_lcdStateDock = nullptr;
+    DockWidget *m_mmuViewerDock = nullptr;
 
     QSet<DockWidget *> m_autoShownDocks;
     QList<HexViewWidget *> m_extraHexWidgets;

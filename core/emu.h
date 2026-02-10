@@ -55,10 +55,23 @@ extern bool turbo_mode;
 
 /* Hardware configuration overrides (GUI-settable).
  * -1 = use defaults; >= 0 = override value. */
-extern int16_t adc_battery_level_override;  /* 0-930 ADC raw value */
-extern int8_t  adc_charging_override;       /* 0 = not charging, 1 = charging */
-extern int16_t lcd_brightness_override;     /* 0-255 */
-extern int16_t adc_keypad_type_override;    /* -1 = default (73) */
+/* Live-tuned from UI thread while read by emulation thread. Keep volatile so
+ * runtime overrides are re-read and not optimized into stale values. */
+extern volatile int16_t adc_battery_level_override;  /* 0-930 ADC raw value */
+extern volatile int8_t  adc_charging_override;       /* 0 = not charging, 1 = charging */
+extern volatile int16_t lcd_contrast_override;       /* 0-147 */
+#define LCD_CONTRAST_MAX 147
+extern volatile int16_t adc_keypad_type_override;    /* -1 = default (73) */
+
+typedef enum charger_state {
+    CHARGER_DISCONNECTED = 0,
+    CHARGER_CONNECTED_NOT_CHARGING,
+    CHARGER_CHARGING,
+} charger_state_t;
+
+extern volatile int battery_mv_override;             /* millivolts, -1 = default */
+extern volatile charger_state_t charger_state_override;
+extern volatile int8_t usb_cable_connected_override; /* -1 = follow link state, 0/1 = force */
 
 enum { LOG_CPU, LOG_IO, LOG_FLASH, LOG_INTS, LOG_ICOUNT, LOG_USB, LOG_GDB, MAX_LOG };
 #define LOG_TYPE_TBL "CIFQ#UG"
@@ -88,6 +101,7 @@ void gui_status_printf(const char *fmt, ...); // Status output
 void gui_show_speed(double speed); // Speed display output
 void gui_usblink_changed(bool state); // Notification for usblink state changes
 void gui_debugger_entered_or_left(bool entered); // Notification for debug events
+
 
 /* callback == 0: Stop requesting input
  * callback != 0: Call callback with input, then stop requesting */

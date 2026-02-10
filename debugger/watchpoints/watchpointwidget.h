@@ -5,6 +5,7 @@
 #include <QTreeWidget>
 #include <QPushButton>
 #include <QToolBar>
+#include <QTimer>
 #include <stdint.h>
 
 class WatchpointWidget : public QWidget
@@ -25,10 +26,12 @@ private slots:
     void removeWatchpoint();
     void onItemDoubleClicked(QTreeWidgetItem *item, int column);
     void onItemChanged(QTreeWidgetItem *item, int column);
+    void updateValues();
 
 private:
     QTreeWidget *m_tree = nullptr;
     QToolBar *m_toolbar = nullptr;
+    QTimer *m_updateTimer = nullptr;
     bool m_refreshing = false;
 };
 

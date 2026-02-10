@@ -9,6 +9,7 @@
 
 extern "C" {
 #include "core/emu.h"
+#include "core/misc.h"
 }
 
 #include "core/debug_api.h"
@@ -146,9 +147,10 @@ void LCDStateWidget::refresh()
     auto *ctrlGroup = new QTreeWidgetItem(m_tree);
     ctrlGroup->setText(0, QStringLiteral("Control"));
 
-    /* PL110 has control at 0x018, PL111 has it at 0x018 on CX too */
-    uint32_t ctrl = readReg(emulate_cx ? 0x01C : 0x018);
-    uint32_t intmask = readReg(emulate_cx ? 0x018 : 0x01C);
+    /* PL110: control at 0x01C, intmask at 0x018
+     * PL111 (CX/CX2): control at 0x018, intmask at 0x01C */
+    uint32_t ctrl = readReg(emulate_cx ? 0x018 : 0x01C);
+    uint32_t intmask = readReg(emulate_cx ? 0x01C : 0x018);
 
     {
         auto *item = new QTreeWidgetItem(ctrlGroup);
@@ -185,6 +187,16 @@ void LCDStateWidget::refresh()
         auto *item = new QTreeWidgetItem(ctrlGroup);
         item->setText(0, QStringLiteral("IntStatus (0x020)"));
         item->setText(1, hex(intstat, 2));
+    }
+
+    /* Contrast (hdq1w register, not part of PL11x) */
+    {
+        auto *item = new QTreeWidgetItem(ctrlGroup);
+        item->setText(0, QStringLiteral("Contrast"));
+        item->setText(1, QStringLiteral("%1").arg(hdq1w.lcd_contrast));
+        bool off = (hdq1w.lcd_contrast == 0);
+        item->setText(2, off ? QStringLiteral("LCD off")
+                             : QStringLiteral("%1%%").arg(hdq1w.lcd_contrast * 100 / LCD_CONTRAST_MAX));
     }
 
     /* Cursor */

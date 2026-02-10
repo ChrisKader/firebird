@@ -7,7 +7,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QGroupBox>
-#include <stdint.h>
+#include <QTimer>
 
 class HwConfigWidget : public QWidget
 {
@@ -17,11 +17,17 @@ public:
 
 public slots:
     void refresh();
+    void syncOverridesFromGlobals();
+
+protected:
+    void showEvent(QShowEvent *event) override;
+    void hideEvent(QHideEvent *event) override;
 
 private:
     void applyBatteryOverride();
-    void applyBrightnessOverride();
+    void applyContrastOverride();
     void applyKeypadType();
+    void pollContrast();
 
     /* Hardware Info (read-only) */
     QLabel *m_productLabel;
@@ -30,16 +36,19 @@ private:
     /* Battery section */
     QSlider *m_batterySlider;
     QLabel *m_batteryLabel;
-    QCheckBox *m_chargingBox;
+    QComboBox *m_chargerStateCombo;
     QCheckBox *m_batteryOverride;
 
     /* Display section */
-    QSlider *m_brightnessSlider;
-    QLabel *m_brightnessLabel;
-    QCheckBox *m_brightnessOverride;
+    QSlider *m_contrastSlider;
+    QLabel *m_contrastLabel;
+    QCheckBox *m_contrastOverride;
 
     /* Keypad type section */
     QComboBox *m_keypadTypeCombo;
+
+    /* Periodic poll for live contrast readout */
+    QTimer *m_pollTimer = nullptr;
 };
 
 #endif // HWCONFIGWIDGET_H

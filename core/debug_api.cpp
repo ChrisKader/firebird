@@ -21,8 +21,10 @@ struct bp_meta {
     uint32_t addr;
     uint32_t hit_count;
     uint32_t size;
+    uint32_t last_value;
     bool     enabled;
     bool     in_use;
+    bool     type_exec, type_read, type_write;
     char     condition[128];
     bool     has_condition;
 };
@@ -49,7 +51,11 @@ static struct bp_meta *bp_meta_alloc(uint32_t addr)
             bp_meta_table[i].addr = addr;
             bp_meta_table[i].hit_count = 0;
             bp_meta_table[i].size = 1;
+            bp_meta_table[i].last_value = 0;
             bp_meta_table[i].enabled = true;
+            bp_meta_table[i].type_exec = false;
+            bp_meta_table[i].type_read = false;
+            bp_meta_table[i].type_write = false;
             bp_meta_table[i].condition[0] = '\0';
             bp_meta_table[i].has_condition = false;
             return &bp_meta_table[i];
@@ -319,49 +325,38 @@ int debug_list_breakpoints(struct debug_breakpoint *out, int max_count)
 {
     int count = 0;
 
-    /* Include active breakpoints from RAM flags */
-    for (unsigned area = 0; area < sizeof(mem_areas) / sizeof(*mem_areas); area++) {
-        if (!mem_areas[area].ptr)
+    /* Metadata-driven: iterate all entries, check RAM flags when available */
+    for (int i = 0; i < BP_META_MAX && count < max_count; i++) {
+        if (!bp_meta_table[i].in_use)
             continue;
-        uint32_t *flags_start = &RAM_FLAGS(mem_areas[area].ptr);
-        uint32_t *flags_end = &RAM_FLAGS(mem_areas[area].ptr + mem_areas[area].size);
-
-        for (uint32_t *flags = flags_start; flags != flags_end; flags++) {
-            if (*flags & (RF_READ_BREAKPOINT | RF_WRITE_BREAKPOINT | RF_EXEC_BREAKPOINT)) {
-                if (count >= max_count)
-                    return count;
-
-                uint32_t addr = mem_areas[area].base +
-                    (uint32_t)((uint8_t *)flags - (uint8_t *)flags_start);
-                out[count].addr  = addr;
-                out[count].exec  = (*flags & RF_EXEC_BREAKPOINT) != 0;
-                out[count].read  = (*flags & RF_READ_BREAKPOINT) != 0;
-                out[count].write = (*flags & RF_WRITE_BREAKPOINT) != 0;
-
-                struct bp_meta *m = bp_meta_find(addr);
-                out[count].hit_count = m ? m->hit_count : 0;
-                out[count].size      = m ? m->size : 1;
-                out[count].enabled   = m ? m->enabled : true;
-                count++;
-            }
-        }
-    }
-
-    /* Include disabled breakpoints (in metadata but flags cleared) */
-    for (int i = 0; i < BP_META_MAX; i++) {
-        if (!bp_meta_table[i].in_use || bp_meta_table[i].enabled)
-            continue;
-        if (count >= max_count)
-            return count;
 
         uint32_t addr = bp_meta_table[i].addr;
         out[count].addr      = addr;
-        out[count].exec      = false;
-        out[count].read      = false;
-        out[count].write     = false;
         out[count].hit_count = bp_meta_table[i].hit_count;
         out[count].size      = bp_meta_table[i].size;
-        out[count].enabled   = false;
+        out[count].enabled   = bp_meta_table[i].enabled;
+
+        if (bp_meta_table[i].enabled) {
+            /* Check RAM flags for active breakpoints */
+            void *ptr = virt_mem_ptr(addr & ~3, 4);
+            if (!ptr) ptr = phys_mem_ptr(addr & ~3, 4);
+            if (ptr) {
+                uint32_t flags = RAM_FLAGS(ptr);
+                out[count].exec  = (flags & RF_EXEC_BREAKPOINT) != 0;
+                out[count].read  = (flags & RF_READ_BREAKPOINT) != 0;
+                out[count].write = (flags & RF_WRITE_BREAKPOINT) != 0;
+            } else {
+                /* MMIO watchpoint: use stored type */
+                out[count].exec  = bp_meta_table[i].type_exec;
+                out[count].read  = bp_meta_table[i].type_read;
+                out[count].write = bp_meta_table[i].type_write;
+            }
+        } else {
+            /* Disabled: use stored type */
+            out[count].exec  = bp_meta_table[i].type_exec;
+            out[count].read  = bp_meta_table[i].type_read;
+            out[count].write = bp_meta_table[i].type_write;
+        }
         count++;
     }
 
@@ -372,22 +367,32 @@ bool debug_set_breakpoint(uint32_t addr, bool exec, bool read, bool write)
 {
     void *ptr = virt_mem_ptr(addr & ~3, 4);
     if (!ptr)
+        ptr = phys_mem_ptr(addr & ~3, 4);
+
+    if (ptr) {
+        /* RAM/ROM address: set hardware breakpoint flags */
+        uint32_t *flags = &RAM_FLAGS(ptr);
+        if (exec) {
+            if (*flags & RF_CODE_TRANSLATED)
+                flush_translations();
+            *flags |= RF_EXEC_BREAKPOINT;
+        }
+        if (read)
+            *flags |= RF_READ_BREAKPOINT;
+        if (write)
+            *flags |= RF_WRITE_BREAKPOINT;
+    } else if (exec) {
+        /* Can't set exec breakpoint on non-RAM (MMIO) address */
         return false;
-
-    uint32_t *flags = &RAM_FLAGS(ptr);
-
-    if (exec) {
-        if (*flags & RF_CODE_TRANSLATED)
-            flush_translations();
-        *flags |= RF_EXEC_BREAKPOINT;
     }
-    if (read)
-        *flags |= RF_READ_BREAKPOINT;
-    if (write)
-        *flags |= RF_WRITE_BREAKPOINT;
+    /* MMIO addresses: watchpoints are metadata-only (show value, no break) */
 
-    /* Ensure metadata entry exists */
-    bp_meta_alloc(addr);
+    struct bp_meta *m = bp_meta_alloc(addr);
+    if (!m)
+        return false;
+    m->type_exec = exec;
+    m->type_read = read;
+    m->type_write = write;
 
     return true;
 }
@@ -396,9 +401,10 @@ bool debug_clear_breakpoint(uint32_t addr)
 {
     void *ptr = virt_mem_ptr(addr & ~3, 4);
     if (!ptr)
-        return false;
+        ptr = phys_mem_ptr(addr & ~3, 4);
+    if (ptr)
+        RAM_FLAGS(ptr) &= ~(RF_READ_BREAKPOINT | RF_WRITE_BREAKPOINT | RF_EXEC_BREAKPOINT);
 
-    RAM_FLAGS(ptr) &= ~(RF_READ_BREAKPOINT | RF_WRITE_BREAKPOINT | RF_EXEC_BREAKPOINT);
     bp_meta_free(addr);
     return true;
 }
@@ -416,11 +422,21 @@ bool debug_set_breakpoint_enabled(uint32_t addr, bool enabled)
     } else if (!enabled && m->enabled) {
         /* Disable: clear RAM flags but keep metadata */
         void *ptr = virt_mem_ptr(addr & ~3, 4);
+        if (!ptr)
+            ptr = phys_mem_ptr(addr & ~3, 4);
         if (ptr)
             RAM_FLAGS(ptr) &= ~(RF_READ_BREAKPOINT | RF_WRITE_BREAKPOINT | RF_EXEC_BREAKPOINT);
         m->enabled = false;
     }
 
+    return true;
+}
+
+bool debug_set_breakpoint_size(uint32_t addr, uint32_t size)
+{
+    struct bp_meta *m = bp_meta_find(addr);
+    if (!m) return false;
+    m->size = size;
     return true;
 }
 
@@ -436,6 +452,22 @@ void debug_increment_hit_count(uint32_t addr)
 {
     struct bp_meta *m = bp_meta_find(addr);
     if (m) m->hit_count++;
+}
+
+void debug_watchpoint_update_value(uint32_t addr)
+{
+    struct bp_meta *m = bp_meta_find(addr);
+    if (!m) return;
+    /* Read the current value from physical memory */
+    void *ptr = phys_mem_ptr(addr & ~3, 4);
+    if (ptr)
+        m->last_value = *(uint32_t *)ptr;
+}
+
+uint32_t debug_get_watchpoint_value(uint32_t addr)
+{
+    struct bp_meta *m = bp_meta_find(addr);
+    return m ? m->last_value : 0;
 }
 
 /* -- Conditional Breakpoints --------------------------------- */

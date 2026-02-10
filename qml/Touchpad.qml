@@ -36,37 +36,25 @@ Rectangle {
 
     // Touchpad secondary navigation icons (blue, at border edge)
     // On the real calculator these sit at/just outside the touchpad rim.
-    SvgIcon {
+    SecondaryLabel {
+        placement: "top"; margin: 1
         pathData: svgPaths.touchpadUp
-        fillColor: FBUI.Theme.accent
-        width: 16; height: 7
-        padding: 0
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.bottom: parent.top; anchors.bottomMargin: 1
+        width: 16; height: 7; padding: 0
     }
-    SvgIcon {
+    SecondaryLabel {
+        placement: "bottom"; margin: 1
         pathData: svgPaths.touchpadDown
-        fillColor: FBUI.Theme.accent
-        width: 16; height: 7
-        padding: 0
-        anchors.horizontalCenter: parent.horizontalCenter
-        anchors.top: parent.bottom; anchors.topMargin: 1
+        width: 16; height: 7; padding: 0
     }
-    SvgIcon {
+    SecondaryLabel {
+        placement: "left"; margin: 1
         pathData: svgPaths.touchpadLeft
-        fillColor: FBUI.Theme.accent
-        width: 7; height: 16
-        padding: 0
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.right: parent.left; anchors.rightMargin: 1
+        width: 7; height: 16; padding: 0
     }
-    SvgIcon {
+    SecondaryLabel {
+        placement: "right"; margin: 1
         pathData: svgPaths.touchpadRight
-        fillColor: FBUI.Theme.accent
-        width: 7; height: 16
-        padding: 0
-        anchors.verticalCenter: parent.verticalCenter
-        anchors.left: parent.right; anchors.leftMargin: 1
+        width: 7; height: 16; padding: 0
     }
 
     // Touchpad arrow indicators (inside touchpad, near edges)

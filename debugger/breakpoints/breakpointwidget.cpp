@@ -122,15 +122,27 @@ void BreakpointWidget::addBreakpoint()
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
     if (dlg.exec() == QDialog::Accepted) {
+        QString text = addrEdit->text().trimmed();
+        if (text.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive))
+            text = text.mid(2);
         bool ok = false;
-        uint32_t addr = addrEdit->text().toUInt(&ok, 16);
-        if (ok) {
-            debug_set_breakpoint(addr, execBox->isChecked(),
-                                 readBox->isChecked(), writeBox->isChecked());
-            if (!condEdit->text().isEmpty())
-                debug_set_breakpoint_condition(addr, condEdit->text().toUtf8().constData());
-            refresh();
+        uint32_t addr = text.toUInt(&ok, 16);
+        if (!ok || text.isEmpty()) {
+            QMessageBox::warning(this, tr("Invalid Address"),
+                                 tr("Please enter a valid hex address."));
+            return;
         }
+        if (!debug_set_breakpoint(addr, execBox->isChecked(),
+                                  readBox->isChecked(), writeBox->isChecked())) {
+            QMessageBox::warning(this, tr("Breakpoint Failed"),
+                                 tr("Could not set breakpoint at 0x%1.\n"
+                                    "The address may not be in RAM.")
+                                     .arg(addr, 8, 16, QLatin1Char('0')));
+            return;
+        }
+        if (!condEdit->text().isEmpty())
+            debug_set_breakpoint_condition(addr, condEdit->text().toUtf8().constData());
+        refresh();
     }
 }
 

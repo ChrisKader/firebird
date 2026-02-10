@@ -75,7 +75,8 @@ struct debug_breakpoint {
 int  debug_list_breakpoints(struct debug_breakpoint *out, int max_count);
 
 /* Set breakpoint flags at `addr`. At least one of exec/read/write must
- * be true. Returns false if the address is not in RAM. */
+ * be true. Exec breakpoints require a RAM address; read/write watchpoints
+ * are also allowed on MMIO addresses (metadata-only). */
 bool debug_set_breakpoint(uint32_t addr, bool exec, bool read, bool write);
 
 /* Clear all breakpoint flags at `addr`. */
@@ -85,11 +86,21 @@ bool debug_clear_breakpoint(uint32_t addr);
  * Disabled breakpoints remain in the list but don't trigger. */
 bool debug_set_breakpoint_enabled(uint32_t addr, bool enabled);
 
+/* Set the watchpoint byte range for the breakpoint at `addr`. */
+bool debug_set_breakpoint_size(uint32_t addr, uint32_t size);
+
 /* Reset the hit counter for the breakpoint at `addr`. */
 bool debug_reset_hit_count(uint32_t addr);
 
 /* Increment the hit counter when a breakpoint triggers (called from cpu). */
 void debug_increment_hit_count(uint32_t addr);
+
+/* Snapshot the current value at `addr` into metadata (called from
+ * read_action/write_action on the emu thread). */
+void debug_watchpoint_update_value(uint32_t addr);
+
+/* Retrieve the last-captured value for the watchpoint at `addr`. */
+uint32_t debug_get_watchpoint_value(uint32_t addr);
 
 /* Set a condition expression for the breakpoint at `addr`.
  * Supported syntax: "r0==0x1234", "hit>=5", "[0xA0000000]==0xFF"

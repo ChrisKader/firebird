@@ -59,13 +59,12 @@
 #include "mainwindow.h"
 #include "ui/widgettheme.h"
 #include "ui/materialicons.h"
-#include "ui/activitybar.h"
 #include "ui_mainwindow.h"
 #include "app/qmlbridge.h"
 #include "ui/framebuffer.h"
 #include "ui/keypadbridge.h"
-#include "ui/ansitextwriter.h"
 #include "debugger/dockmanager.h"
+
 #include "debugger/disassembly/disassemblywidget.h"
 #include "debugger/hexview/hexviewwidget.h"
 #include "debugger/console/consolewidget.h"
@@ -73,10 +72,14 @@
 #include "debugger/hwconfig/hwconfigwidget.h"
 
 MainWindow *main_window;
-// Change this if you change the UI
-static const constexpr int WindowStateVersion = 5;
+// Only bump this for incompatible structural changes (e.g. nested QMainWindow
+// redesign).  Adding/removing individual docks does NOT require a bump —
+// restoreState() gracefully skips missing docks and leaves new ones at their
+// default positions.
+static const constexpr int WindowStateVersion = 9;
 
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
+
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
@@ -180,33 +183,12 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Add a compact "Debugger" toggle button into the custom header bar,
     // similar to VS Code's header controls. (Currently disabled)
 
-    // Hide the old button bar in the Debugger dock (now redundant -- debug
-    // toggle lives in the control row under the LCD).
-    if (ui->tabDebugger)
-    {
-        if (auto *bar = ui->tabDebugger->findChild<QWidget *>(QStringLiteral("debuggerButtonBar")))
-            bar->hide();
-    }
-
-    if (ui->tabSerial)
-    {
-        if (auto *clear = ui->tabSerial->findChild<QToolButton *>(QStringLiteral("serialClearButton")))
-        {
-            applyMaterialGlyph(clear, 0xE14C, tr("Clear serial output"));
-            connect(clear, &QToolButton::clicked, this, [this]()
-                    {
-                ui->serialConsole->clear();
-            });
-        }
-    }
 
     // Apply Material glyphs to main control buttons if the font is available.
     applyMaterialGlyph(ui->buttonPlayPause, 0xE037, tr("Start"));
     applyMaterialGlyph(ui->buttonReset, 0xE5D5, tr("Reset"));
     applyMaterialGlyph(ui->buttonScreenshot, 0xE412, tr("Screenshot"));
     applyMaterialGlyph(ui->buttonUSB, 0xE1E0, tr("Connect USB"));
-    if (ui->horizontalLayout_7)
-        ui->horizontalLayout_7->setAlignment(Qt::AlignHCenter);
     QSize controlSize = ui->buttonPlayPause->sizeHint();
     controlSize.setWidth(qMax(controlSize.width(), ui->buttonReset->sizeHint().width()));
     controlSize.setWidth(qMax(controlSize.width(), ui->buttonScreenshot->sizeHint().width()));
@@ -218,30 +200,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     ui->buttonSpeed->setFixedSize(controlSize);
     applyMaterialGlyphPush(ui->buttonSpeed, 0xE9E4, tr("Toggle turbo mode"));
     ui->buttonSpeed->setCheckable(true);
-
-    // Debug toggle button in the control row under the LCD.
-    {
-        auto *debugBtn = new QToolButton(ui->frame);
-        debugBtn->setAutoRaise(true);
-        debugBtn->setIconSize(QSize(24, 24));
-        debugBtn->setCheckable(true);
-        applyMaterialGlyph(debugBtn, 0xE868, tr("Enter debugger"));
-        ui->horizontalLayout_7->addWidget(debugBtn);
-        debugger_toggle_button = debugBtn;
-        debugBtn->setEnabled(ui->actionDebugger->isEnabled());
-        connect(ui->actionDebugger, &QAction::changed, debugBtn, [this, debugBtn]() {
-            debugBtn->setEnabled(ui->actionDebugger->isEnabled());
-        });
-        connect(debugBtn, &QToolButton::clicked, this, [this]() {
-            if (!debugger_active) {
-                ui->actionDebugger->trigger();
-            } else {
-                debugStr(QStringLiteral("> c\n"));
-                emit debuggerCommand(QStringLiteral("c"));
-                setDebuggerActive(false);
-            }
-        });
-    }
 
     // Unified play/pause/start toggle.
     updatePlayPauseButtonFn = [this, applyMaterialGlyph]()
@@ -297,13 +255,82 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     content_window->setObjectName(QStringLiteral("contentWindow"));
     content_window->setDockOptions(QMainWindow::AllowTabbedDocks |
                                    QMainWindow::AllowNestedDocks |
-                                   QMainWindow::AnimatedDocks);
+                                   QMainWindow::AnimatedDocks |
+                                   QMainWindow::GroupedDragging);
 
-    // Move the existing frame (LCD + controls) into the inner main window as its central widget.
-    ui->mainLayout->removeWidget(ui->frame);
-    ui->frame->setParent(content_window);
-    content_window->setCentralWidget(ui->frame);
+    // Use an invisible placeholder as central widget so docks fill all the space.
+    // setFixedSize(0, 10) keeps a minimal vertical extent so all four dock areas
+    // remain usable; setMaximumSize(0,0) can cause Qt to collapse adjacent docks.
+    auto *placeholder = new QWidget(content_window);
+    placeholder->setFixedSize(0, 10);
+    content_window->setCentralWidget(placeholder);
     ui->mainLayout->addWidget(content_window);
+
+    // Extract LCDWidget from ui->frame into its own dock
+    {
+        m_dock_lcd = new DockWidget(tr("Screen"), content_window);
+        m_dock_lcd->setObjectName(QStringLiteral("dockLCD"));
+        m_dock_lcd->hideTitlebar(true);
+        m_dock_lcd->setAllowedAreas(Qt::AllDockWidgetAreas);
+        m_dock_lcd->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        m_dock_lcd->setWidget(ui->lcdView);
+        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_lcd);
+        connect(ui->lcdView, &LCDWidget::scaleChanged, this, [this](int percent) {
+            m_dock_lcd->setWindowTitle(tr("Screen") + QStringLiteral(" (%1%)").arg(percent));
+        });
+    }
+
+    // Extract control buttons from ui->frame into their own dock
+    {
+        auto *controlsWidget = new QWidget(content_window);
+        controlsWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        auto *controlsLayout = new QHBoxLayout(controlsWidget);
+        controlsLayout->setContentsMargins(4, 2, 4, 2);
+        controlsLayout->setSpacing(8);
+        controlsLayout->setAlignment(Qt::AlignHCenter);
+
+        // Reparent buttons from the .ui frame into this new widget
+        controlsLayout->addWidget(ui->buttonPlayPause);
+        controlsLayout->addWidget(ui->buttonReset);
+        controlsLayout->addWidget(ui->buttonScreenshot);
+        controlsLayout->addWidget(ui->buttonUSB);
+        controlsLayout->addWidget(ui->buttonSpeed);
+
+        // Debug toggle button
+        {
+            auto *debugBtn = new QToolButton(controlsWidget);
+            debugBtn->setAutoRaise(true);
+            debugBtn->setIconSize(QSize(24, 24));
+            debugBtn->setCheckable(true);
+            applyMaterialGlyph(debugBtn, 0xE868, tr("Enter debugger"));
+            controlsLayout->addWidget(debugBtn);
+            debugger_toggle_button = debugBtn;
+            debugBtn->setEnabled(ui->actionDebugger->isEnabled());
+            connect(ui->actionDebugger, &QAction::changed, debugBtn, [this, debugBtn]() {
+                debugBtn->setEnabled(ui->actionDebugger->isEnabled());
+            });
+            connect(debugBtn, &QToolButton::clicked, this, [this]() {
+                if (!debugger_active) {
+                    ui->actionDebugger->trigger();
+                } else {
+                    debugStr(QStringLiteral("> c\n"));
+                    emit debuggerCommand(QStringLiteral("c"));
+                    setDebuggerActive(false);
+                }
+            });
+        }
+
+        m_dock_controls = new DockWidget(tr("Controls"), content_window);
+        m_dock_controls->setObjectName(QStringLiteral("dockControls"));
+        m_dock_controls->hideTitlebar(true);
+        m_dock_controls->setAllowedAreas(Qt::AllDockWidgetAreas);
+        m_dock_controls->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        m_dock_controls->setWidget(controlsWidget);
+        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_controls);
+    }
+
+    // Hide the now-empty frame (cannot delete -- owned by Ui::MainWindow)
+    ui->frame->setVisible(false);
 
     // Turn the header bar into a fixed toolbar that lives above the dock/central area,
     // similar to VS Code's in-window title / command bar.
@@ -340,20 +367,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // VS Code-style: bottom panel tabs at top, right panel tabs at top
     content_window->setTabPosition(Qt::BottomDockWidgetArea, QTabWidget::North);
     content_window->setTabPosition(Qt::RightDockWidgetArea, QTabWidget::North);
-
-    // Create Activity Bar on the left side of the outer MainWindow
-    m_activityBar = new ActivityBar(material_icon_font, this);
-
-    auto *activityToolBar = new QToolBar(this);
-    activityToolBar->setObjectName(QStringLiteral("activityBarToolbar"));
-    activityToolBar->setMovable(false);
-    activityToolBar->setFloatable(false);
-    activityToolBar->setAllowedAreas(Qt::LeftToolBarArea);
-    activityToolBar->setContentsMargins(0, 0, 0, 0);
-    auto *activityAction = new QWidgetAction(activityToolBar);
-    activityAction->setDefaultWidget(m_activityBar);
-    activityToolBar->addAction(activityAction);
-    addToolBar(Qt::LeftToolBarArea, activityToolBar);
 
     applyWidgetTheme();
 
@@ -628,7 +641,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
                 m_dock_nand->setVisible(true);
                 m_dock_nand->raise();
             }
-            if (m_activityBar) m_activityBar->setActive(QStringLiteral("nand"));
         });
 
         auto *importRAM = ui->menuFlash->addAction(tr("Import RAM Image..."));
@@ -690,8 +702,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         ui->menuLanguage->addAction(action);
     }
 
-    // Debugging
-    connect(ui->lineEdit, SIGNAL(returnPressed()), this, SLOT(debugCommand()));
 
     // File transfer
     connect(ui->refreshButton, SIGNAL(clicked(bool)), ui->usblinkTree, SLOT(reloadFilebrowser()));
@@ -708,10 +718,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Set up monospace fonts
     QFont monospace = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     monospace.setStyleHint(QFont::Monospace);
-    ui->debugConsole->setFont(monospace);
-    ui->serialConsole->setFont(monospace);
-    ui->debugConsole->setMaximumBlockCount(5000);
-    ui->serialConsole->setMaximumBlockCount(5000);
 
     // Without this line, Qt prints warning messages...
     qRegisterMetaType<QVector<int>>();
@@ -748,23 +754,40 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     lcd.restoreGeometry(settings->value(QStringLiteral("extLCDGeometry")).toByteArray());
     restoreGeometry(settings->value(QStringLiteral("windowGeometry")).toByteArray());
 
-    // Try to restore state; if version mismatch, apply default layout
-    if (!content_window->restoreState(settings->value(QStringLiteral("windowState")).toByteArray(), WindowStateVersion))
-        resetDockLayout();
-
-    // Restore activity bar state
-    if (m_activityBar) {
-        QString activeEntry = settings->value(QStringLiteral("activityBarActive"),
-                                               QStringLiteral("files")).toString();
-        m_activityBar->setActive(activeEntry);
+    // Restore dock layout.  Try the current version first; on version mismatch
+    // attempt older versions so the user's layout survives dock additions/removals.
+    // Only fall back to the default layout if nothing works at all.
+    QByteArray savedState = settings->value(QStringLiteral("windowState")).toByteArray();
+    bool restored = false;
+    if (!savedState.isEmpty()) {
+        for (int v = WindowStateVersion; v >= 1 && !restored; --v)
+            restored = content_window->restoreState(savedState, v);
     }
+    if (!restored) {
+        qDebug("restoreState failed (size=%lld) — applying default layout",
+               (long long)savedState.size());
+        resetDockLayout();
+    }
+
     m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
 
     // Restore HW config overrides
     adc_battery_level_override = (int16_t)settings->value(QStringLiteral("hwBatteryOverride"), -1).toInt();
     adc_charging_override = (int8_t)settings->value(QStringLiteral("hwChargingOverride"), -1).toInt();
-    lcd_brightness_override = (int16_t)settings->value(QStringLiteral("hwBrightnessOverride"), -1).toInt();
+    lcd_contrast_override = (int16_t)settings->value(QStringLiteral("hwBrightnessOverride"), -1).toInt();
     adc_keypad_type_override = (int16_t)settings->value(QStringLiteral("hwKeypadTypeOverride"), -1).toInt();
+    battery_mv_override = settings->value(QStringLiteral("hwBatteryMvOverride"), -1).toInt();
+    if (battery_mv_override < 0 && adc_battery_level_override >= 0)
+        battery_mv_override = 3000 + (adc_battery_level_override * (4200 - 3000) + 465) / 930;
+    int savedChargerState = settings->value(QStringLiteral("hwChargerStateOverride"), -1).toInt();
+    if (savedChargerState >= CHARGER_DISCONNECTED && savedChargerState <= CHARGER_CHARGING)
+        charger_state_override = (charger_state_t)savedChargerState;
+    else if (adc_charging_override >= 0)
+        charger_state_override = adc_charging_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+    else
+        charger_state_override = CHARGER_DISCONNECTED;
+    if (m_hwConfig)
+        m_hwConfig->syncOverridesFromGlobals();
 
     refillKitMenus();
 
@@ -847,10 +870,6 @@ void MainWindow::applyWidgetTheme()
     pal.setColor(QPalette::Shadow, theme.window);
     qApp->setPalette(pal);
 
-    /* Frame border removal */
-    if (auto *frame = qobject_cast<QFrame *>(ui->frame))
-        frame->setFrameShape(QFrame::NoFrame);
-
     /* VS Code-style comprehensive stylesheet */
     if (content_window) {
         QString ss = QStringLiteral(
@@ -917,9 +936,14 @@ void MainWindow::applyWidgetTheme()
         content_window->setStyleSheet(ss);
     }
 
-    /* Update activity bar theme */
-    if (m_activityBar)
-        m_activityBar->updateTheme();
+    /* The outer QMainWindow has no docks of its own; suppress the Fusion-style
+     * separator lines that Qt draws at each dock-area boundary.  Target only
+     * the outer window (objectName "MainWindow") so content_window's dock
+     * resize handles remain functional. */
+    setStyleSheet(QStringLiteral(
+        "QMainWindow#MainWindow::separator { width: 0; height: 0; }"
+        "QToolBar#headerToolBar { border: none; }"
+    ));
 
     /* Refresh dock icons (color may have changed with theme) and thin title bars */
     if (m_debugDocks)
@@ -985,20 +1009,22 @@ MainWindow::~MainWindow()
     settings->setValue(QStringLiteral("extLCDVisible"), lcd.isVisible());
 
     // Save MainWindow state and geometry
-    settings->setValue(QStringLiteral("windowState"), content_window->saveState(WindowStateVersion));
+    QByteArray state = content_window->saveState(WindowStateVersion);
+    qDebug("Saving windowState: %lld bytes, ver=%d", (long long)state.size(), WindowStateVersion);
+    settings->setValue(QStringLiteral("windowState"), state);
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
 
-    // Save activity bar state
-    if (m_activityBar)
-        settings->setValue(QStringLiteral("activityBarActive"), m_activityBar->activeId());
     settings->setValue(QStringLiteral("lcdKeypadLinked"), m_lcdKeypadLinked);
 
     // Save HW config overrides
     settings->setValue(QStringLiteral("hwBatteryOverride"), (int)adc_battery_level_override);
     settings->setValue(QStringLiteral("hwChargingOverride"), (int)adc_charging_override);
-    settings->setValue(QStringLiteral("hwBrightnessOverride"), (int)lcd_brightness_override);
+    settings->setValue(QStringLiteral("hwBrightnessOverride"), (int)lcd_contrast_override);
     settings->setValue(QStringLiteral("hwKeypadTypeOverride"), (int)adc_keypad_type_override);
+    settings->setValue(QStringLiteral("hwBatteryMvOverride"), battery_mv_override);
+    settings->setValue(QStringLiteral("hwChargerStateOverride"), (int)charger_state_override);
 
+    settings->sync();
     delete settings;
     delete ui;
 }
@@ -1080,12 +1106,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 
 void MainWindow::serialChar(const char c)
 {
-    /* Still feed the serial QPlainTextEdit (legacy serial tab, accessible
-     * from Docks menu) so it keeps working for users who need it. */
-    m_serialWriter->processChar(c);
-
-    /* Buffer complete lines and forward to the Console dock with UART tag.
-     * The Console is now the single unified output for all sources. */
+    /* Buffer complete lines and forward to the Console dock with UART tag. */
     if (c == '\n' || c == '\r') {
         if (!m_serialLineBuf.isEmpty()) {
             if (m_debugDocks && m_debugDocks->console())
@@ -1142,21 +1163,9 @@ void MainWindow::debugStr(QString str)
             m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Debug, str);
         }
 
-        /* Badge: increment debug badge when console dock is not visible */
-        if (m_activityBar && m_debugDocks->consoleDock()
-            && !m_debugDocks->consoleDock()->isVisible()) {
-            m_activityBar->setBadge(QStringLiteral("debug"),
-                                     m_activityBar->badge(QStringLiteral("debug")) + 1);
-        }
     }
 }
 
-void MainWindow::debugCommand()
-{
-    emit debugStr(QStringLiteral("> %1\n").arg(ui->lineEdit->text()));
-    emit debuggerCommand(ui->lineEdit->text());
-    ui->lineEdit->clear();
-}
 
 void MainWindow::setDebuggerActive(bool active)
 {
@@ -1354,8 +1363,8 @@ void MainWindow::convertTabsToDocks()
         DockWidget *dw = new DockWidget(tab_title, content_window);
         dw->hideTitlebar(true); // Create with hidden titlebar to not resize the window on startup
         dw->setWindowIcon(tab_icon);
-        // This is used for storing window state, so must not be translated at this point
-        dw->setObjectName(tab_title);
+        // objectName must be a stable, untranslated identifier for saveState/restoreState
+        dw->setObjectName(tab->objectName());
         dw->setAllowedAreas(Qt::AllDockWidgetAreas);
         dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
 
@@ -1364,16 +1373,12 @@ void MainWindow::convertTabsToDocks()
         action->setIcon(dw->windowIcon());
         docks_menu->addAction(action);
 
-        if (tab == ui->tabDebugger)
-            dock_debugger = dw;
-
         dw->setWidget(tab);
 
         dock_pairs.append({tab, dw});
     }
 
     DockWidget *dock_files = nullptr;
-    DockWidget *dock_serial = nullptr;
     DockWidget *dock_keypad = nullptr;
 
     /* All sidebar docks go in LeftDockWidgetArea, exclusively controlled
@@ -1385,7 +1390,6 @@ void MainWindow::convertTabsToDocks()
         DockWidget *dw = pair.dock;
 
         if (tab == ui->tabFiles)         dock_files = dw;
-        else if (tab == ui->tabSerial)   dock_serial = dw;
         else if (tab == ui->tab)         dock_keypad = dw;
 
         content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
@@ -1393,7 +1397,6 @@ void MainWindow::convertTabsToDocks()
 
     /* Store sidebar dock pointers for activity bar wiring */
     m_dock_files = dock_files;
-    m_dock_serial = dock_serial;
     m_dock_keypad = dock_keypad;
 
     /* Create NAND Browser dock */
@@ -1426,71 +1429,31 @@ void MainWindow::convertTabsToDocks()
         dw->setVisible(false);
     }
 
-    /* Wire Activity Bar entries to sidebar docks.
-     * Serial Monitor is phased out -- the Console dock is now the single
-     * unified output.  Serial tab remains accessible from the Docks menu. */
-    if (m_activityBar) {
-        using namespace MaterialIcons;
-        m_activityBar->addEntry(QStringLiteral("files"),    CP::Folder,    tr("File Transfer"));
-        m_activityBar->addEntry(QStringLiteral("debug"),    CP::BugReport, tr("Debugger"));
-        m_activityBar->addEntry(QStringLiteral("keypad"),   CP::Keyboard,  tr("Keypad"));
-        m_activityBar->addEntry(QStringLiteral("nand"),     CP::Storage,   tr("NAND Browser"));
-        m_activityBar->addEntry(QStringLiteral("hwconfig"), CP::Tune,      tr("Hardware Config"));
-
-        connect(m_activityBar, &ActivityBar::entryClicked, this, [this](const QString &id) {
-            /* Map entry IDs to sidebar docks */
-            QDockWidget *dock = nullptr;
-            if (id == QLatin1String("files"))         dock = m_dock_files;
-            else if (id == QLatin1String("debug"))    dock = dock_debugger;
-            else if (id == QLatin1String("keypad"))   dock = m_dock_keypad;
-            else if (id == QLatin1String("nand"))     dock = m_dock_nand;
-            else if (id == QLatin1String("hwconfig")) dock = m_dock_hwconfig;
-
-            if (!dock) return;
-
-            /* Toggle: if already active and visible, collapse the sidebar;
-             * otherwise hide ALL sidebar docks and show only the selected one. */
-            if (m_activityBar->activeId() == id && dock->isVisible()) {
-                dock->setVisible(false);
-                m_activityBar->setActive(QString());
-            } else {
-                /* Hide every sidebar dock first (includes phased-out serial) */
-                for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
-                                        dock_debugger,
-                                        static_cast<QDockWidget*>(m_dock_serial),
-                                        static_cast<QDockWidget*>(m_dock_keypad),
-                                        static_cast<QDockWidget*>(m_dock_nand),
-                                        static_cast<QDockWidget*>(m_dock_hwconfig)}) {
-                    if (dw) dw->setVisible(false);
-                }
-                dock->setVisible(true);
-                dock->raise();
-                m_activityBar->setActive(id);
-            }
-
-            /* Clear badge on activation */
-            m_activityBar->clearBadge(id);
-
-            /* Refresh HW config when shown */
-            if (id == QLatin1String("hwconfig") && m_hwConfig)
-                m_hwConfig->refresh();
-        });
-
-        /* Start with only the "files" dock visible in the sidebar */
-        m_activityBar->setActive(QStringLiteral("files"));
-        if (dock_debugger) dock_debugger->setVisible(false);
-        if (m_dock_serial) m_dock_serial->setVisible(false);
-        if (m_dock_keypad) m_dock_keypad->setVisible(false);
+    /* Add LCD and Controls dock toggle actions to the Docks menu */
+    if (m_dock_lcd) {
+        docks_menu->addAction(m_dock_lcd->toggleViewAction());
     }
+    if (m_dock_controls) {
+        docks_menu->addAction(m_dock_controls->toggleViewAction());
+    }
+
+    /* Start with only the "files" dock visible in the sidebar */
+    if (m_dock_keypad) m_dock_keypad->setVisible(false);
+    if (m_dock_nand)   m_dock_nand->setVisible(false);
+    if (m_dock_hwconfig) m_dock_hwconfig->setVisible(false);
 
     /* -- LCD/Keypad Link ---------------------------------------- */
     if (m_dock_keypad) {
-        /* We piggyback a small link button onto the keypad dock's title bar.
-         * When "linked" and the external LCD window is visible, undocking the
-         * keypad will make it follow the LCD window position.  */
-        // (Phase 6 hook -- functional link button is minimal: just toggles state
-        //  and updates icon. Actual window-following requires moveEvent tracking
-        //  on the lcd widget which is best added when the feature is actively used.)
+        /* QQuickWidget's Shape.CurveRenderer loses GPU state when the
+         * widget is reparented during dock/undock.  Reload the QML
+         * source to recreate all Shape items with fresh resources. */
+        connect(m_dock_keypad, &QDockWidget::topLevelChanged, this, [this]() {
+            QTimer::singleShot(0, this, [this]() {
+                auto src = ui->keypadWidget->source();
+                ui->keypadWidget->setSource(QUrl());
+                ui->keypadWidget->setSource(src);
+            });
+        });
     }
 
     // Hint Qt about corner preferences so the left/bottom docks stay grouped, keeping the LCD central.
@@ -1509,9 +1472,6 @@ void MainWindow::convertTabsToDocks()
     connect(m_debugDocks, &DebugDockManager::debugCommand,
             this, &MainWindow::debuggerCommand);
 
-    /* Create ANSI text writer for serial console */
-    m_serialWriter = new AnsiTextWriter(ui->serialConsole, this);
-
     setUIEditMode(editmode_toggle->isChecked());
 
     ui->tabWidget->setHidden(true);
@@ -1528,11 +1488,13 @@ void MainWindow::retranslateDocks()
             dw->setWindowTitle(tr("Keypad"));
         else if (dw->widget() == ui->tabFiles)
             dw->setWindowTitle(tr("File Transfer"));
-        else if (dw->widget() == ui->tabSerial)
-            dw->setWindowTitle(tr("Serial Monitor"));
-        else if (dw->widget() == ui->tabDebugger)
-            dw->setWindowTitle(tr("Debugger"));
     }
+    if (m_dock_lcd) {
+        int percent = qRound(qMin(ui->lcdView->width() / 320.0, ui->lcdView->height() / 240.0) * 100.0);
+        m_dock_lcd->setWindowTitle(tr("Screen") + QStringLiteral(" (%1%)").arg(percent));
+    }
+    if (m_dock_controls)
+        m_dock_controls->setWindowTitle(tr("Controls"));
     if (m_debugDocks) m_debugDocks->retranslate();
 }
 
@@ -1663,10 +1625,13 @@ void MainWindow::launchIdaInstantDebugging()
 
 void MainWindow::connectUSB()
 {
-    if (usblink_connected)
+    if (usblink_connected) {
+        usb_cable_connected_override = 0;
         usblink_queue_reset();
-    else
+    } else {
+        usb_cable_connected_override = 1;
         usblink_connect();
+    }
 
     usblinkChanged(false);
 }
@@ -1785,10 +1750,20 @@ void MainWindow::setUIEditMode(bool e)
 
 void MainWindow::resetDockLayout()
 {
+    /* Reset LCD and Controls docks to RightDockWidgetArea (main area) */
+    if (m_dock_lcd) {
+        m_dock_lcd->setFloating(false);
+        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_lcd);
+        m_dock_lcd->setVisible(true);
+    }
+    if (m_dock_controls) {
+        m_dock_controls->setFloating(false);
+        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_controls);
+        m_dock_controls->setVisible(true);
+    }
+
     /* Reset sidebar docks: all to LeftDockWidgetArea, only files visible */
     for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
-                            dock_debugger,
-                            static_cast<QDockWidget*>(m_dock_serial),
                             static_cast<QDockWidget*>(m_dock_keypad),
                             static_cast<QDockWidget*>(m_dock_nand),
                             static_cast<QDockWidget*>(m_dock_hwconfig)}) {
@@ -1798,8 +1773,6 @@ void MainWindow::resetDockLayout()
             dw->setVisible(dw == m_dock_files);
         }
     }
-    if (m_activityBar)
-        m_activityBar->setActive(QStringLiteral("files"));
 
     if (m_dock_files)
         content_window->resizeDocks({m_dock_files}, {280}, Qt::Horizontal);

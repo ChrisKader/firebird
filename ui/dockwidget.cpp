@@ -33,6 +33,19 @@ DockWidget::DockWidget(const QString &title, QWidget *parent, Qt::WindowFlags fl
     });
 }
 
+void DockWidget::setWidget(QWidget *widget)
+{
+    // Qt docs: "Custom size hints, minimum and maximum sizes and size policies
+    // should be implemented in the child widget."  Enforce a minimum on the
+    // content widget so that Qt's dock layout never collapses a tab group to
+    // zero when the user resizes an adjacent dock.
+    if (widget && widget->minimumWidth() < 60)
+        widget->setMinimumWidth(60);
+    if (widget && widget->minimumHeight() < 40)
+        widget->setMinimumHeight(40);
+    QDockWidget::setWidget(widget);
+}
+
 void DockWidget::hideTitlebar(bool b)
 {
     hide_titlebar_if_possible = b;

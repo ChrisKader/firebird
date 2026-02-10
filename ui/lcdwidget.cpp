@@ -8,6 +8,7 @@ LCDWidget::LCDWidget(QWidget *parent, Qt::WindowFlags f)
     : QWidget(parent, f)
 {
     setMinimumSize(320, 240);
+    setFocusPolicy(Qt::StrongFocus);
 
     connect(&refresh_timer, SIGNAL(timeout()), this, SLOT(update()));
 
@@ -55,6 +56,12 @@ void LCDWidget::closeEvent(QCloseEvent *e)
     QWidget::closeEvent(e);
 
     emit closed();
+}
+
+void LCDWidget::resizeEvent(QResizeEvent *)
+{
+    int percent = qRound(qMin(width() / 320.0, height() / 240.0) * 100.0);
+    emit scaleChanged(percent);
 }
 
 void LCDWidget::paintEvent(QPaintEvent *)

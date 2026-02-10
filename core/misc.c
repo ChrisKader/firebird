@@ -8,14 +8,19 @@
 #include "keypad.h"
 #include "flash.h"
 #include "mem.h"
+#include "cx2.h"
+#include "usblink.h"
 
 // Miscellaneous hardware modules deemed too trivial to get their own files
 
 /* Hardware configuration overrides (GUI-settable, declared in emu.h) */
-int16_t adc_battery_level_override = -1;
-int8_t  adc_charging_override = -1;
-int16_t lcd_brightness_override = -1;
-int16_t adc_keypad_type_override = -1;
+volatile int16_t adc_battery_level_override = -1;
+volatile int8_t  adc_charging_override = -1;
+volatile int16_t lcd_contrast_override = -1;
+volatile int16_t adc_keypad_type_override = -1;
+volatile int battery_mv_override = -1;
+volatile charger_state_t charger_state_override = CHARGER_DISCONNECTED;
+volatile int8_t usb_cable_connected_override = -1;
 
 /* 8FFF0000 */
 void sdramctl_write_word(uint32_t addr, uint32_t value) {
@@ -1158,7 +1163,13 @@ void hdq1w_write(uint32_t addr, uint32_t value) {
         case 0x04: return;
         case 0x0C: return;
         case 0x14: return;
-        case 0x20: hdq1w.lcd_contrast = value; return;
+        case 0x20:
+            /* On CX2, contrast is driven by the backlight PWM controller
+             * at 90130000, not the HDQ1W register.  Ignore OS writes here
+             * so they don't overwrite the PWM-derived value. */
+            if (!emulate_cx2 && lcd_contrast_override < 0)
+                hdq1w.lcd_contrast = value;
+            return;
     }
     bad_write_word(addr, value);
 }
@@ -1295,6 +1306,199 @@ void sramctl_write_word(uint32_t addr, uint32_t value) {
 
 /* C4000000: ADC (Analog-to-Digital Converter) */
 static adc_state adc;
+typedef struct adc_cx2_state {
+    uint32_t reg[0x1000 / sizeof(uint32_t)];
+    uint32_t bg_counter;
+    uint32_t sample_tick;
+} adc_cx2_state;
+static adc_cx2_state adc_cx2;
+
+enum {
+    CX2_BATTERY_MV_MIN = 3000,
+    CX2_BATTERY_MV_MAX = 4200,
+    /* Bootloader constants from ADC conversion paths (0x1120241c/0x11202420). */
+    CX2_ADC_CODE_MIN = 0x098B,
+    CX2_ADC_CODE_MAX = 0x0C99,
+};
+
+static bool cx2_battery_override_active(void)
+{
+    return battery_mv_override >= 0
+        || adc_battery_level_override >= 0;
+}
+
+static int clamp_int(int value, int min, int max)
+{
+    if (value < min)
+        return min;
+    if (value > max)
+        return max;
+    return value;
+}
+
+static int cx2_effective_battery_mv(void)
+{
+    if (battery_mv_override >= 0)
+        return clamp_int(battery_mv_override, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX);
+
+    if (adc_battery_level_override >= 0) {
+        int raw = clamp_int(adc_battery_level_override, 0, 930);
+        int span = CX2_BATTERY_MV_MAX - CX2_BATTERY_MV_MIN;
+        return CX2_BATTERY_MV_MIN + (raw * span + 465) / 930;
+    }
+
+    /* Default to a full battery, matching classic ADC default behavior. */
+    return CX2_BATTERY_MV_MAX;
+}
+
+static uint16_t cx2_adc_code_from_mv(int mv)
+{
+    uint32_t span_mv = (uint32_t)(CX2_BATTERY_MV_MAX - CX2_BATTERY_MV_MIN);
+    uint32_t span_code = (uint32_t)(CX2_ADC_CODE_MAX - CX2_ADC_CODE_MIN);
+    uint32_t pos_mv = (uint32_t)(clamp_int(mv, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX) - CX2_BATTERY_MV_MIN);
+    /* CX II battery conversion uses inverse polarity: lower mV -> higher code. */
+    return (uint16_t)(CX2_ADC_CODE_MAX - (pos_mv * span_code + span_mv / 2) / span_mv);
+}
+
+static uint32_t cx2_adc_current_code(void)
+{
+    return cx2_adc_code_from_mv(cx2_effective_battery_mv());
+}
+
+static uint32_t cx2_adc_vref_code(void)
+{
+    /* Keep a stable VREF/reference channel distinct from the battery channel.
+     * CX II firmware computes battery values from channel relationships, so
+     * driving all channels with the same code can lock %/charge behavior. */
+    return 0x0AB0u;
+}
+
+static uint32_t cx2_adc_jittered_code(uint32_t code, int jitter)
+{
+    int value = (int)code + jitter;
+    return (uint32_t)clamp_int(value, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
+}
+
+static uint32_t cx2_adc_bg_reload(void)
+{
+    uint32_t period = adc_cx2.reg[0x110u >> 2] & 0xFFFFu;
+    /* Keep periodic completions very responsive in the PMU polling domain.
+     * For the common 0x960 period used by bootloader code this yields 1 tick,
+     * avoiding ADC timeout paths that quickly force power-off. */
+    uint32_t reload = period ? (period >> 11) : 1u;
+    if (reload < 1u)
+        reload = 1u;
+    if (reload > 16u)
+        reload = 16u;
+    return reload;
+}
+
+static charger_state_t cx2_effective_charger_state(void)
+{
+    if (cx2_battery_override_active()) {
+        if (charger_state_override >= CHARGER_DISCONNECTED
+                && charger_state_override <= CHARGER_CHARGING)
+            return charger_state_override;
+        return (adc_charging_override > 0) ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+    }
+    if (usb_cable_connected_override >= 0)
+        return usb_cable_connected_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+    return usblink_connected ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+}
+
+static uint32_t cx2_adc_status_word(void)
+{
+    uint32_t status = 0x08002A4Du;
+    switch (cx2_effective_charger_state()) {
+    case CHARGER_CONNECTED_NOT_CHARGING:
+        status |= 0x00010000u;
+        break;
+    case CHARGER_CHARGING:
+        status |= 0x00030000u;
+        break;
+    default:
+        break;
+    }
+    return status;
+}
+
+static void cx2_adc_refresh_samples(void)
+{
+    uint32_t batt = cx2_adc_current_code();
+    uint32_t vref = cx2_adc_vref_code();
+    static const int8_t jitter[7] = { 0, 1, -1, 2, -2, 3, -3 };
+    uint32_t phase = adc_cx2.sample_tick++ % 7u;
+
+    /* 0x900B0000..0x900B001C are consumed as an 8-entry sample bank.
+     * Alternate battery and VREF-like channels to better match firmware math. */
+    adc_cx2.reg[0x00u >> 2] = cx2_adc_jittered_code(batt, jitter[(phase + 0u) % 7u]);
+    adc_cx2.reg[0x04u >> 2] = cx2_adc_jittered_code(vref, jitter[(phase + 1u) % 7u]);
+    adc_cx2.reg[0x08u >> 2] = cx2_adc_jittered_code(batt, jitter[(phase + 2u) % 7u]);
+    adc_cx2.reg[0x0Cu >> 2] = cx2_adc_jittered_code(vref, jitter[(phase + 3u) % 7u]);
+    adc_cx2.reg[0x10u >> 2] = cx2_adc_jittered_code(batt, jitter[(phase + 4u) % 7u]);
+    adc_cx2.reg[0x14u >> 2] = cx2_adc_jittered_code(vref, jitter[(phase + 5u) % 7u]);
+    adc_cx2.reg[0x18u >> 2] = cx2_adc_status_word();
+    adc_cx2.reg[0x1Cu >> 2] = cx2_adc_jittered_code(batt, jitter[(phase + 6u) % 7u]);
+}
+
+static bool cx2_adc_irq_should_assert(void)
+{
+    uint32_t chan;
+    for (chan = 0; chan < 7; chan++) {
+        uint32_t base = (0x100u + chan * 0x20u) >> 2;
+        uint32_t s08 = adc_cx2.reg[base + (0x08u >> 2)];
+        uint32_t s0c = adc_cx2.reg[base + (0x0Cu >> 2)];
+        uint32_t status = s08 | s0c;
+        if (status & 1u)
+            return true;
+    }
+    return false;
+}
+
+static void cx2_adc_update_irq(void)
+{
+    bool on = cx2_adc_irq_should_assert();
+    int_set(INT_ADC, on);
+    /* CX II bootloader ADC paths use logical IRQ 13 mapping in several places.
+     * Mirror the source onto raw IRQ 13 as well so either mask path can fire. */
+    int_set(13, on);
+    if (on)
+        aladdin_pmu_set_adc_pending(true);
+}
+
+void adc_cx2_background_step(void)
+{
+    /* 0x118 bit0 enables periodic conversions in observed boot flows. */
+    if ((adc_cx2.reg[0x118u >> 2] & 1u) == 0)
+        return;
+    if (cx2_adc_irq_should_assert()) {
+        /* If status is latched, keep IRQ/pending in sync with that latch. */
+        cx2_adc_update_irq();
+        return;
+    }
+
+    if (adc_cx2.bg_counter == 0u)
+        adc_cx2.bg_counter = cx2_adc_bg_reload();
+    if (--adc_cx2.bg_counter != 0u)
+        return;
+
+    adc_cx2.bg_counter = cx2_adc_bg_reload();
+    cx2_adc_refresh_samples();
+    adc_cx2.reg[0x108u >> 2] |= 1u;
+    adc_cx2.reg[0x10Cu >> 2] |= 1u;
+    cx2_adc_update_irq();
+}
+
+void adc_cx2_clear_pending(void)
+{
+    uint32_t chan;
+    for (chan = 0; chan < 7; chan++) {
+        uint32_t base = (0x100u + chan * 0x20u) >> 2;
+        adc_cx2.reg[base + (0x08u >> 2)] &= ~(1u | 2u);
+        adc_cx2.reg[base + (0x0Cu >> 2)] &= ~(1u | 2u);
+    }
+    cx2_adc_update_irq();
+}
 
 static uint16_t adc_read_channel(int n) {
     if (pmu.disable2 & 0x10)
@@ -1316,6 +1520,13 @@ static uint16_t adc_read_channel(int n) {
 }
 void adc_reset() {
     memset(&adc, 0, sizeof adc);
+    memset(&adc_cx2, 0, sizeof adc_cx2);
+    adc_cx2.bg_counter = 0u;
+    cx2_adc_refresh_samples();
+    /* Bootloader expects initial pending-like bits on channel 0 status regs. */
+    adc_cx2.reg[0x108u >> 2] = 1u;
+    adc_cx2.reg[0x10Cu >> 2] = 1u;
+    cx2_adc_update_irq();
 }
 uint32_t adc_read_word(uint32_t addr) {
     int n;
@@ -1377,23 +1588,58 @@ void adc_write_word(uint32_t addr, uint32_t value) {
 
 uint32_t adc_cx2_read_word(uint32_t addr)
 {
-    /* CX2 "ADC" at 0x900B0000 has an unknown register layout.
-     * The OS reads multiple offsets; we don't know which is the data register.
-     * Return 0x6969 for ALL reads by default (~3.5V battery, safe stub).
-     * When battery override is active, offset 0x10 returns the override
-     * value; all other offsets continue returning 0x6969 so the OS doesn't
-     * see unexpected zeros in status/control registers. */
-    if ((addr & 0xFF) == 0x10 && adc_battery_level_override >= 0)
-        return (uint32_t)adc_battery_level_override;
-    return 0x6969;
+    uint32_t offset = addr & 0xFFF;
+    uint32_t index = offset >> 2;
+    if (offset == 0x00 && cx2_battery_override_active())
+        cx2_adc_refresh_samples();
+    else if (offset == 0x18)
+        adc_cx2.reg[index] = cx2_adc_status_word();
+    uint32_t reg = adc_cx2.reg[index];
+    return reg;
 }
 
 void adc_cx2_write_word(uint32_t addr, uint32_t value)
 {
-    (void) addr;
-    (void) value;
-    // It expects an IRQ on writing something
-    int_set(INT_ADC, 1);
+    uint32_t offset = addr & 0xFFF;
+    uint32_t index = offset >> 2;
+
+    adc_cx2.reg[index] = value;
+
+    if (offset == 0x104 && (value & 1u)) {
+        /* Bootloader pre-trigger phase polls 0x108/0x10C immediately after 0x104. */
+        cx2_adc_refresh_samples();
+        adc_cx2.reg[0x108u >> 2] |= 1u;
+        adc_cx2.reg[0x10Cu >> 2] |= 1u;
+        adc_cx2.bg_counter = cx2_adc_bg_reload();
+        return;
+    }
+
+    if (offset == 0x100 && ((value & 1u) || value == 0x00071100u)) {
+        /* 0x100 launch is where PMU pending/IRQ behavior is observed.
+         * 0x00071100 also appears in bootloader flows and should still
+         * produce a completion IRQ. */
+        cx2_adc_refresh_samples();
+        adc_cx2.reg[0x108u >> 2] |= 1u;
+        adc_cx2.reg[0x10Cu >> 2] |= 1u;
+        adc_cx2.bg_counter = cx2_adc_bg_reload();
+        cx2_adc_update_irq();
+        return;
+    }
+
+    if (offset == 0x108 || offset == 0x10C) {
+        /* Pending bit0 is write-1-to-clear. Keep this latch one-bit wide;
+         * treating bit1 as persistent state can trap bootloader probe loops. */
+        uint32_t old = adc_cx2.reg[index];
+        uint32_t newv = old;
+        if (value & 1u)
+            newv &= ~1u;
+        newv &= ~2u;
+        adc_cx2.reg[index] = newv;
+        if ((adc_cx2.reg[0x118u >> 2] & 1u) != 0u && !cx2_adc_irq_should_assert())
+            adc_cx2.bg_counter = cx2_adc_bg_reload();
+        cx2_adc_update_irq();
+        return;
+    }
 }
 
 bool misc_suspend(emu_snapshot *snapshot)

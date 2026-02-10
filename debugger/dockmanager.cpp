@@ -21,6 +21,7 @@
 #include "debugger/cyclecounter/cyclecounterwidget.h"
 #include "debugger/timermonitor/timermonitorwidget.h"
 #include "debugger/lcdstate/lcdstatewidget.h"
+#include "debugger/mmuviewer/mmuviewerwidget.h"
 #include "debugger/gotodialog.h"
 #include <QFileDialog>
 #include <QMessageBox>
@@ -65,6 +66,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     m_cycleCounterWidget = new CycleCounterWidget(m_host);
     m_timerMonitorWidget = new TimerMonitorWidget(m_host);
     m_lcdStateWidget = new LCDStateWidget(m_host);
+    m_mmuViewerWidget = new MMUViewerWidget(m_host);
 
     m_disasmWidget->setIconFont(m_iconFont);
 
@@ -103,6 +105,8 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
                                    QStringLiteral("dockTimerMonitor"), Qt::BottomDockWidgetArea);
     m_lcdStateDock = makeDock(tr("LCD State"), m_lcdStateWidget,
                                QStringLiteral("dockLCDState"), Qt::BottomDockWidgetArea);
+    m_mmuViewerDock = makeDock(tr("MMU Viewer"), m_mmuViewerWidget,
+                                QStringLiteral("dockMMUViewer"), Qt::BottomDockWidgetArea);
 
     /* Set Material icons on toggle actions */
     refreshIcons();
@@ -117,6 +121,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     m_host->tabifyDockWidget(m_memVisDock, m_cycleCounterDock);
     m_host->tabifyDockWidget(m_cycleCounterDock, m_timerMonitorDock);
     m_host->tabifyDockWidget(m_timerMonitorDock, m_lcdStateDock);
+    m_host->tabifyDockWidget(m_lcdStateDock, m_mmuViewerDock);
     m_hexDock->raise();
 
     /* -- Connect signals ----------------------------------- */
@@ -282,6 +287,7 @@ void DebugDockManager::refreshIcons()
     setIcon(m_cycleCounterDock, CP::CycleCounter);
     setIcon(m_timerMonitorDock, CP::Timer);
     setIcon(m_lcdStateDock,     CP::Display);
+    setIcon(m_mmuViewerDock,    CP::Layers);
 }
 
 void DebugDockManager::refreshAll()
@@ -314,6 +320,7 @@ void DebugDockManager::refreshAll()
     defer(0, [this]() { if (m_portMonitorWidget) m_portMonitorWidget->refresh(); });
     defer(0, [this]() { if (m_timerMonitorWidget) m_timerMonitorWidget->refresh(); });
     defer(0, [this]() { if (m_lcdStateWidget) m_lcdStateWidget->refresh(); });
+    defer(0, [this]() { if (m_mmuViewerWidget) m_mmuViewerWidget->refresh(); });
     defer(0, [this]() { if (m_memVisWidget) m_memVisWidget->refresh(); });
     defer(0, [this]() { if (m_cycleCounterWidget) m_cycleCounterWidget->refresh(); });
 }
@@ -333,6 +340,7 @@ void DebugDockManager::retranslate()
     if (m_cycleCounterDock) m_cycleCounterDock->setWindowTitle(tr("Cycle Counter"));
     if (m_timerMonitorDock) m_timerMonitorDock->setWindowTitle(tr("Timer Monitor"));
     if (m_lcdStateDock) m_lcdStateDock->setWindowTitle(tr("LCD State"));
+    if (m_mmuViewerDock) m_mmuViewerDock->setWindowTitle(tr("MMU Viewer"));
 }
 
 void DebugDockManager::raise()
@@ -381,7 +389,7 @@ void DebugDockManager::resetLayout()
         m_disasmDock, m_registerDock, m_stackDock,
         m_hexDock, m_breakpointDock, m_watchpointDock, m_portMonitorDock,
         m_keyHistoryDock, m_consoleDock, m_memVisDock, m_cycleCounterDock,
-        m_timerMonitorDock, m_lcdStateDock
+        m_timerMonitorDock, m_lcdStateDock, m_mmuViewerDock
     };
 
     /* Remove all debug docks first */
@@ -412,7 +420,7 @@ void DebugDockManager::resetLayout()
     DockWidget *bottomDocks[] = {
         m_hexDock, m_breakpointDock, m_watchpointDock, m_portMonitorDock,
         m_keyHistoryDock, m_consoleDock, m_memVisDock, m_cycleCounterDock,
-        m_timerMonitorDock, m_lcdStateDock
+        m_timerMonitorDock, m_lcdStateDock, m_mmuViewerDock
     };
     DockWidget *firstBottom = nullptr;
     for (DockWidget *dw : bottomDocks) {

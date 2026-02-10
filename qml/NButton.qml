@@ -22,12 +22,15 @@ Rectangle {
     // Pressing the right mouse button "locks" the button in enabled state
     property bool fixed: false
     property int keymap_id: 1
+    // Guard to prevent feedback loop: when C++ sets pressed via
+    // onButtonStateChanged, we must NOT call Emu.setButtonState() again.
+    property bool _fromCpp: false
 
     signal clicked()
 
     border.width: active ? 2 : 1
     border.color: border_color
-    radius: 6
+    radius: 3
     color: active ? active_color : back_color
 
     onPressedChanged: {
@@ -37,14 +40,18 @@ Rectangle {
         if(!pressed)
             fixed = false;
 
-        Emu.setButtonState(root.keymap_id, root.pressed);
+        if(!_fromCpp)
+            Emu.setButtonState(root.keymap_id, root.pressed);
     }
 
     Connections {
         target: Emu
         function onButtonStateChanged(id, state) {
-            if(id === root.keymap_id)
+            if(id === root.keymap_id) {
+                root._fromCpp = true;
                 root.pressed = state;
+                root._fromCpp = false;
+            }
         }
     }
 

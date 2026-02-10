@@ -22,9 +22,11 @@ public slots:
 
 protected:
     virtual void paintEvent(QPaintEvent *) override;
+    virtual void resizeEvent(QResizeEvent *) override;
 
 signals:
     void closed();
+    void scaleChanged(int percent);
 
 private:
     QTimer refresh_timer;

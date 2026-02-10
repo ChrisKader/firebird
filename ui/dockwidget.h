@@ -20,6 +20,8 @@ public:
 
     ~DockWidget() {}
 
+    void setWidget(QWidget *widget);
+
     void hideTitlebar(bool b);
     void applyThinBarStyle();
 

@@ -7,7 +7,7 @@ import Firebird.UIComponents 1.0 as FBUI
 Rectangle {
     id: rectangle1
     width: 265
-    height: 340
+    height: 354
 
     readonly property color accent: FBUI.Theme.accent
     readonly property color accentMuted: FBUI.Theme.accentMuted
@@ -25,7 +25,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.leftMargin: 5
         anchors.top: rectangle3.top
-        anchors.topMargin: 0
+        anchors.topMargin: 14
         // This defaults to 5 and is affected by scaling,
         // which is not desired here as the keypad is scaled
         // by its parent already.
@@ -38,15 +38,7 @@ Rectangle {
             Layout.fillWidth: true
             keymap_id: 73
 
-            SvgIcon {
-                width: 33
-                height: 11
-                pathData: svgPaths.undo
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.undo }
         }
 
         NBigButton {
@@ -56,16 +48,7 @@ Rectangle {
             Layout.fillWidth: true
             keymap_id: 65
 
-            SvgIcon {
-                id: text6
-                width: 33
-                height: 11
-                pathData: svgPaths.save
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.save }
         }
 
         NBigButton {
@@ -85,7 +68,7 @@ Rectangle {
         anchors.bottomMargin: 0
         z: 3
         anchors.top: rectangle3.top
-        anchors.topMargin: 0
+        anchors.topMargin: 14
         anchors.right: parent.right
         anchors.rightMargin: 5
         // See above.
@@ -98,15 +81,7 @@ Rectangle {
             Layout.fillWidth: true
             keymap_id: 9
 
-            SvgIcon {
-                width: 33
-                height: 11
-                pathData: svgPaths.pageBarOff
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.pageBarOff }
 
             onClicked: {
                 if(!Emu.isRunning)
@@ -128,16 +103,7 @@ Rectangle {
             Layout.fillWidth: true
             keymap_id: 69
 
-            SvgIcon {
-                id: text7
-                width: 33
-                height: 11
-                pathData: svgPaths.addPage
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.addPage }
         }
 
         NBigButton {
@@ -147,12 +113,9 @@ Rectangle {
             Layout.fillWidth: true
             keymap_id: 71
 
-            SvgIcon {
+            SecondaryLabel {
                 pathData: svgPaths.contextMenu
-                fillColor: rectangle1.accent
                 width: 20
-                height: 10
-                anchors.bottom: nButton6.top
                 anchors.horizontalCenter: parent.horizontalCenter
             }
         }
@@ -167,7 +130,7 @@ Rectangle {
         z: 2
         anchors.horizontalCenter: gridLayout1.horizontalCenter
         anchors.top: parent.top
-        anchors.topMargin: 6
+        anchors.topMargin: 20
     }
 
     GridLayout {
@@ -193,16 +156,7 @@ Rectangle {
             svgPath: svgPaths.shift
             keymap_id: 85
 
-            SvgIcon {
-                id: text5
-                width: 33
-                height: 11
-                pathData: svgPaths.caps
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.caps }
         }
 
         NBigButton {
@@ -216,16 +170,7 @@ Rectangle {
             keymap_id: 56
             Layout.column: 2
 
-            SvgIcon {
-                id: text4
-                width: 33
-                height: 11
-                pathData: svgPaths.store
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.store }
         }
 
         NNumButton {
@@ -305,16 +250,7 @@ Rectangle {
             svgPath: svgPaths.decimal
             keymap_id: 59
 
-            SvgIcon {
-                id: text3
-                width: 33
-                height: 11
-                pathData: svgPaths.capture
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.capture }
         }
 
         NNumButton {
@@ -323,16 +259,7 @@ Rectangle {
             svgPath: svgPaths.negative
             keymap_id: 3
 
-            SvgIcon {
-                id: text2
-                width: 33
-                height: 11
-                pathData: svgPaths.ans
-                fillColor: rectangle1.accent
-                padding: 0.15
-                anchors.bottom: parent.top
-                anchors.bottomMargin: 0
-            }
+            SecondaryLabel { pathData: svgPaths.ans }
         }
     }
 
@@ -364,16 +291,7 @@ Rectangle {
         anchors.right: parent.right
         anchors.rightMargin: 5
 
-        SvgIcon {
-            id: text9
-            width: 33
-            height: 11
-            pathData: svgPaths.clear
-            fillColor: rectangle1.accent
-            padding: 0.15
-            anchors.bottom: parent.top
-            anchors.bottomMargin: 0
-        }
+        SecondaryLabel { pathData: svgPaths.clear }
     }
 
     GridLayout {
@@ -454,9 +372,9 @@ Rectangle {
         svgPath1: svgPaths.equal
         svgPath2: svgPaths.trig
 
-        SvgIcon {
+        SecondaryLabel {
+            placement: "none"
             pathData: svgPaths.hintsQuestion
-            fillColor: rectangle1.accent
             width: 14; height: 14
             padding: 0
             anchors.bottom: nDualButton1.button2.top
@@ -574,18 +492,18 @@ Rectangle {
         svgPath1: svgPaths.plus
         svgPath2: svgPaths.minus
 
-        SvgIcon {
+        SecondaryLabel {
+            placement: "none"
             pathData: svgPaths.contrastUp
-            fillColor: rectangle1.accent
             width: 8; height: 8
             padding: 0
             anchors.bottom: nDualButton7.button1.top
             anchors.horizontalCenter: nDualButton7.button1.horizontalCenter
         }
 
-        SvgIcon {
+        SecondaryLabel {
+            placement: "none"
             pathData: svgPaths.contrastDown
-            fillColor: rectangle1.accent
             width: 8; height: 8
             padding: 0
             anchors.bottom: nDualButton7.button2.top
@@ -605,13 +523,9 @@ Rectangle {
         anchors.top: nDualButton7.bottom
         anchors.topMargin: 10
 
-        SvgIcon {
-            id: text1
-            width: 50
-            height: 11
+        SecondaryLabel {
             pathData: svgPaths.approximate
-            fillColor: rectangle1.accent
-            padding: 0.15
+            width: 50
             anchors.bottom: nButton8.top
             anchors.bottomMargin: 1
         }
@@ -619,7 +533,7 @@ Rectangle {
 
     Rectangle {
         id: rectangle3
-        height: 90
+        height: 104
         color: FBUI.Theme.surface
         anchors.top: parent.top
         anchors.topMargin: 0

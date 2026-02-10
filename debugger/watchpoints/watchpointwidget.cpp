@@ -11,8 +11,10 @@
 #include <QSpinBox>
 #include <QFont>
 #include <QFontDatabase>
+#include <QMessageBox>
 
 #include "core/debug_api.h"
+#include "core/mem.h"
 
 /* Column indices */
 enum { COL_ENABLED = 0, COL_ADDR, COL_SIZE, COL_READ, COL_WRITE, COL_VALUE };
@@ -58,6 +60,14 @@ WatchpointWidget::WatchpointWidget(QWidget *parent)
     connect(removeAct, &QAction::triggered, this, &WatchpointWidget::removeWatchpoint);
 
     layout->addWidget(m_toolbar);
+
+    /* Poll watchpoint values at ~5 Hz.  The emu thread writes to RAM at
+     * full speed; we just re-read the watched addresses periodically so
+     * the UI stays up-to-date without flooding the event queue. */
+    m_updateTimer = new QTimer(this);
+    m_updateTimer->setInterval(200);
+    connect(m_updateTimer, &QTimer::timeout, this, &WatchpointWidget::updateValues);
+    m_updateTimer->start();
 }
 
 void WatchpointWidget::refresh()
@@ -90,6 +100,36 @@ void WatchpointWidget::refresh()
     m_refreshing = false;
 }
 
+void WatchpointWidget::updateValues()
+{
+    if (m_tree->topLevelItemCount() == 0)
+        return;
+
+    m_refreshing = true;
+    for (int i = 0; i < m_tree->topLevelItemCount(); i++) {
+        auto *item = m_tree->topLevelItem(i);
+        uint32_t addr = item->data(COL_ADDR, Qt::UserRole).toUInt();
+        int size = item->text(COL_SIZE).toInt();
+        int readSize = qMin(size, 4);
+
+        /* Use phys_mem_ptr directly instead of debug_read_memory.
+         * debug_read_memory calls virt_mem_ptr -> mmu_translate which
+         * is NOT thread-safe and fails when the emu thread is running.
+         * phys_mem_ptr just scans the static mem_areas array, safe from
+         * any thread.  TI-Nspire RAM is identity-mapped (virt == phys). */
+        uint32_t val = 0;
+        void *ptr = phys_mem_ptr(addr, readSize);
+        if (ptr)
+            memcpy(&val, ptr, readSize);
+
+        int displayWidth = readSize * 2;
+        QString newText = QStringLiteral("%1").arg(val, displayWidth, 16, QLatin1Char('0'));
+        if (item->text(COL_VALUE) != newText)
+            item->setText(COL_VALUE, newText);
+    }
+    m_refreshing = false;
+}
+
 void WatchpointWidget::addWatchpoint()
 {
     QDialog dlg(this);
@@ -118,13 +158,26 @@ void WatchpointWidget::addWatchpoint()
     connect(buttons, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
 
     if (dlg.exec() == QDialog::Accepted) {
+        QString text = addrEdit->text().trimmed();
+        if (text.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive))
+            text = text.mid(2);
         bool ok = false;
-        uint32_t addr = addrEdit->text().toUInt(&ok, 16);
-        if (ok) {
-            debug_set_breakpoint(addr, false,
-                                 readBox->isChecked(), writeBox->isChecked());
-            refresh();
+        uint32_t addr = text.toUInt(&ok, 16);
+        if (!ok || text.isEmpty()) {
+            QMessageBox::warning(this, tr("Invalid Address"),
+                                 tr("Please enter a valid hex address."));
+            return;
         }
+        if (!debug_set_breakpoint(addr, false,
+                                  readBox->isChecked(), writeBox->isChecked())) {
+            QMessageBox::warning(this, tr("Watchpoint Failed"),
+                                 tr("Could not set watchpoint at 0x%1.\n"
+                                    "The address may not be in RAM.")
+                                     .arg(addr, 8, 16, QLatin1Char('0')));
+            return;
+        }
+        debug_set_breakpoint_size(addr, (uint32_t)sizeSpin->value());
+        refresh();
     }
 }
 

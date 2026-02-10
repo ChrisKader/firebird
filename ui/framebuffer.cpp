@@ -91,6 +91,15 @@ void paintFramebuffer(QPainter *p)
         QRect imageRect(x, y, image.width(), image.height());
         p->drawImage(imageRect.topLeft(), image);
 
+        // Simulate backlight dimming: overlay black with opacity based on contrast.
+        // contrast=LCD_CONTRAST_MAX → fully bright (no overlay), contrast=1 → nearly black.
+        if (hdq1w.lcd_contrast < LCD_CONTRAST_MAX) {
+            int alpha = 255 - (hdq1w.lcd_contrast * 255 / LCD_CONTRAST_MAX);
+            p->setCompositionMode(QPainter::CompositionMode_SourceOver);
+            p->fillRect(imageRect, QColor(0, 0, 0, alpha));
+            p->setCompositionMode(QPainter::CompositionMode_SourceOver);
+        }
+
         // Draw a visible border around the rendered framebuffer area.
         QColor border = currentWidgetTheme().border;
         border.setAlpha(220);

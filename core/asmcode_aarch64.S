@@ -296,7 +296,17 @@ write_word_asm: .global write_word_asm
 0:	ldr x22, [x21, #8] // x22 = *(x21+1)
 	tbnz x22, #0, 1f
 	str w1, [x22, x0]
+	// Check RAM_FLAGS for DO_WRITE_ACTION
+	add x21, x22, x0           // x21 = host ptr (word-aligned)
+	mov x22, #(65*1024*1024)   // MEM_MAXSIZE
+	ldr w22, [x21, x22]        // w22 = RAM_FLAGS
+	tbnz w22, #1, 3f           // RF_WRITE_BREAKPOINT
+	tbnz w22, #4, 3f           // RF_CODE_EXECUTED
+	tbnz w22, #5, 3f           // RF_CODE_TRANSLATED
+	tbnz w22, #6, 3f           // RF_CODE_NO_TRANSLATE
 	ret
+3:	mov x0, x21                // write_action(ptr)
+	b write_action_aarch64
 
 // Not cached
 1:	tbnz x22, #1, 2f
@@ -333,7 +343,18 @@ write_half_asm: .global write_half_asm
 0:	ldr x22, [x21, #8] // x22 = *(x21+1)
 	tbnz x22, #0, 1f
 	strh w1, [x22, x0]
+	// Check RAM_FLAGS for DO_WRITE_ACTION (word-align for flags)
+	add x21, x22, x0           // x21 = host ptr (halfword-aligned)
+	bic x22, x21, #3           // x22 = word-aligned for flags
+	mov x0, #(65*1024*1024)    // MEM_MAXSIZE
+	ldr w0, [x22, x0]          // w0 = RAM_FLAGS
+	tbnz w0, #1, 3f            // RF_WRITE_BREAKPOINT
+	tbnz w0, #4, 3f            // RF_CODE_EXECUTED
+	tbnz w0, #5, 3f            // RF_CODE_TRANSLATED
+	tbnz w0, #6, 3f            // RF_CODE_NO_TRANSLATE
 	ret
+3:	mov x0, x21                // write_action(ptr)
+	b write_action_aarch64
 
 // Not cached
 1:	tbnz x22, #1, 2f
@@ -369,7 +390,18 @@ write_byte_asm: .global write_byte_asm
 0:	ldr x22, [x21, #8] // x22 = *(x21+1)
 	tbnz x22, #0, 1f
 	strb w1, [x22, x0]
+	// Check RAM_FLAGS for DO_WRITE_ACTION (word-align for flags)
+	add x21, x22, x0           // x21 = host ptr (byte address)
+	bic x22, x21, #3           // x22 = word-aligned for flags
+	mov x0, #(65*1024*1024)    // MEM_MAXSIZE
+	ldr w0, [x22, x0]          // w0 = RAM_FLAGS
+	tbnz w0, #1, 3f            // RF_WRITE_BREAKPOINT
+	tbnz w0, #4, 3f            // RF_CODE_EXECUTED
+	tbnz w0, #5, 3f            // RF_CODE_TRANSLATED
+	tbnz w0, #6, 3f            // RF_CODE_NO_TRANSLATE
 	ret
+3:	mov x0, x21                // write_action(ptr)
+	b write_action_aarch64
 
 // Not cached
 1:	tbnz x22, #1, 2f
@@ -382,8 +414,8 @@ write_byte_asm: .global write_byte_asm
 	bl mmio_write_byte
 	bl load_virt
 	ldp x30, x23, [sp], #16
-	msr nzcv, x17	
-	ret	
+	msr nzcv, x17
+	ret
 
 // Invalid
 2:	stp x30, x23, [sp, #-16]!
@@ -396,5 +428,18 @@ write_byte_asm: .global write_byte_asm
 	bl load_virt
 	ldp x0, x1, [sp], #16
 	ldp x30, x23, [sp], #16
-	msr nzcv, x17	
+	msr nzcv, x17
 	b 0b // Try again
+
+// Shared write_action handler for aarch64 JIT.
+// Called with x0 = host pointer to written memory.
+// Saves/restores virtual CPU state around the C call.
+write_action_aarch64:
+	stp x30, x23, [sp, #-16]!
+	mrs x17, nzcv
+	bl save_virt
+	bl write_action
+	bl load_virt
+	ldp x30, x23, [sp], #16
+	msr nzcv, x17
+	ret

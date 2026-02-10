@@ -56,12 +56,10 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     ui/dockwidget.cpp ui/dockwidget.h
     ui/widgettheme.cpp ui/widgettheme.h
     ui/materialicons.cpp ui/materialicons.h
-    ui/activitybar.cpp ui/activitybar.h
     ui/lcdwidget.cpp ui/lcdwidget.h
     ui/framebuffer.cpp ui/framebuffer.h
     ui/keypadbridge.cpp ui/keypadbridge.h
     ui/keymap.h
-    ui/consolelineedit.cpp ui/consolelineedit.h
     ui/ansitextwriter.cpp ui/ansitextwriter.h
     # Debugger subsystem
     debugger/dockmanager.cpp debugger/dockmanager.h
@@ -81,6 +79,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     debugger/gotodialog.cpp debugger/gotodialog.h
     debugger/nandbrowser/nandbrowserwidget.cpp debugger/nandbrowser/nandbrowserwidget.h
     debugger/hwconfig/hwconfigwidget.cpp debugger/hwconfig/hwconfigwidget.h
+    debugger/mmuviewer/mmuviewerwidget.cpp debugger/mmuviewer/mmuviewerwidget.h
     # Dialogs
     dialogs/fbaboutdialog.cpp dialogs/fbaboutdialog.h
     # File transfer
@@ -100,6 +99,7 @@ qt_add_qml_module(firebird-emu
         qml/NNumButton.qml
         qml/Touchpad.qml
         qml/NDualButton.qml
+        qml/SecondaryLabel.qml
         qml/SvgPaths.qml
         qml/SvgIcon.qml
         qml/MobileUI.qml

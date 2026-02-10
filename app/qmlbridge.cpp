@@ -274,10 +274,9 @@ QString QMLBridge::getVersion()
 
 void QMLBridge::setButtonState(int id, bool state)
 {
-    // Delegate to setKeypad() which handles: keypad_set_key, notifyButtonStateChanged,
-    // and emit keyStateChanged (for key history). The notifyButtonStateChanged call
-    // re-emits buttonStateChanged to QML, but this is harmless -- the QML button
-    // already set its own pressed state before calling us.
+    // Called from QML button clicks.  NButton.qml uses a _fromCpp guard so
+    // the C++ -> QML -> C++ round-trip (via notifyButtonStateChanged) is
+    // suppressed, avoiding duplicate keyStateChanged emissions.
     setKeypad(static_cast<unsigned int>(id), state);
 }
 

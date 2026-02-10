@@ -22,6 +22,7 @@
 #include "translate.h"
 #include "usb_cx2.h"
 #include "cx2.h"
+#include "cpu.h"
 
 uint8_t   (*read_byte_map[64])(uint32_t addr);
 uint16_t  (*read_half_map[64])(uint32_t addr);
@@ -37,6 +38,61 @@ uint32_t bad_read_word(uint32_t addr)              { warn("Bad read_word: %08x",
 void bad_write_byte(uint32_t addr, uint8_t value)  { warn("Bad write_byte: %08x %02x", addr, value); }
 void bad_write_half(uint32_t addr, uint16_t value) { warn("Bad write_half: %08x %04x", addr, value); }
 void bad_write_word(uint32_t addr, uint32_t value) { warn("Bad write_word: %08x %08x", addr, value); }
+
+static bool mmio_trace_checked = false;
+static bool mmio_trace_enabled = false;
+static unsigned mmio_trace_lines = 0;
+static const unsigned mmio_trace_max_lines = 200000;
+static bool mmio_trace_pc_checked = false;
+static bool mmio_trace_pc_enabled = false;
+
+static bool mmio_trace_in_scope(uint32_t addr)
+{
+    return (addr >= 0x900B0000u && addr < 0x900B1000u)
+        || (addr >= 0x90140000u && addr < 0x90150000u);
+}
+
+static bool mmio_trace_on(void)
+{
+    if (!mmio_trace_checked) {
+        const char *env = getenv("FIREBIRD_MMIO_TRACE");
+        mmio_trace_enabled = env && *env;
+        mmio_trace_checked = true;
+    }
+    return mmio_trace_enabled;
+}
+
+static bool mmio_trace_with_pc(void)
+{
+    if (!mmio_trace_pc_checked) {
+        const char *env = getenv("FIREBIRD_MMIO_TRACE_PC");
+        mmio_trace_pc_enabled = env && *env;
+        mmio_trace_pc_checked = true;
+    }
+    return mmio_trace_pc_enabled;
+}
+
+static void mmio_trace_read(uint32_t addr, uint32_t value, unsigned size)
+{
+    if (!mmio_trace_on() || !mmio_trace_in_scope(addr) || mmio_trace_lines >= mmio_trace_max_lines)
+        return;
+    if (mmio_trace_with_pc())
+        fprintf(stderr, "[MMIO R%u] %08x -> %08x @pc=%08x\n", size, addr, value, arm.reg[15]);
+    else
+        fprintf(stderr, "[MMIO R%u] %08x -> %08x\n", size, addr, value);
+    mmio_trace_lines++;
+}
+
+static void mmio_trace_write(uint32_t addr, uint32_t value, unsigned size)
+{
+    if (!mmio_trace_on() || !mmio_trace_in_scope(addr) || mmio_trace_lines >= mmio_trace_max_lines)
+        return;
+    if (mmio_trace_with_pc())
+        fprintf(stderr, "[MMIO W%u] %08x <- %08x @pc=%08x\n", size, addr, value, arm.reg[15]);
+    else
+        fprintf(stderr, "[MMIO W%u] %08x <- %08x\n", size, addr, value);
+    mmio_trace_lines++;
+}
 
 uint8_t *mem_and_flags = NULL;
 struct mem_area_desc mem_areas[5];
@@ -62,23 +118,21 @@ uint32_t phys_mem_addr(void *ptr) {
 }
 
 SYSVABI void read_action(void *ptr) {
-    uint32_t addr = phys_mem_addr(ptr);
-    if (!gdb_connected)
-        emuprintf("Hit read breakpoint at %08x. Entering debugger.\n", addr);
-    debugger(DBG_READ_BREAKPOINT, addr);
+    if (gdb_connected) {
+        uint32_t addr = phys_mem_addr(ptr);
+        debugger(DBG_READ_BREAKPOINT, addr);
+    }
 }
 
 SYSVABI void write_action(void *ptr) {
-    uint32_t addr = phys_mem_addr(ptr);
     uint32_t *flags = &RAM_FLAGS((size_t)ptr & ~3);
     if (*flags & RF_WRITE_BREAKPOINT) {
-        if (!gdb_connected)
-            emuprintf("Hit write breakpoint at %08x. Entering debugger.\n", addr);
-        debugger(DBG_WRITE_BREAKPOINT, addr);
+        if (gdb_connected)
+            debugger(DBG_WRITE_BREAKPOINT, phys_mem_addr(ptr));
     }
 #ifndef NO_TRANSLATION
     if (*flags & RF_CODE_TRANSLATED) {
-        logprintf(LOG_CPU, "Wrote to translated code at %08x. Deleting translations.\n", addr);
+        logprintf(LOG_CPU, "Wrote to translated code at %08x. Deleting translations.\n", phys_mem_addr(ptr));
         invalidate_translation(*flags >> RFS_TRANSLATION_INDEX);
     } else {
         *flags &= ~RF_CODE_NO_TRANSLATE;
@@ -145,26 +199,35 @@ void apb_set_map(int entry, uint32_t (*read)(uint32_t addr), void (*write)(uint3
 }
 uint8_t apb_read_byte(uint32_t addr) {
     if (addr >= 0x90150000) return bad_read_byte(addr);
-    return apb_map[addr >> 16 & 31].read(addr & ~3) >> ((addr & 3) << 3);
+    uint8_t ret = apb_map[addr >> 16 & 31].read(addr & ~3) >> ((addr & 3) << 3);
+    mmio_trace_read(addr, ret, 8);
+    return ret;
 }
 uint16_t apb_read_half(uint32_t addr) {
     if (addr >= 0x90150000) return bad_read_half(addr);
-    return apb_map[addr >> 16 & 31].read(addr & ~2) >> ((addr & 2) << 3);
+    uint16_t ret = apb_map[addr >> 16 & 31].read(addr & ~2) >> ((addr & 2) << 3);
+    mmio_trace_read(addr, ret, 16);
+    return ret;
 }
 uint32_t apb_read_word(uint32_t addr) {
     if (addr >= 0x90150000) return bad_read_word(addr);
-    return apb_map[addr >> 16 & 31].read(addr);
+    uint32_t ret = apb_map[addr >> 16 & 31].read(addr);
+    mmio_trace_read(addr, ret, 32);
+    return ret;
 }
 void apb_write_byte(uint32_t addr, uint8_t value) {
     if (addr >= 0x90150000) { bad_write_byte(addr, value); return; }
+    mmio_trace_write(addr, value, 8);
     apb_map[addr >> 16 & 31].write(addr & ~3, value * 0x01010101u);
 }
 void apb_write_half(uint32_t addr, uint16_t value) {
     if (addr >= 0x90150000) { bad_write_half(addr, value); return; }
+    mmio_trace_write(addr, value, 16);
     apb_map[addr >> 16 & 31].write(addr & ~2, value * 0x00010001u);
 }
 void apb_write_word(uint32_t addr, uint32_t value) {
     if (addr >= 0x90150000) { bad_write_word(addr, value); return; }
+    mmio_trace_write(addr, value, 32);
     apb_map[addr >> 16 & 31].write(addr, value);
 }
 
@@ -457,7 +520,7 @@ bool memory_initialize(uint32_t sdram_size)
             apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word);
             apb_set_map(0x12, memc_ddr_read, memc_ddr_write);
             add_reset_proc(memc_ddr_reset);
-            apb_set_map(0x13, bad_read_word, cx2_backlight_write);
+            apb_set_map(0x13, cx2_backlight_read, cx2_backlight_write);
             add_reset_proc(cx2_backlight_reset);
             apb_set_map(0x14, aladdin_pmu_read, aladdin_pmu_write);
             add_reset_proc(aladdin_pmu_reset);

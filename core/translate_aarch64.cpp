@@ -839,8 +839,8 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
 
 static void _invalidate_translation(int index)
 {
-	/* Disabled for now. write_action not called in asmcode_aarch64.S so this can't happen
-	   and translation_pc_ptr is inaccurate due to translation_jmp anyway.
+	/* translation_pc_ptr is inaccurate due to translation_jmp,
+	   so we skip the self-modification check here.
 
 	uint32_t flags = RAM_FLAGS(translation_pc_ptr);
 	if ((flags & RF_CODE_TRANSLATED) && (int)(flags >> RFS_TRANSLATION_INDEX) == index)

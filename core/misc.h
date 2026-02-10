@@ -232,6 +232,8 @@ void adc_write_word(uint32_t addr, uint32_t value);
 // CX2: 0x900B0000
 uint32_t adc_cx2_read_word(uint32_t addr);
 void adc_cx2_write_word(uint32_t addr, uint32_t value);
+void adc_cx2_background_step(void);
+void adc_cx2_clear_pending(void);
 
 // The peripherals in misc.c have trivial suspend/resume ops, so don't need
 // separate functions each. Note: serial/serial_cx is in serial.c instead.

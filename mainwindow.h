@@ -14,9 +14,7 @@
 #include "app/qmlbridge.h"
 
 class DebugDockManager;
-class AnsiTextWriter;
 class DockWidget;
-class ActivityBar;
 class NandBrowserWidget;
 class HwConfigWidget;
 
@@ -111,14 +109,13 @@ public slots:
     void suspended(bool success);
     void stopped();
 
-    //Serial
+    //Serial (forwarded to Console dock)
     void serialChar(const char c);
 
     //Debugging
     void debugInputRequested(bool b);
     void debuggerEntered(bool entered);
     void debugStr(QString str);
-    void debugCommand();
 
     //File transfer
     void changeProgress(int value);
@@ -179,8 +176,6 @@ private:
 
     QSettings *settings = nullptr;
 
-    // To make it possible to activate the debugger
-    QDockWidget *dock_debugger = nullptr;
 
     // Second LCDWidget for use as external window
     LCDWidget lcd{this, Qt::Window};
@@ -222,9 +217,6 @@ private:
     // Debug subsystem (owns all 12 debug dock widgets)
     DebugDockManager *m_debugDocks = nullptr;
 
-    // ANSI escape sequence writer for serial console
-    AnsiTextWriter *m_serialWriter = nullptr;
-
     // Serial line buffer for forwarding to Console dock
     QString m_serialLineBuf;
 
@@ -232,15 +224,15 @@ private:
     bool focus_pause_enabled = false;
     bool focus_auto_paused = false;
 
-    // VS Code-style Activity Bar
-    ActivityBar *m_activityBar = nullptr;
-
-    // Sidebar docks (wired to activity bar)
+    // Sidebar docks
     DockWidget *m_dock_files = nullptr;
-    DockWidget *m_dock_serial = nullptr;
     DockWidget *m_dock_keypad = nullptr;
     DockWidget *m_dock_nand = nullptr;
     DockWidget *m_dock_hwconfig = nullptr;
+
+    // LCD and Controls docks (extracted from ui->frame)
+    DockWidget *m_dock_lcd = nullptr;
+    DockWidget *m_dock_controls = nullptr;
 
     // NAND browser & HW config widgets
     NandBrowserWidget *m_nandBrowser = nullptr;
@@ -249,8 +241,6 @@ private:
     // LCD/Keypad link state
     bool m_lcdKeypadLinked = false;
 
-    // Badge tracking for serial output
-    int m_serialBadgeCount = 0;
 };
 
 // Used as global instance by EmuThread and friends
