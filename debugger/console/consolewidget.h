@@ -8,17 +8,21 @@
 #include <QCompleter>
 #include <QElapsedTimer>
 
+#include "ui/dockstate.h"
+
 class AnsiTextWriter;
 
 /* Source tag for console output lines */
 enum class ConsoleTag { Debug, Uart, Sys, Nlog };
 
-class ConsoleWidget : public QWidget
+class ConsoleWidget : public QWidget, public DockStateSerializable
 {
     Q_OBJECT
 
 public:
     explicit ConsoleWidget(QWidget *parent = nullptr);
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 public slots:
     /** Append plain text (user commands, raw output). Timestamped, default text color. */

@@ -10,7 +10,9 @@
 #include <QTreeWidget>
 #include <stdint.h>
 
-class RegisterWidget : public QWidget
+#include "ui/dockstate.h"
+
+class RegisterWidget : public QWidget, public DockStateSerializable
 {
     Q_OBJECT
 
@@ -21,6 +23,8 @@ public:
 
 public slots:
     void refresh();
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 signals:
     void registerChanged(int reg, uint32_t value);

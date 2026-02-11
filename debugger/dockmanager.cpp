@@ -4,8 +4,10 @@
 #include <QMenu>
 #include <QShortcut>
 #include <QTimer>
+#include <QJsonArray>
 
 #include "ui/dockwidget.h"
+#include "ui/dockstate.h"
 #include "ui/kdockwidget.h"
 #include "ui/keypadbridge.h"
 #include "ui/materialicons.h"
@@ -321,6 +323,69 @@ void DebugDockManager::ensureExtraHexDocks(int count)
         return;
     while (extraHexDockCount() < count)
         addHexViewDock();
+}
+
+QJsonObject DebugDockManager::serializeDockStates() const
+{
+    QJsonObject root;
+    root.insert(QStringLiteral("schema"), QStringLiteral("firebird.debug.dockstate.v1"));
+
+    QJsonArray docks;
+    const auto appendState = [&docks](DockWidget *dock) {
+        if (!dock)
+            return;
+        DockStateSerializable *serializable = dynamic_cast<DockStateSerializable *>(dock->widget());
+        if (!serializable)
+            return;
+        QJsonObject item;
+        item.insert(QStringLiteral("dockId"), dock->objectName());
+        item.insert(QStringLiteral("customState"), serializable->serializeState());
+        docks.append(item);
+    };
+
+    appendState(m_disasmDock);
+    appendState(m_registerDock);
+    appendState(m_hexDock);
+    appendState(m_breakpointDock);
+    appendState(m_watchpointDock);
+    appendState(m_portMonitorDock);
+    appendState(m_stackDock);
+    appendState(m_keyHistoryDock);
+    appendState(m_consoleDock);
+    appendState(m_memVisDock);
+    appendState(m_cycleCounterDock);
+    appendState(m_timerMonitorDock);
+    appendState(m_lcdStateDock);
+    appendState(m_mmuViewerDock);
+    for (DockWidget *dock : m_extraHexDocks)
+        appendState(dock);
+
+    root.insert(QStringLiteral("docks"), docks);
+    return root;
+}
+
+void DebugDockManager::restoreDockStates(const QJsonObject &stateRoot)
+{
+    auto restoreOne = [this](const QString &dockId, const QJsonObject &customState) {
+        if (dockId.isEmpty())
+            return;
+        DockWidget *dock = m_host ? m_host->findChild<DockWidget *>(dockId) : nullptr;
+        if (!dock)
+            return;
+        DockStateSerializable *serializable = dynamic_cast<DockStateSerializable *>(dock->widget());
+        if (!serializable)
+            return;
+        serializable->restoreState(customState);
+    };
+
+    const QJsonArray items = stateRoot.value(QStringLiteral("docks")).toArray();
+    for (const QJsonValue &value : items) {
+        if (!value.isObject())
+            continue;
+        const QJsonObject item = value.toObject();
+        restoreOne(item.value(QStringLiteral("dockId")).toString(),
+                   item.value(QStringLiteral("customState")).toObject());
+    }
 }
 
 void DebugDockManager::refreshIcons()

@@ -295,6 +295,33 @@ void DisassemblyWidget::goToAddress(uint32_t addr)
     viewport()->update();
 }
 
+QJsonObject DisassemblyWidget::serializeState() const
+{
+    QJsonObject state;
+    state.insert(QStringLiteral("baseAddr"), QStringLiteral("%1").arg(m_baseAddr, 8, 16, QLatin1Char('0')));
+    if (m_searchEdit)
+        state.insert(QStringLiteral("searchText"), m_searchEdit->text());
+    return state;
+}
+
+void DisassemblyWidget::restoreState(const QJsonObject &state)
+{
+    if (m_searchEdit)
+        m_searchEdit->setText(state.value(QStringLiteral("searchText")).toString());
+
+    bool ok = false;
+    uint32_t addr = state.value(QStringLiteral("baseAddr")).toString().toUInt(&ok, 16);
+    if (!ok) {
+        const int fallback = state.value(QStringLiteral("baseAddr")).toInt(-1);
+        if (fallback >= 0) {
+            addr = static_cast<uint32_t>(fallback);
+            ok = true;
+        }
+    }
+    if (ok)
+        goToAddress(addr);
+}
+
 void DisassemblyWidget::updateLines()
 {
     int count = 0;

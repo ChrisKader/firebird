@@ -10,8 +10,9 @@
 #include <QToolBar>
 
 #include "core/debug_api.h"
+#include "ui/dockstate.h"
 
-class DisassemblyWidget : public QAbstractScrollArea
+class DisassemblyWidget : public QAbstractScrollArea, public DockStateSerializable
 {
     Q_OBJECT
 
@@ -25,6 +26,8 @@ public slots:
     void refresh();
     void goToAddress(uint32_t addr);
     void goToPC();
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 signals:
     void breakpointToggled(uint32_t addr, bool set);

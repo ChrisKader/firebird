@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QSet>
 #include <QList>
+#include <QJsonObject>
 #include <cstdint>
 
 class QMainWindow;
@@ -44,6 +45,8 @@ public:
     void setEditMode(bool enabled);
     void ensureExtraHexDocks(int count);
     int extraHexDockCount() const { return m_hexViewCount > 1 ? (m_hexViewCount - 1) : 0; }
+    QJsonObject serializeDockStates() const;
+    void restoreDockStates(const QJsonObject &stateRoot);
 
     DisassemblyWidget *disassembly() const { return m_disasmWidget; }
     HexViewWidget *hexView() const { return m_hexWidget; }

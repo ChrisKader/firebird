@@ -66,6 +66,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     app/kitmodel.cpp app/kitmodel.h
     # Shared UI components
     ui/dockwidget.cpp ui/dockwidget.h
+    ui/dockstate.h
     ui/kdockwidget.cpp ui/kdockwidget.h
     ui/widgettheme.cpp ui/widgettheme.h
     ui/materialicons.cpp ui/materialicons.h

@@ -123,6 +123,7 @@ static constexpr const char *kSettingHwBatteryMvOverride = "hwBatteryMvOverride"
 static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOverride";
 static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
 static constexpr const char *kSettingLayoutProfile = "layoutProfile";
+static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -237,7 +238,11 @@ static bool ensureLayoutProfilesDir(QString *errorOut = nullptr)
     return false;
 }
 
-static bool saveLayoutProfile(QMainWindow *window, const QString &profileName, int version, QString *errorOut = nullptr)
+static bool saveLayoutProfile(QMainWindow *window,
+                              const QString &profileName,
+                              int version,
+                              const QJsonObject &debugDockState = QJsonObject(),
+                              QString *errorOut = nullptr)
 {
     if (!window) {
         if (errorOut)
@@ -248,7 +253,9 @@ static bool saveLayoutProfile(QMainWindow *window, const QString &profileName, i
         return false;
 
     const QByteArray state = window->saveState(version);
-    const QJsonObject layoutJson = exportLegacyDockLayoutJson(window, state, version);
+    QJsonObject layoutJson = exportLegacyDockLayoutJson(window, state, version);
+    if (!debugDockState.isEmpty())
+        layoutJson.insert(QStringLiteral("debugDockState"), debugDockState);
     const QJsonDocument doc(layoutJson);
 
     const QString filePath = layoutProfilePath(profileName);
@@ -264,7 +271,8 @@ static bool saveLayoutProfile(QMainWindow *window, const QString &profileName, i
 }
 
 static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName, int fallbackVersion,
-                                 QString *errorOut = nullptr)
+                                 QString *errorOut = nullptr,
+                                 QJsonObject *debugDockStateOut = nullptr)
 {
     if (!window) {
         if (errorOut)
@@ -295,6 +303,8 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
     }
 
     const QJsonObject root = doc.object();
+    if (debugDockStateOut)
+        *debugDockStateOut = root.value(QStringLiteral("debugDockState")).toObject();
     const QString stateBase64 = root.value(QStringLiteral("windowStateBase64")).toString();
     if (stateBase64.isEmpty()) {
         if (errorOut)
@@ -1045,9 +1055,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     QByteArray savedState = settings->value(QStringLiteral("windowState")).toByteArray();
     bool restored = false;
     const QString startupProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
+    QJsonObject restoredDebugDockState;
     if (!startupProfile.isEmpty()) {
         QString profileError;
-        if (restoreLayoutProfile(content_window, startupProfile, WindowStateVersion, &profileError)) {
+        if (restoreLayoutProfile(content_window, startupProfile, WindowStateVersion,
+                                 &profileError, &restoredDebugDockState)) {
             restored = true;
         } else {
             qDebug("profile restore failed (%s): %s",
@@ -1063,6 +1075,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         qDebug("restoreState failed (size=%lld) -- applying default layout",
                (long long)savedState.size());
         resetDockLayout();
+    }
+
+    if (m_debugDocks) {
+        if (!restoredDebugDockState.isEmpty()) {
+            m_debugDocks->restoreDockStates(restoredDebugDockState);
+        } else {
+            QJsonParseError debugStateErr = {};
+            const QString savedDebugState = settings->value(QString::fromLatin1(kSettingDebugDockStateJson)).toString();
+            const QJsonDocument debugStateDoc = QJsonDocument::fromJson(savedDebugState.toUtf8(), &debugStateErr);
+            if (debugStateErr.error == QJsonParseError::NoError && debugStateDoc.isObject())
+                m_debugDocks->restoreDockStates(debugStateDoc.object());
+        }
     }
 
     m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
@@ -1317,7 +1341,13 @@ void MainWindow::savePersistentUiState()
     QByteArray state = content_window->saveState(WindowStateVersion);
     qDebug("Saving windowState: %lld bytes, ver=%d", (long long)state.size(), WindowStateVersion);
     settings->setValue(QStringLiteral("windowState"), state);
-    const QJsonObject layoutJson = exportLegacyDockLayoutJson(content_window, state, WindowStateVersion);
+    QJsonObject layoutJson = exportLegacyDockLayoutJson(content_window, state, WindowStateVersion);
+    if (m_debugDocks) {
+        const QJsonObject debugDockState = m_debugDocks->serializeDockStates();
+        layoutJson.insert(QStringLiteral("debugDockState"), debugDockState);
+        settings->setValue(QString::fromLatin1(kSettingDebugDockStateJson),
+                           QString::fromUtf8(QJsonDocument(debugDockState).toJson(QJsonDocument::Compact)));
+    }
     settings->setValue(QString::fromLatin1(kSettingWindowLayoutJson),
                        QString::fromUtf8(QJsonDocument(layoutJson).toJson(QJsonDocument::Compact)));
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
@@ -1703,8 +1733,11 @@ void MainWindow::convertTabsToDocks()
     QMenu *layouts_menu = docks_menu->addMenu(tr("Layouts"));
 
     const auto saveLayoutProfileAction = [this](const QString &profileName) {
+        const QJsonObject debugDockState = m_debugDocks ? m_debugDocks->serializeDockStates()
+                                                        : QJsonObject();
         QString error;
-        if (!saveLayoutProfile(content_window, profileName, WindowStateVersion, &error)) {
+        if (!saveLayoutProfile(content_window, profileName, WindowStateVersion,
+                               debugDockState, &error)) {
             QMessageBox::warning(this, tr("Save layout failed"),
                                  tr("Could not save layout profile '%1': %2")
                                      .arg(profileName, error));
@@ -1716,13 +1749,17 @@ void MainWindow::convertTabsToDocks()
 
     const auto loadLayoutProfileAction = [this](const QString &profileName) {
         QString error;
-        if (!restoreLayoutProfile(content_window, profileName, WindowStateVersion, &error)) {
+        QJsonObject debugDockState;
+        if (!restoreLayoutProfile(content_window, profileName, WindowStateVersion,
+                                  &error, &debugDockState)) {
             QMessageBox::warning(this, tr("Load layout failed"),
                                  tr("Could not load layout profile '%1': %2")
                                      .arg(profileName, error));
             return;
         }
         settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
+        if (m_debugDocks && !debugDockState.isEmpty())
+            m_debugDocks->restoreDockStates(debugDockState);
         if (m_debugDocks)
             m_debugDocks->refreshIcons();
         showStatusMsg(tr("Loaded layout profile '%1'").arg(profileName));

@@ -159,6 +159,56 @@ void HexViewWidget::goToAddress(uint32_t addr)
     refresh();
 }
 
+QJsonObject HexViewWidget::serializeState() const
+{
+    QJsonObject state;
+    state.insert(QStringLiteral("baseAddr"), QStringLiteral("%1").arg(m_baseAddr, 8, 16, QLatin1Char('0')));
+    state.insert(QStringLiteral("selectedOffset"), m_selectedOffset);
+    state.insert(QStringLiteral("showAscii"), m_showAscii);
+    if (m_searchTypeCombo)
+        state.insert(QStringLiteral("searchType"), m_searchTypeCombo->currentIndex());
+    if (m_searchEdit)
+        state.insert(QStringLiteral("searchText"), m_searchEdit->text());
+    return state;
+}
+
+void HexViewWidget::restoreState(const QJsonObject &state)
+{
+    if (m_searchTypeCombo) {
+        const int idx = state.value(QStringLiteral("searchType")).toInt(m_searchTypeCombo->currentIndex());
+        if (idx >= 0 && idx < m_searchTypeCombo->count())
+            m_searchTypeCombo->setCurrentIndex(idx);
+    }
+    if (m_searchEdit)
+        m_searchEdit->setText(state.value(QStringLiteral("searchText")).toString());
+
+    if (m_asciiToggle) {
+        const bool showAscii = state.value(QStringLiteral("showAscii")).toBool(m_asciiToggle->isChecked());
+        m_asciiToggle->setChecked(showAscii);
+    } else {
+        m_showAscii = state.value(QStringLiteral("showAscii")).toBool(m_showAscii);
+    }
+
+    bool ok = false;
+    uint32_t baseAddr = state.value(QStringLiteral("baseAddr")).toString().toUInt(&ok, 16);
+    if (!ok) {
+        const int fallback = state.value(QStringLiteral("baseAddr")).toInt(-1);
+        if (fallback >= 0) {
+            baseAddr = static_cast<uint32_t>(fallback);
+            ok = true;
+        }
+    }
+    if (!ok)
+        return;
+
+    int selectedOffset = state.value(QStringLiteral("selectedOffset")).toInt(0);
+    if (selectedOffset < 0)
+        selectedOffset = 0;
+    if (selectedOffset >= BYTES_PER_ROW * 64)
+        selectedOffset = 0;
+    goToAddress(baseAddr + static_cast<uint32_t>(selectedOffset));
+}
+
 QByteArray HexViewWidget::buildSearchPattern() const
 {
     QString text = m_searchEdit->text();

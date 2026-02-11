@@ -17,6 +17,8 @@ Changing this order can break persisted layouts because `restoreState` requires 
 
 - Layout state is saved with `content_window->saveState(WindowStateVersion)`.
 - A JSON bridge export is also saved in settings key `windowLayoutJson` for migration tooling.
+- Debug dock custom widget state is saved separately in settings key `debugDockStateJson`
+  and embedded in layout/profile JSON as `debugDockState`.
 - Layout state is restored with version fallback from `WindowStateVersion` down to `1`.
 - If restore fails for all versions, default dock layout is applied.
 
@@ -27,6 +29,8 @@ Changing this order can break persisted layouts because `restoreState` requires 
   - Save as: `default`, `debugging`, `custom`
 - Profiles are stored as JSON files in `AppConfigLocation/layouts/`.
 - Each profile uses the same JSON schema (`windowStateBase64` + dock metadata) as the migration bridge.
+- Profiles also store `debugDockState` for per-widget options (for example disassembly address,
+  register display format, and console filter/history).
 - The selected profile is persisted (`layoutProfile`) and attempted first during startup before legacy `windowState` fallback.
 
 ## Design notes

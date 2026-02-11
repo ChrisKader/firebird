@@ -279,6 +279,31 @@ void RegisterWidget::refresh()
     }
 }
 
+QJsonObject RegisterWidget::serializeState() const
+{
+    QJsonObject state;
+    if (m_formatCombo)
+        state.insert(QStringLiteral("displayFormat"), m_formatCombo->currentIndex());
+    if (m_modeCombo)
+        state.insert(QStringLiteral("modeIndex"), m_modeCombo->currentIndex());
+    return state;
+}
+
+void RegisterWidget::restoreState(const QJsonObject &state)
+{
+    if (m_formatCombo) {
+        const int idx = state.value(QStringLiteral("displayFormat")).toInt(m_formatCombo->currentIndex());
+        if (idx >= 0 && idx < m_formatCombo->count())
+            m_formatCombo->setCurrentIndex(idx);
+    }
+    if (m_modeCombo) {
+        const int idx = state.value(QStringLiteral("modeIndex")).toInt(m_modeCombo->currentIndex());
+        if (idx >= 0 && idx < m_modeCombo->count())
+            m_modeCombo->setCurrentIndex(idx);
+    }
+    refresh();
+}
+
 void RegisterWidget::refreshCP15()
 {
     m_cp15Tree->clear();

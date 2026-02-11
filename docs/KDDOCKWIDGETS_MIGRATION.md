@@ -55,3 +55,8 @@ What it does:
 - `ui/kdockwidget.h` / `ui/kdockwidget.cpp` now provide `KDockWidget`.
 - Current implementation still inherits existing `DockWidget` so behavior is unchanged.
 - Main and debugger dock creation paths now construct `KDockWidget`, which reduces future migration churn when swapping to KDDockWidgets-backed docks.
+
+## Per-Dock State Hook
+
+- Debug widgets now opt into `DockStateSerializable` (`ui/dockstate.h`) to persist custom per-dock UI state.
+- `DebugDockManager` saves/restores these states under `debugDockState` in layout JSON/profile files.

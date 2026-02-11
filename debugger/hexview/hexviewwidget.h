@@ -11,7 +11,9 @@
 #include <QListWidget>
 #include <stdint.h>
 
-class HexViewWidget : public QAbstractScrollArea
+#include "ui/dockstate.h"
+
+class HexViewWidget : public QAbstractScrollArea, public DockStateSerializable
 {
     Q_OBJECT
 
@@ -23,6 +25,8 @@ public:
 public slots:
     void refresh();
     void goToAddress(uint32_t addr);
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 signals:
     void addressSelected(uint32_t addr);
