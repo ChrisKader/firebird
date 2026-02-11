@@ -211,14 +211,35 @@ if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
     endif()
     target_compile_definitions(firebird-emu PRIVATE FIREBIRD_USE_KDDOCKWIDGETS=1)
 
+    set(_kddockwidgets_target "")
     if(TARGET KDDockWidgets::KDDockWidgets)
-        target_link_libraries(firebird-emu PRIVATE KDDockWidgets::KDDockWidgets)
+        set(_kddockwidgets_target KDDockWidgets::KDDockWidgets)
     elseif(TARGET KDDockWidgets::kddockwidgets)
-        target_link_libraries(firebird-emu PRIVATE KDDockWidgets::kddockwidgets)
+        set(_kddockwidgets_target KDDockWidgets::kddockwidgets)
     elseif(TARGET KDAB::kddockwidgets)
-        target_link_libraries(firebird-emu PRIVATE KDAB::kddockwidgets)
+        set(_kddockwidgets_target KDAB::kddockwidgets)
     else()
         message(FATAL_ERROR "KDDockWidgets package found, but no known CMake target was exported.")
+    endif()
+
+    target_link_libraries(firebird-emu PRIVATE ${_kddockwidgets_target})
+
+    if(BUILD_TESTING)
+        add_executable(firebird-kdd-layout-tests
+            tests/kdd_layout_test.cpp
+        )
+        target_link_libraries(firebird-kdd-layout-tests PRIVATE
+            Qt::Core
+            Qt::Widgets
+            Qt::Test
+            ${_kddockwidgets_target}
+        )
+        add_test(NAME firebird-kdd-layout-tests
+            COMMAND firebird-kdd-layout-tests
+        )
+        set_tests_properties(firebird-kdd-layout-tests PROPERTIES
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+        )
     endif()
 endif()
 
