@@ -16,11 +16,18 @@ Changing this order can break persisted layouts because `restoreState` requires 
 ## Persistence
 
 - Layout state is saved with `content_window->saveState(WindowStateVersion)`.
+- Primary persisted layout store is profile JSON in `AppConfigLocation/layouts/`
+  (default profile: `layouts/default.json`).
 - A JSON bridge export is also saved in settings key `windowLayoutJson` for migration tooling.
 - Debug dock custom widget state is saved separately in settings key `debugDockStateJson`
   and embedded in layout/profile JSON as `debugDockState`.
 - Layout state is restored with version fallback from `WindowStateVersion` down to `1`.
-- If restore fails for all versions, default dock layout is applied.
+- Startup restore order is:
+  1. selected profile JSON (`layoutProfile`, defaulting to `default`)
+  2. legacy `windowState` in QSettings
+  3. legacy `windowLayoutJson` bridge in QSettings
+  4. reset to default layout
+- If startup used legacy settings data, Firebird migrates it into the selected profile JSON.
 
 ## Layout Profiles
 

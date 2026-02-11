@@ -124,6 +124,7 @@ static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOve
 static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
 static constexpr const char *kSettingLayoutProfile = "layoutProfile";
 static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
+static constexpr const char *kLayoutSchemaQMainWindowV1 = "firebird.qmainwindow.layout.v1";
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -182,7 +183,7 @@ static QString dockAreaToString(Qt::DockWidgetArea area)
 static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteArray &state, int version)
 {
     QJsonObject root;
-    root.insert(QStringLiteral("schema"), QStringLiteral("firebird.qmainwindow.layout.v1"));
+    root.insert(QStringLiteral("schema"), QString::fromLatin1(kLayoutSchemaQMainWindowV1));
     root.insert(QStringLiteral("windowStateVersion"), version);
     root.insert(QStringLiteral("windowStateBase64"), QString::fromLatin1(state.toBase64()));
 
@@ -205,6 +206,39 @@ static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteAr
     }
     root.insert(QStringLiteral("docks"), docks);
     return root;
+}
+
+static bool extractWindowStateFromLayoutObject(const QJsonObject &root,
+                                               QByteArray *stateOut,
+                                               int *versionOut,
+                                               QString *errorOut = nullptr)
+{
+    const QString schema = root.value(QStringLiteral("schema")).toString();
+    if (!schema.isEmpty() && schema != QLatin1String(kLayoutSchemaQMainWindowV1)) {
+        if (errorOut)
+            *errorOut = QStringLiteral("unsupported layout schema: %1").arg(schema);
+        return false;
+    }
+
+    const QString stateBase64 = root.value(QStringLiteral("windowStateBase64")).toString();
+    if (stateBase64.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("windowStateBase64 missing");
+        return false;
+    }
+
+    const QByteArray state = QByteArray::fromBase64(stateBase64.toLatin1());
+    if (state.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("windowStateBase64 decode failed");
+        return false;
+    }
+
+    if (stateOut)
+        *stateOut = state;
+    if (versionOut)
+        *versionOut = root.value(QStringLiteral("windowStateVersion")).toInt(WindowStateVersion);
+    return true;
 }
 
 static QString layoutProfilesDirPath()
@@ -293,10 +327,10 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
         return false;
     }
 
-    QJsonParseError parseError = {};
-    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    QJsonParseError jsonParseError = {};
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &jsonParseError);
     file.close();
-    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+    if (jsonParseError.error != QJsonParseError::NoError || !doc.isObject()) {
         if (errorOut)
             *errorOut = QStringLiteral("invalid JSON in %1").arg(filePath);
         return false;
@@ -305,21 +339,16 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
     const QJsonObject root = doc.object();
     if (debugDockStateOut)
         *debugDockStateOut = root.value(QStringLiteral("debugDockState")).toObject();
-    const QString stateBase64 = root.value(QStringLiteral("windowStateBase64")).toString();
-    if (stateBase64.isEmpty()) {
+
+    QByteArray state;
+    int profileVersion = fallbackVersion;
+    QString stateParseError;
+    if (!extractWindowStateFromLayoutObject(root, &state, &profileVersion, &stateParseError)) {
         if (errorOut)
-            *errorOut = QStringLiteral("windowStateBase64 missing in %1").arg(filePath);
+            *errorOut = QStringLiteral("%1 in %2").arg(stateParseError, filePath);
         return false;
     }
 
-    const QByteArray state = QByteArray::fromBase64(stateBase64.toLatin1());
-    if (state.isEmpty()) {
-        if (errorOut)
-            *errorOut = QStringLiteral("windowStateBase64 decode failed in %1").arg(filePath);
-        return false;
-    }
-
-    const int profileVersion = root.value(QStringLiteral("windowStateVersion")).toInt(fallbackVersion);
     for (int version = profileVersion; version >= 1; --version) {
         if (window->restoreState(state, version))
             return true;
@@ -1054,22 +1083,46 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Only fall back to the default layout if nothing works at all.
     QByteArray savedState = settings->value(QStringLiteral("windowState")).toByteArray();
     bool restored = false;
+    bool restoredFromLegacyWindowState = false;
+    bool restoredFromLegacyLayoutJson = false;
     const QString startupProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
     QJsonObject restoredDebugDockState;
-    if (!startupProfile.isEmpty()) {
+    const QString autoProfile = startupProfile.isEmpty() ? QStringLiteral("default") : startupProfile;
+    if (!autoProfile.isEmpty()) {
         QString profileError;
-        if (restoreLayoutProfile(content_window, startupProfile, WindowStateVersion,
+        if (restoreLayoutProfile(content_window, autoProfile, WindowStateVersion,
                                  &profileError, &restoredDebugDockState)) {
             restored = true;
-        } else {
+        } else if (!startupProfile.isEmpty()) {
             qDebug("profile restore failed (%s): %s",
-                   startupProfile.toUtf8().constData(),
+                   autoProfile.toUtf8().constData(),
                    profileError.toUtf8().constData());
         }
     }
     if (!restored && !savedState.isEmpty()) {
         for (int v = WindowStateVersion; v >= 1 && !restored; --v)
             restored = content_window->restoreState(savedState, v);
+        if (restored)
+            restoredFromLegacyWindowState = true;
+    }
+    if (!restored) {
+        const QString layoutJsonText = settings->value(QString::fromLatin1(kSettingWindowLayoutJson)).toString();
+        if (!layoutJsonText.isEmpty()) {
+            QJsonParseError parseError = {};
+            const QJsonDocument doc = QJsonDocument::fromJson(layoutJsonText.toUtf8(), &parseError);
+            if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
+                QByteArray stateFromJson;
+                int jsonVersion = WindowStateVersion;
+                if (extractWindowStateFromLayoutObject(doc.object(), &stateFromJson, &jsonVersion)) {
+                    for (int v = jsonVersion; v >= 1 && !restored; --v)
+                        restored = content_window->restoreState(stateFromJson, v);
+                    if (restoredDebugDockState.isEmpty())
+                        restoredDebugDockState = doc.object().value(QStringLiteral("debugDockState")).toObject();
+                    if (restored)
+                        restoredFromLegacyLayoutJson = true;
+                }
+            }
+        }
     }
     if (!restored) {
         qDebug("restoreState failed (size=%lld) -- applying default layout",
@@ -1086,6 +1139,22 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
             const QJsonDocument debugStateDoc = QJsonDocument::fromJson(savedDebugState.toUtf8(), &debugStateErr);
             if (debugStateErr.error == QJsonParseError::NoError && debugStateDoc.isObject())
                 m_debugDocks->restoreDockStates(debugStateDoc.object());
+        }
+    }
+
+    if (!startupProfile.isEmpty() || restored) {
+        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), autoProfile);
+    }
+    if (restoredFromLegacyWindowState || restoredFromLegacyLayoutJson) {
+        const QJsonObject debugDockState = m_debugDocks ? m_debugDocks->serializeDockStates()
+                                                        : QJsonObject();
+        QString migrateError;
+        if (!saveLayoutProfile(content_window, autoProfile, WindowStateVersion, debugDockState, &migrateError)) {
+            qDebug("legacy layout migration to profile '%s' failed: %s",
+                   autoProfile.toUtf8().constData(),
+                   migrateError.toUtf8().constData());
+        } else {
+            qDebug("migrated legacy layout to profile '%s'", autoProfile.toUtf8().constData());
         }
     }
 
@@ -1342,8 +1411,9 @@ void MainWindow::savePersistentUiState()
     qDebug("Saving windowState: %lld bytes, ver=%d", (long long)state.size(), WindowStateVersion);
     settings->setValue(QStringLiteral("windowState"), state);
     QJsonObject layoutJson = exportLegacyDockLayoutJson(content_window, state, WindowStateVersion);
+    QJsonObject debugDockState;
     if (m_debugDocks) {
-        const QJsonObject debugDockState = m_debugDocks->serializeDockStates();
+        debugDockState = m_debugDocks->serializeDockStates();
         layoutJson.insert(QStringLiteral("debugDockState"), debugDockState);
         settings->setValue(QString::fromLatin1(kSettingDebugDockStateJson),
                            QString::fromUtf8(QJsonDocument(debugDockState).toJson(QJsonDocument::Compact)));
@@ -1353,6 +1423,16 @@ void MainWindow::savePersistentUiState()
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
     if (m_debugDocks)
         settings->setValue(QStringLiteral("debugExtraHexDockCount"), m_debugDocks->extraHexDockCount());
+    QString activeProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
+    if (activeProfile.isEmpty())
+        activeProfile = QStringLiteral("default");
+    settings->setValue(QString::fromLatin1(kSettingLayoutProfile), activeProfile);
+    QString profileError;
+    if (!saveLayoutProfile(content_window, activeProfile, WindowStateVersion, debugDockState, &profileError)) {
+        qDebug("save layout profile '%s' failed: %s",
+               activeProfile.toUtf8().constData(),
+               profileError.toUtf8().constData());
+    }
 
     settings->setValue(QStringLiteral("lcdKeypadLinked"), m_lcdKeypadLinked);
 
