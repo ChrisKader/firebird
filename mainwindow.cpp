@@ -106,6 +106,48 @@ static constexpr const char *kSettingHwKeypadTypeOverride = "hwKeypadTypeOverrid
 static constexpr const char *kSettingHwBatteryMvOverride = "hwBatteryMvOverride";
 static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOverride";
 
+struct HwOverrides {
+    int batteryRaw = -1;
+    int charging = -1;
+    int brightness = -1;
+    int keypadType = -1;
+    int batteryMv = -1;
+    int chargerState = -1;
+};
+
+static HwOverrides readHwOverridesFromSettings(QSettings *settings)
+{
+    HwOverrides overrides;
+    if (!settings)
+        return overrides;
+    const auto readValue = [settings](const char *key) {
+        return settings->value(QString::fromLatin1(key), -1).toInt();
+    };
+    overrides.batteryRaw = readValue(kSettingHwBatteryOverride);
+    overrides.charging = readValue(kSettingHwChargingOverride);
+    overrides.brightness = readValue(kSettingHwBrightnessOverride);
+    overrides.keypadType = readValue(kSettingHwKeypadTypeOverride);
+    overrides.batteryMv = readValue(kSettingHwBatteryMvOverride);
+    overrides.chargerState = readValue(kSettingHwChargerStateOverride);
+    return overrides;
+}
+
+static void writeHwOverridesToSettings(QSettings *settings, const HwOverrides &overrides)
+{
+    if (!settings)
+        return;
+    const std::array<std::pair<const char *, int>, 6> values = {{
+        { kSettingHwBatteryOverride, overrides.batteryRaw },
+        { kSettingHwChargingOverride, overrides.charging },
+        { kSettingHwBrightnessOverride, overrides.brightness },
+        { kSettingHwKeypadTypeOverride, overrides.keypadType },
+        { kSettingHwBatteryMvOverride, overrides.batteryMv },
+        { kSettingHwChargerStateOverride, overrides.chargerState },
+    }};
+    for (const auto &entry : values)
+        settings->setValue(QString::fromLatin1(entry.first), entry.second);
+}
+
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
 
 void MainWindow::applyStandardDockFeatures(QDockWidget *dw) const
@@ -839,15 +881,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
 
     // Restore HW config overrides
-    const auto readHwOverride = [this](const char *key) {
-        return settings->value(QString::fromLatin1(key), -1).toInt();
-    };
-    adc_battery_level_override = static_cast<int16_t>(readHwOverride(kSettingHwBatteryOverride));
-    adc_charging_override = static_cast<int8_t>(readHwOverride(kSettingHwChargingOverride));
-    lcd_contrast_override = static_cast<int16_t>(readHwOverride(kSettingHwBrightnessOverride));
-    adc_keypad_type_override = static_cast<int16_t>(readHwOverride(kSettingHwKeypadTypeOverride));
-    battery_mv_override = readHwOverride(kSettingHwBatteryMvOverride);
-    int savedChargerState = readHwOverride(kSettingHwChargerStateOverride);
+    const HwOverrides hw = readHwOverridesFromSettings(settings);
+    adc_battery_level_override = static_cast<int16_t>(hw.batteryRaw);
+    adc_charging_override = static_cast<int8_t>(hw.charging);
+    lcd_contrast_override = static_cast<int16_t>(hw.brightness);
+    adc_keypad_type_override = static_cast<int16_t>(hw.keypadType);
+    battery_mv_override = hw.batteryMv;
+    int savedChargerState = hw.chargerState;
     if (savedChargerState >= CHARGER_DISCONNECTED && savedChargerState <= CHARGER_CHARGING)
         charger_state_override = (charger_state_t)savedChargerState;
     else if (adc_charging_override >= 0)
@@ -1097,16 +1137,15 @@ void MainWindow::savePersistentUiState()
     settings->setValue(QStringLiteral("lcdKeypadLinked"), m_lcdKeypadLinked);
 
     // Save HW config overrides
-    const std::array<std::pair<const char *, int>, 6> hwOverrides = {{
-        { kSettingHwBatteryOverride, static_cast<int>(adc_battery_level_override) },
-        { kSettingHwChargingOverride, static_cast<int>(adc_charging_override) },
-        { kSettingHwBrightnessOverride, static_cast<int>(lcd_contrast_override) },
-        { kSettingHwKeypadTypeOverride, static_cast<int>(adc_keypad_type_override) },
-        { kSettingHwBatteryMvOverride, battery_mv_override },
-        { kSettingHwChargerStateOverride, static_cast<int>(charger_state_override) },
-    }};
-    for (const auto &entry : hwOverrides)
-        settings->setValue(QString::fromLatin1(entry.first), entry.second);
+    const HwOverrides hw = {
+        static_cast<int>(adc_battery_level_override),
+        static_cast<int>(adc_charging_override),
+        static_cast<int>(lcd_contrast_override),
+        static_cast<int>(adc_keypad_type_override),
+        battery_mv_override,
+        static_cast<int>(charger_state_override),
+    };
+    writeHwOverridesToSettings(settings, hw);
 
     settings->sync();
 }
@@ -1230,7 +1269,10 @@ void MainWindow::debugInputRequested(bool b)
     if (b)
     {
         if (m_debugDocks) m_debugDocks->raise();
-        if (m_debugDocks) m_debugDocks->refreshAll();
+        if (m_debugDocks) {
+            m_debugDocks->markDirty();
+            m_debugDocks->refreshAll();
+        }
         if (m_debugDocks && m_debugDocks->console())
             m_debugDocks->console()->focusInput();
     }
@@ -1245,7 +1287,10 @@ void MainWindow::debuggerEntered(bool entered)
     if (entered)
     {
         if (m_debugDocks) m_debugDocks->raise();
-        if (m_debugDocks) m_debugDocks->refreshAll();
+        if (m_debugDocks) {
+            m_debugDocks->markDirty();
+            m_debugDocks->refreshAll();
+        }
         if (m_debugDocks && m_debugDocks->console())
             m_debugDocks->console()->focusInput();
     }

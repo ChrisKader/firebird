@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QSet>
 #include <QList>
+#include <cstdint>
 
 class QMainWindow;
 class QMenu;
@@ -37,6 +38,7 @@ public:
     void raise();
     void hideAutoShown();
     void refreshAll();
+    void markDirty(uint32_t flags = 0xFFFFFFFFu);
     void refreshIcons();
     void retranslate();
     void setEditMode(bool enabled);
@@ -53,6 +55,17 @@ signals:
     void debugCommand(QString cmd);
 
 private:
+    enum DirtyFlags : uint32_t {
+        DIRTY_DISASM  = 1u << 0,
+        DIRTY_REGS    = 1u << 1,
+        DIRTY_MEMORY  = 1u << 2,
+        DIRTY_BREAKS  = 1u << 3,
+        DIRTY_IO      = 1u << 4,
+        DIRTY_STATS   = 1u << 5,
+        DIRTY_STACK   = 1u << 6,
+        DIRTY_ALL     = 0xFFFFFFFFu,
+    };
+
     QMainWindow *m_host;
     QFont m_iconFont;
 
@@ -91,6 +104,7 @@ private:
     QList<DockWidget *> m_extraHexDocks;
     QMenu *m_docksMenu = nullptr;
     int m_hexViewCount = 1;
+    uint32_t m_dirtyFlags = DIRTY_ALL;
 };
 
 #endif // DEBUGDOCKMANAGER_H

@@ -345,8 +345,20 @@ void DebugDockManager::refreshIcons()
     setIcon(m_mmuViewerDock,    CP::Layers);
 }
 
+void DebugDockManager::markDirty(uint32_t flags)
+{
+    m_dirtyFlags |= flags;
+}
+
 void DebugDockManager::refreshAll()
 {
+    if (m_dirtyFlags == 0)
+        return;
+
+    const uint32_t dirty = m_dirtyFlags;
+    const auto shouldRefresh = [dirty](uint32_t flag) {
+        return (dirty & flag) != 0;
+    };
     auto refreshNow = [](auto *widget, bool enabled = true) {
         if (widget && enabled)
             widget->refresh();
@@ -356,8 +368,8 @@ void DebugDockManager::refreshAll()
     };
 
     /* Refresh high-priority widgets immediately (disassembly, registers). */
-    refreshNow(m_disasmWidget, dockVisible(m_disasmDock));
-    refreshNow(m_registerWidget, dockVisible(m_registerDock));
+    refreshNow(m_disasmWidget, shouldRefresh(DIRTY_DISASM) && dockVisible(m_disasmDock));
+    refreshNow(m_registerWidget, shouldRefresh(DIRTY_REGS) && dockVisible(m_registerDock));
 
     /* Stagger remaining widgets across separate event-loop iterations
      * so no single callback blocks the UI for too long.  Each widget
@@ -367,16 +379,18 @@ void DebugDockManager::refreshAll()
     };
 
     /* Lightweight widgets first (tables with few rows, no MMIO reads). */
-    defer(0, [this]() {
-        if (m_breakpointWidget && m_breakpointDock && m_breakpointDock->isVisible())
+    defer(0, [this, dirty]() {
+        if ((dirty & DIRTY_BREAKS) && m_breakpointWidget && m_breakpointDock && m_breakpointDock->isVisible())
             m_breakpointWidget->refresh();
-        if (m_watchpointWidget && m_watchpointDock && m_watchpointDock->isVisible())
+        if ((dirty & DIRTY_BREAKS) && m_watchpointWidget && m_watchpointDock && m_watchpointDock->isVisible())
             m_watchpointWidget->refresh();
     });
 
-    defer(0, [this]() {
-        if (m_hexWidget && m_hexDock && m_hexDock->isVisible())
+    defer(0, [this, dirty]() {
+        if ((dirty & DIRTY_MEMORY) && m_hexWidget && m_hexDock && m_hexDock->isVisible())
             m_hexWidget->refresh();
+        if ((dirty & DIRTY_MEMORY) == 0)
+            return;
         const int n = qMin(m_extraHexWidgets.size(), m_extraHexDocks.size());
         for (int i = 0; i < n; i++) {
             HexViewWidget *hw = m_extraHexWidgets.at(i);
@@ -393,18 +407,22 @@ void DebugDockManager::refreshAll()
                 widget->refresh();
         });
     };
-    const auto deferRefreshIfVisible = [&](auto *widget, DockWidget *dock) {
+    const auto deferRefreshIfVisible = [&](auto *widget, DockWidget *dock, uint32_t flag) {
+        if ((dirty & flag) == 0)
+            return;
         if (!dock || !dock->isVisible())
             return;
         deferRefresh(widget);
     };
-    deferRefreshIfVisible(m_stackWidget, m_stackDock);
-    deferRefreshIfVisible(m_portMonitorWidget, m_portMonitorDock);
-    deferRefreshIfVisible(m_timerMonitorWidget, m_timerMonitorDock);
-    deferRefreshIfVisible(m_lcdStateWidget, m_lcdStateDock);
-    deferRefreshIfVisible(m_mmuViewerWidget, m_mmuViewerDock);
-    deferRefreshIfVisible(m_memVisWidget, m_memVisDock);
-    deferRefreshIfVisible(m_cycleCounterWidget, m_cycleCounterDock);
+    deferRefreshIfVisible(m_stackWidget, m_stackDock, DIRTY_STACK);
+    deferRefreshIfVisible(m_portMonitorWidget, m_portMonitorDock, DIRTY_IO);
+    deferRefreshIfVisible(m_timerMonitorWidget, m_timerMonitorDock, DIRTY_IO);
+    deferRefreshIfVisible(m_lcdStateWidget, m_lcdStateDock, DIRTY_IO);
+    deferRefreshIfVisible(m_mmuViewerWidget, m_mmuViewerDock, DIRTY_IO);
+    deferRefreshIfVisible(m_memVisWidget, m_memVisDock, DIRTY_STATS);
+    deferRefreshIfVisible(m_cycleCounterWidget, m_cycleCounterDock, DIRTY_STATS);
+
+    m_dirtyFlags = 0;
 }
 
 void DebugDockManager::retranslate()
