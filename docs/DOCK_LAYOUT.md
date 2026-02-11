@@ -48,6 +48,10 @@ Changing this order can break persisted layouts because `restoreState` requires 
   - `Always Raise`
   - `Raise on Explicit Actions`
   - `Never Raise Automatically`
+- `resetDockLayout()` arranges bottom docks into grouped tabs:
+  - Memory: Memory, Memory Visualizer, MMU Viewer, extra memory views
+  - System: Port Monitor, Timer Monitor, LCD State, Cycle Counter
+  - Debug tools: Console, Breakpoints, Watchpoints, Key History
 
 ## Related code
 

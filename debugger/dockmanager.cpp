@@ -589,23 +589,44 @@ void DebugDockManager::resetLayout()
         if (m_registerDock) m_registerDock->raise();
     }
 
-    /* Bottom area: Memory, Breakpoints, Watchpoints, Port Monitor, etc. tabbed */
-    DockWidget *bottomDocks[] = {
-        m_hexDock, m_breakpointDock, m_watchpointDock, m_portMonitorDock,
-        m_keyHistoryDock, m_consoleDock, m_memVisDock, m_cycleCounterDock,
-        m_timerMonitorDock, m_lcdStateDock, m_mmuViewerDock
+    /* Bottom area groups:
+     * - Memory: Memory, Memory Visualizer, MMU Viewer, extra Memory views
+     * - System: Port Monitor, Timer Monitor, LCD State, Cycle Counter
+     * - Debug tools: Console, Breakpoints, Watchpoints, Key History
+     */
+    auto placeGroup = [this](DockWidget *anchor, const QList<DockWidget *> &tabs) -> DockWidget * {
+        if (!anchor)
+            return nullptr;
+        m_host->addDockWidget(Qt::BottomDockWidgetArea, anchor);
+        anchor->setVisible(true);
+        for (DockWidget *dw : tabs) {
+            if (!dw)
+                continue;
+            m_host->addDockWidget(Qt::BottomDockWidgetArea, dw);
+            dw->setVisible(true);
+            m_host->tabifyDockWidget(anchor, dw);
+        }
+        return anchor;
     };
-    DockWidget *firstBottom = nullptr;
-    for (DockWidget *dw : bottomDocks) {
-        if (!dw) continue;
-        m_host->addDockWidget(Qt::BottomDockWidgetArea, dw);
-        dw->setVisible(true);
-        if (firstBottom)
-            m_host->tabifyDockWidget(firstBottom, dw);
-        else
-            firstBottom = dw;
-    }
-    if (m_hexDock) m_hexDock->raise();
+
+    QList<DockWidget *> memoryTabs = { m_memVisDock, m_mmuViewerDock };
+    for (DockWidget *extra : m_extraHexDocks)
+        memoryTabs.append(extra);
+    DockWidget *memoryRoot = placeGroup(m_hexDock, memoryTabs);
+    DockWidget *systemRoot = placeGroup(m_portMonitorDock,
+                                        { m_timerMonitorDock, m_lcdStateDock, m_cycleCounterDock });
+    DockWidget *debugToolsRoot = placeGroup(m_consoleDock,
+                                            { m_breakpointDock, m_watchpointDock, m_keyHistoryDock });
+
+    if (memoryRoot && systemRoot)
+        m_host->splitDockWidget(memoryRoot, systemRoot, Qt::Horizontal);
+    if (systemRoot && debugToolsRoot)
+        m_host->splitDockWidget(systemRoot, debugToolsRoot, Qt::Horizontal);
+    else if (memoryRoot && debugToolsRoot)
+        m_host->splitDockWidget(memoryRoot, debugToolsRoot, Qt::Horizontal);
+
+    if (m_hexDock)
+        m_hexDock->raise();
 
     /* Sizing hints */
     QList<QDockWidget *> hTargets;
@@ -616,7 +637,9 @@ void DebugDockManager::resetLayout()
 
     QList<QDockWidget *> vTargets;
     QList<int> vSizes;
-    if (firstBottom) { vTargets << firstBottom; vSizes << 200; }
+    if (memoryRoot) { vTargets << memoryRoot; vSizes << 200; }
+    else if (systemRoot) { vTargets << systemRoot; vSizes << 200; }
+    else if (debugToolsRoot) { vTargets << debugToolsRoot; vSizes << 200; }
     if (!vTargets.isEmpty())
         m_host->resizeDocks(vTargets, vSizes, Qt::Vertical);
 }
