@@ -1440,6 +1440,7 @@ void MainWindow::convertTabsToDocks()
     /* Legacy name kept for compatibility with existing call sites.
      * This function is the authoritative dock construction routine for
      * desktop UI mode and runs before restoreState(). */
+    /* STEP 1: Build dock-management menu and layout actions. */
     // Create "Docks" menu to make closing and opening docks more intuitive
     QMenu *docks_menu = new QMenu(tr("Docks"), this);
     ui->menubar->insertMenu(ui->menuAbout->menuAction(), docks_menu);
@@ -1457,7 +1458,7 @@ void MainWindow::convertTabsToDocks()
 
     docks_menu->addSeparator();
 
-    // Convert the hidden tab pages into movable/floatable dock widgets around the central panel.
+    /* STEP 2: Convert hidden legacy tabs into regular docks. */
     struct TabDockPair
     {
         QWidget *tab = nullptr;
@@ -1501,6 +1502,7 @@ void MainWindow::convertTabsToDocks()
     m_dock_files = dock_files;
     m_dock_keypad = dock_keypad;
 
+    /* STEP 3: Create utility docks that were not tab pages. */
     /* Create NAND Browser dock */
     m_nandBrowser = new NandBrowserWidget(content_window);
     m_dock_nand = createMainDock(tr("NAND Browser"),
@@ -1525,6 +1527,7 @@ void MainWindow::convertTabsToDocks()
         docks_menu->addAction(m_dock_controls->toggleViewAction());
     }
 
+    /* STEP 4: Wire post-dock-creation links that depend on dock objects. */
     /* -- LCD/Keypad Link ---------------------------------------- */
     if (m_dock_keypad) {
         /* QQuickWidget's Shape.CurveRenderer loses GPU state when the
@@ -1541,6 +1544,7 @@ void MainWindow::convertTabsToDocks()
 
     // Keep default corner behavior so all docks behave like regular Qt docks.
 
+    /* STEP 5: Create debugger docks and finalize initial dock visibility. */
     /* Create the CEmu-style debugger docks via DebugDockManager */
     m_debugDocks = new DebugDockManager(content_window, material_icon_font, this);
     m_debugDocks->createDocks(docks_menu);
