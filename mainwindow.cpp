@@ -289,11 +289,15 @@ static bool restoreDockLayout(QMainWindow *window,
     }
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     if (asKDDMainWindow(window)) {
+        KDDockWidgets::LayoutSaver relativeSaver(KDDockWidgets::RestoreOption_RelativeToMainWindow);
+        if (relativeSaver.restoreLayout(layoutData))
+            return true;
+
         KDDockWidgets::LayoutSaver saver;
         if (saver.restoreLayout(layoutData))
             return true;
         if (errorOut)
-            *errorOut = QStringLiteral("LayoutSaver::restoreLayout failed");
+            *errorOut = QStringLiteral("LayoutSaver::restoreLayout failed (relative and absolute)");
         return false;
     }
 #else
@@ -2227,6 +2231,36 @@ void MainWindow::convertTabsToDocks()
                                      .arg(profileName, error));
             return;
         }
+
+        const auto coreVisibleCount = [this]() -> int {
+            int visible = 0;
+            for (DockWidget *dock : {m_dock_lcd, m_dock_controls, m_dock_keypad}) {
+                if (dock && dock->isVisible())
+                    ++visible;
+            }
+            for (const QString &name : {QStringLiteral("dockDisasm"),
+                                        QStringLiteral("dockRegisters"),
+                                        QStringLiteral("dockMemory"),
+                                        QStringLiteral("dockConsole")}) {
+                DockWidget *dock = content_window ? content_window->findChild<DockWidget *>(name) : nullptr;
+                if (dock && dock->isVisible())
+                    ++visible;
+            }
+            return visible;
+        };
+
+        const QSize contentSize = content_window ? content_window->size() : QSize();
+        const bool collapsed = contentSize.width() < 180 || contentSize.height() < 140;
+        if (profileName == QLatin1String("default") && (collapsed || coreVisibleCount() == 0)) {
+            qWarning("loaded default profile produced collapsed/empty layout, applying resetDockLayout fallback");
+            resetDockLayout();
+            settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
+            if (m_debugDocks)
+                m_debugDocks->refreshIcons();
+            showStatusMsg(tr("Loaded layout profile '%1' (fallback reset)").arg(profileName));
+            return;
+        }
+
         settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
         if (m_debugDocks && !debugDockState.isEmpty())
             m_debugDocks->restoreDockStates(debugDockState);
