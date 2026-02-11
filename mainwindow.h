@@ -7,6 +7,9 @@
 #include <QLabel>
 #include <QQuickWidget>
 #include <QStringList>
+#include <QHash>
+#include <QSet>
+#include <QJsonObject>
 #include <functional>
 #include <memory>
 
@@ -37,6 +40,8 @@ class QMenu;
 class QIcon;
 class QAction;
 class QTimer;
+class QPoint;
+class QEvent;
 class QQuickWidgetLessBroken : public QQuickWidget
 {
     Q_OBJECT
@@ -183,8 +188,30 @@ private:
                                bool hideTitlebar = true,
                                bool closable = true,
                                bool startVisible = true);
+    QList<DockWidget *> coreGroupableDocks() const;
+    void refreshCoreDockWatchTargets();
+    void scheduleCoreDockConnectOverlayRefresh();
+    void refreshCoreDockConnectOverlay();
+    void toggleCoreDockConnectionByKey(const QString &pairKey,
+                                       Qt::DockWidgetArea areaHint = Qt::NoDockWidgetArea);
+    void applyConnectedCoreDocks(DockWidget *sourceDock = nullptr, bool syncSize = true);
+    bool isCoreDockPairConnected(DockWidget *a, DockWidget *b) const;
+    bool isCoreDockPairConnectedByName(const QString &nameA, const QString &nameB) const;
+    Qt::DockWidgetArea inferRelativeArea(DockWidget *from,
+                                         DockWidget *to,
+                                         QPoint *borderCenterOut = nullptr) const;
+    void setCoreDockPairConnected(DockWidget *a,
+                                  DockWidget *b,
+                                  bool connected,
+                                  Qt::DockWidgetArea areaHint = Qt::NoDockWidgetArea);
+    static QString makeCorePairKey(const QString &a, const QString &b);
+    static QString makeCoreDirectionalKey(const QString &from, const QString &to);
+    static Qt::DockWidgetArea oppositeArea(Qt::DockWidgetArea area);
+    QJsonObject serializeCoreDockConnections() const;
+    void restoreCoreDockConnections(const QJsonObject &stateRoot);
 
 protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
 private:
@@ -278,6 +305,12 @@ private:
     QList<QByteArray> m_layoutUndoHistory;
     QList<QByteArray> m_layoutRedoHistory;
     bool m_layoutHistoryApplying = false;
+    QTimer *m_coreDockOverlayTimer = nullptr;
+    QHash<QString, QPointer<QToolButton>> m_coreDockOverlayButtons;
+    QHash<QObject *, QPointer<DockWidget>> m_coreDockWatchTargets;
+    QSet<QString> m_connectedCoreDockPairs;
+    QHash<QString, Qt::DockWidgetArea> m_coreDockDirectionalAreas;
+    bool m_syncingCoreDockConnections = false;
 
 };
 

@@ -331,17 +331,6 @@ qt_add_resources(firebird-emu "resources4"
         ${resources4_resource_files}
 )
 
-set(layout_profile_resource_files
-    "default.json"
-)
-
-qt_add_resources(firebird-emu "layoutprofiles"
-    PREFIX
-        "/layouts"
-    FILES
-        ${layout_profile_resource_files}
-)
-
 if(UNIX)
     target_sources(firebird-emu PUBLIC
         core/os/os-linux.c
