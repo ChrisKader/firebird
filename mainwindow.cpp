@@ -31,6 +31,9 @@
 #include <QGroupBox>
 #include <QPlainTextEdit>
 #include <QTabBar>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 
 #include <QApplication>
 #include <QPalette>
@@ -116,6 +119,7 @@ static constexpr const char *kSettingHwBrightnessOverride = "hwBrightnessOverrid
 static constexpr const char *kSettingHwKeypadTypeOverride = "hwKeypadTypeOverride";
 static constexpr const char *kSettingHwBatteryMvOverride = "hwBatteryMvOverride";
 static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOverride";
+static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -157,6 +161,46 @@ static void writeHwOverridesToSettings(QSettings *settings, const HwOverrides &o
     }};
     for (const auto &entry : values)
         settings->setValue(QString::fromLatin1(entry.first), entry.second);
+}
+
+static QString dockAreaToString(Qt::DockWidgetArea area)
+{
+    switch (area) {
+    case Qt::LeftDockWidgetArea: return QStringLiteral("left");
+    case Qt::RightDockWidgetArea: return QStringLiteral("right");
+    case Qt::TopDockWidgetArea: return QStringLiteral("top");
+    case Qt::BottomDockWidgetArea: return QStringLiteral("bottom");
+    default: break;
+    }
+    return QStringLiteral("none");
+}
+
+static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteArray &state, int version)
+{
+    QJsonObject root;
+    root.insert(QStringLiteral("schema"), QStringLiteral("firebird.qmainwindow.layout.v1"));
+    root.insert(QStringLiteral("windowStateVersion"), version);
+    root.insert(QStringLiteral("windowStateBase64"), QString::fromLatin1(state.toBase64()));
+
+    QJsonArray docks;
+    if (window) {
+        const auto dockChildren = window->findChildren<QDockWidget *>();
+        for (QDockWidget *dw : dockChildren) {
+            if (!dw)
+                continue;
+            QJsonObject dock;
+            dock.insert(QStringLiteral("objectName"), dw->objectName());
+            dock.insert(QStringLiteral("title"), dw->windowTitle());
+            dock.insert(QStringLiteral("visible"), dw->isVisible());
+            dock.insert(QStringLiteral("floating"), dw->isFloating());
+            dock.insert(QStringLiteral("area"), dockAreaToString(window->dockWidgetArea(dw)));
+            dock.insert(QStringLiteral("geometryBase64"),
+                        QString::fromLatin1(dw->saveGeometry().toBase64()));
+            docks.append(dock);
+        }
+    }
+    root.insert(QStringLiteral("docks"), docks);
+    return root;
 }
 
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
@@ -1145,6 +1189,9 @@ void MainWindow::savePersistentUiState()
     QByteArray state = content_window->saveState(WindowStateVersion);
     qDebug("Saving windowState: %lld bytes, ver=%d", (long long)state.size(), WindowStateVersion);
     settings->setValue(QStringLiteral("windowState"), state);
+    const QJsonObject layoutJson = exportLegacyDockLayoutJson(content_window, state, WindowStateVersion);
+    settings->setValue(QString::fromLatin1(kSettingWindowLayoutJson),
+                       QString::fromUtf8(QJsonDocument(layoutJson).toJson(QJsonDocument::Compact)));
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
     if (m_debugDocks)
         settings->setValue(QStringLiteral("debugExtraHexDockCount"), m_debugDocks->extraHexDockCount());

@@ -16,6 +16,7 @@ Changing this order can break persisted layouts because `restoreState` requires 
 ## Persistence
 
 - Layout state is saved with `content_window->saveState(WindowStateVersion)`.
+- A JSON bridge export is also saved in settings key `windowLayoutJson` for migration tooling.
 - Layout state is restored with version fallback from `WindowStateVersion` down to `1`.
 - If restore fails for all versions, default dock layout is applied.
 
