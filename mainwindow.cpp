@@ -121,6 +121,7 @@ static constexpr const char *kSettingHwKeypadTypeOverride = "hwKeypadTypeOverrid
 static constexpr const char *kSettingHwBatteryMvOverride = "hwBatteryMvOverride";
 static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOverride";
 static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
+static constexpr const char *kSettingLayoutProfile = "layoutProfile";
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -1042,7 +1043,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Only fall back to the default layout if nothing works at all.
     QByteArray savedState = settings->value(QStringLiteral("windowState")).toByteArray();
     bool restored = false;
-    if (!savedState.isEmpty()) {
+    const QString startupProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
+    if (!startupProfile.isEmpty()) {
+        QString profileError;
+        if (restoreLayoutProfile(content_window, startupProfile, WindowStateVersion, &profileError)) {
+            restored = true;
+        } else {
+            qDebug("profile restore failed (%s): %s",
+                   startupProfile.toUtf8().constData(),
+                   profileError.toUtf8().constData());
+        }
+    }
+    if (!restored && !savedState.isEmpty()) {
         for (int v = WindowStateVersion; v >= 1 && !restored; --v)
             restored = content_window->restoreState(savedState, v);
     }
@@ -1697,6 +1709,7 @@ void MainWindow::convertTabsToDocks()
                                      .arg(profileName, error));
             return;
         }
+        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
         showStatusMsg(tr("Saved layout profile '%1'").arg(profileName));
     };
 
@@ -1708,6 +1721,7 @@ void MainWindow::convertTabsToDocks()
                                      .arg(profileName, error));
             return;
         }
+        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
         if (m_debugDocks)
             m_debugDocks->refreshIcons();
         showStatusMsg(tr("Loaded layout profile '%1'").arg(profileName));
