@@ -6,6 +6,7 @@
 #include <QTimer>
 
 #include "ui/dockwidget.h"
+#include "ui/kdockwidget.h"
 #include "ui/keypadbridge.h"
 #include "ui/materialicons.h"
 #include "debugger/disassembly/disassemblywidget.h"
@@ -88,8 +89,8 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
 {
     auto makeDock = [&](const QString &title, QWidget *widget, DebugDockId id,
                         Qt::DockWidgetArea area) -> DockWidget * {
-        auto *dw = new DockWidget(title, m_host);
-        dw->hideTitlebar(true);
+        auto *dw = new KDockWidget(title, m_host);
+        dw->applyThinTitlebar(true);
         dw->setObjectName(QString::fromLatin1(dockObjectName(id)));
         dw->setWidget(widget);
         applyStandardDockFeatures(dw);
@@ -294,8 +295,8 @@ void DebugDockManager::addHexViewDock()
     QString title = tr("Memory %1").arg(m_hexViewCount);
     QString objName = QStringLiteral("dockMemory%1").arg(m_hexViewCount);
 
-    auto *dw = new DockWidget(title, m_host);
-    dw->hideTitlebar(true);
+    auto *dw = new KDockWidget(title, m_host);
+    dw->applyThinTitlebar(true);
     dw->setObjectName(objName);
     dw->setWidget(widget);
     applyStandardDockFeatures(dw);

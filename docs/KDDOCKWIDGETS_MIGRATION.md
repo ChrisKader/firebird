@@ -49,3 +49,9 @@ What it does:
 - Creates placeholder docks for known Firebird dock object names.
 - Calls `restoreState()` with version fallback.
 - Emits migration JSON with dock area/visibility/floating/geometry info.
+
+## Wrapper Layer
+
+- `ui/kdockwidget.h` / `ui/kdockwidget.cpp` now provide `KDockWidget`.
+- Current implementation still inherits existing `DockWidget` so behavior is unchanged.
+- Main and debugger dock creation paths now construct `KDockWidget`, which reduces future migration churn when swapping to KDDockWidgets-backed docks.

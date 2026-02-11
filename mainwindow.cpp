@@ -64,6 +64,7 @@
 #include "core/usblink_queue.h"
 
 #include "ui/dockwidget.h"
+#include "ui/kdockwidget.h"
 #include "mainwindow.h"
 #include "ui/widgettheme.h"
 #include "ui/materialicons.h"
@@ -339,9 +340,9 @@ DockWidget *MainWindow::createMainDock(const QString &title,
                                        const QIcon &icon,
                                        bool hideTitlebar)
 {
-    auto *dw = new DockWidget(title, content_window);
+    auto *dw = new KDockWidget(title, content_window);
     if (hideTitlebar)
-        dw->hideTitlebar(true);
+        dw->applyThinTitlebar(true);
     if (!objectName.isEmpty())
         dw->setObjectName(objectName);
     if (!icon.isNull())
