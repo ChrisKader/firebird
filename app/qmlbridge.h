@@ -189,5 +189,6 @@ private:
 };
 
 extern QMLBridge *the_qml_bridge;
+QMLBridge *qmlBridgeInstance();
 
 #endif // QMLBRIDGE_H

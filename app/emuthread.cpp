@@ -21,6 +21,11 @@
 
 EmuThread emu_thread;
 
+EmuThread *emuThreadInstance()
+{
+    return &emu_thread;
+}
+
 void gui_do_stuff(bool wait)
 {
     emu_thread.doStuff(wait);

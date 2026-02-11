@@ -17,7 +17,10 @@ LCDWidget::LCDWidget(QWidget *parent, Qt::WindowFlags f)
 
 void LCDWidget::mousePressEvent(QMouseEvent *event)
 {
-    the_qml_bridge->setTouchpadState((qreal)event->x() / width(), (qreal)event->y() / height(), true, event->button() == Qt::RightButton);
+    if (QMLBridge *bridge = qmlBridgeInstance()) {
+        bridge->setTouchpadState((qreal)event->x() / width(), (qreal)event->y() / height(), true,
+                                 event->button() == Qt::RightButton);
+    }
 }
 
 void LCDWidget::mouseReleaseEvent(QMouseEvent *event)
@@ -27,14 +30,18 @@ void LCDWidget::mouseReleaseEvent(QMouseEvent *event)
     else
         keypad.touchpad_contact = false;
 
-    the_qml_bridge->touchpadStateChanged();
+    if (QMLBridge *bridge = qmlBridgeInstance())
+        bridge->touchpadStateChanged();
     keypad.kpc.gpio_int_active |= 0x800;
     keypad_int_check();
 }
 
 void LCDWidget::mouseMoveEvent(QMouseEvent *event)
 {
-    the_qml_bridge->setTouchpadState((qreal)event->x() / width(), (qreal)event->y() / height(), keypad.touchpad_contact, keypad.touchpad_down);
+    if (QMLBridge *bridge = qmlBridgeInstance()) {
+        bridge->setTouchpadState((qreal)event->x() / width(), (qreal)event->y() / height(),
+                                 keypad.touchpad_contact, keypad.touchpad_down);
+    }
 }
 
 void LCDWidget::showEvent(QShowEvent *e)

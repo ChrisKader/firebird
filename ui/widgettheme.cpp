@@ -136,7 +136,8 @@ const WidgetTheme &currentWidgetTheme()
         QColor(QStringLiteral("#0066b8")),   // inputActiveBorder
     };
 
-    const bool use_dark = !the_qml_bridge ? true : the_qml_bridge->getDarkTheme();
+    QMLBridge *bridge = qmlBridgeInstance();
+    const bool use_dark = !bridge ? true : bridge->getDarkTheme();
     return use_dark ? dark_theme : light_theme;
 }
 

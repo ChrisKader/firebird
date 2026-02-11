@@ -92,7 +92,8 @@ void setKeypad(unsigned int keymap_id, bool state)
     //assert(col < KEYPAD_COLS); Not needed.
 
     ::keypad_set_key(row, col, state);
-    the_qml_bridge->notifyButtonStateChanged(row, col, state);
+    if (QMLBridge *bridge = qmlBridgeInstance())
+        bridge->notifyButtonStateChanged(row, col, state);
 
     emit qt_keypad_bridge.keyStateChanged(
         QString::fromLatin1(keyIdToName(keymap_id)), state);
@@ -317,7 +318,8 @@ void QtKeypadBridge::keyPressEvent(QKeyEvent *event)
     }
 
     keypad.touchpad_contact = keypad.touchpad_down = true;
-    the_qml_bridge->touchpadStateChanged();
+    if (QMLBridge *bridge = qmlBridgeInstance())
+        bridge->touchpadStateChanged();
     keypad.kpc.gpio_int_active |= 0x800;
 
     keypad_int_check();
@@ -371,7 +373,8 @@ void QtKeypadBridge::keyReleaseEvent(QKeyEvent *event)
         return;
     }
 
-    the_qml_bridge->touchpadStateChanged();
+    if (QMLBridge *bridge = qmlBridgeInstance())
+        bridge->touchpadStateChanged();
     keypad.kpc.gpio_int_active |= 0x800;
     keypad_int_check();
 }

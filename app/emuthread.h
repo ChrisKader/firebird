@@ -65,5 +65,6 @@ private:
 };
 
 extern EmuThread emu_thread;
+EmuThread *emuThreadInstance();
 
 #endif // EMUTHREAD_H

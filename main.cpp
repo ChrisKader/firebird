@@ -116,7 +116,7 @@ int main(int argc, char **argv)
 
     // Register QMLBridge for Keypad<->Emu communication
     qmlRegisterSingletonType<QMLBridge>("Firebird.Emu", 1, 0, "Emu", [](QQmlEngine *, QJSEngine *) -> QObject* {
-        return the_qml_bridge;
+        return qmlBridgeInstance();
     });
     // Register QtFramebuffer for QML display
     qmlRegisterType<QMLFramebuffer>("Firebird.Emu", 1, 0, "EmuScreen");
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
 
     #ifndef MOBILE_UI
         MainWindow mw;
-        main_window = &mw;
+        setMainWindow(&mw);
     #else
         QQmlApplicationEngine engine;
         engine.addImportPath(QStringLiteral("qrc:/qml/qml/"));
@@ -140,7 +140,8 @@ int main(int argc, char **argv)
         for(auto win : app.topLevelWindows())
             if(win->isVisible()) return;
 
-        emu_thread.stop();
+        if (EmuThread *emu = emuThreadInstance())
+            emu->stop();
     });
 
     int execRet = app.exec();

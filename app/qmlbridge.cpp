@@ -19,6 +19,11 @@
 
 QMLBridge *the_qml_bridge = nullptr;
 
+QMLBridge *qmlBridgeInstance()
+{
+    return the_qml_bridge;
+}
+
 QMLBridge::QMLBridge(QObject *parent) : QObject(parent)
 #ifdef IS_IOS_BUILD
 /* This is needed for iOS, as the app location changes at reinstall */
@@ -350,7 +355,9 @@ int QMLBridge::kitIndexForID(unsigned int id)
 #ifndef MOBILE_UI
 void QMLBridge::switchUIMode(bool mobile_ui)
 {
-    main_window->switchUIMode(mobile_ui);
+    MainWindow *window = getMainWindow();
+    if (window)
+        window->switchUIMode(mobile_ui);
 }
 #endif
 

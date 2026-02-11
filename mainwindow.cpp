@@ -76,6 +76,16 @@
 #include "debugger/hwconfig/hwconfigwidget.h"
 
 MainWindow *main_window;
+
+MainWindow *getMainWindow()
+{
+    return main_window;
+}
+
+void setMainWindow(MainWindow *window)
+{
+    main_window = window;
+}
 // Only bump this for incompatible structural changes (e.g. nested QMainWindow
 // redesign).  Adding/removing individual docks does NOT require a bump --
 // restoreState() gracefully skips missing docks and leaves new ones at their
@@ -1373,15 +1383,19 @@ void MainWindow::usblinkProgress(int progress)
 
 void MainWindow::usblink_progress_callback(int progress, void *)
 {
+    MainWindow *mw = getMainWindow();
+    if (!mw || !mw->ui)
+        return;
+
     // TODO: Don't do a full refresh
     // Also refresh on error, in case of multiple transfers
     if ((progress == 100 || progress < 0) && usblink_queue_size() == 1)
-        main_window->ui->usblinkTree->wantToReload(); // Reload the file explorer after uploads finished
+        mw->ui->usblinkTree->wantToReload(); // Reload the file explorer after uploads finished
 
     if (progress < 0 || progress > 100)
         progress = 0; // No error handling here
 
-    emit main_window->usblink_progress_changed(progress);
+    emit mw->usblink_progress_changed(progress);
 }
 
 void MainWindow::switchUIMode(bool mobile_ui)

@@ -260,5 +260,7 @@ private:
 
 // Used as global instance by EmuThread and friends
 extern MainWindow *main_window;
+MainWindow *getMainWindow();
+void setMainWindow(MainWindow *window);
 
 #endif // MAINWINDOW_H
