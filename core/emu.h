@@ -64,6 +64,7 @@ extern volatile int16_t lcd_contrast_override;       /* 0-147 */
 extern volatile int16_t adc_keypad_type_override;    /* -1 = default (73) */
 
 typedef enum charger_state {
+    CHARGER_AUTO = -1,
     CHARGER_DISCONNECTED = 0,
     CHARGER_CONNECTED_NOT_CHARGING,
     CHARGER_CHARGING,
@@ -95,6 +96,7 @@ int gui_getchar(); // Serial input
 void gui_putchar(char c); // Serial output
 void gui_debug_printf(const char *fmt, ...); // Debug output #1
 void gui_debug_vprintf(const char *fmt, va_list ap); // Debug output #2
+void gui_nlog_printf(const char *fmt, ...); // NLOG output
 void gui_perror(const char *msg); // Error output
 void gui_set_busy(bool busy); // To change the cursor, for instance
 void gui_status_printf(const char *fmt, ...); // Status output

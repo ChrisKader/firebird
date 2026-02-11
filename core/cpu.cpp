@@ -17,6 +17,7 @@
 #include "emu.h"
 #include "mem.h"
 #include "mmu.h"
+#include "nspire_log_hook.h"
 #include "translate.h"
 
 // Global CPU state
@@ -27,6 +28,7 @@ void cpu_arm_loop()
     while (!exiting && cycle_count_delta < 0 && current_instr_size == 4)
     {
         arm.reg[15] &= ~0x3; // Align PC
+        nspire_log_hook_poll(arm.reg[15]);
         Instruction *p = static_cast<Instruction*>(read_instruction(arm.reg[15]));
         if(!p)
             error("Jumped out of memory\n");
@@ -67,6 +69,8 @@ void cpu_arm_loop()
             else
             {
                 if(*flags_ptr & RF_EXEC_BREAKPOINT) {
+                    if (nspire_log_hook_handle_exec(arm.reg[15]))
+                        goto skip_debugger;
                     debug_increment_hit_count(arm.reg[15]);
                     if(!debug_evaluate_condition(arm.reg[15]))
                         goto skip_debugger;

@@ -183,7 +183,7 @@ uint32_t serial_cx_read(uint32_t addr) {
     switch (addr & 0xFFFF) {
         case 0x000:
             if (!(serial_cx.rx & 1))
-                error("Attempted to read empty RBR");
+                return 0;
             uint8_t byte = serial_cx.rx_char;
             serial_cx.rx = 0;
             serial_cx.int_status &= ~0x10;
@@ -218,13 +218,14 @@ void serial_cx_write(uint32_t addr, uint32_t value) {
         case 0x000:
             serial_byte_out(value);
             /* Note: On real PL011, TXIS is a level signal reflecting FIFO
-             * fill state — it's asserted whenever the FIFO is at or below
+             * fill state -- it's asserted whenever the FIFO is at or below
              * the trigger level. Since we have no FIFO (bytes are consumed
              * instantly), we cannot simply latch TXIS here or it causes an
              * interrupt storm. Proper TXIS would need a deferred timer to
              * simulate FIFO drain. For now, firmware uses polling TX. */
             return;
         case 0x004: return; /* UARTRSR write-to-clear */
+        case 0x018: return; /* UARTFR is RO on hardware; ignore stray writes */
         case 0x020: return; /* UARTILPR */
         case 0x024: return;
         case 0x028: return;
@@ -244,7 +245,7 @@ void serial_cx_write(uint32_t addr, uint32_t value) {
     bad_write_word(addr, value);
 }
 
-/* Second PL011 UART for CX2 (0x90070000) — independent state
+/* Second PL011 UART for CX2 (0x90070000) -- independent state
  * (serial_cx2 is defined above, near serial_cx_int_check) */
 
 bool serial_cx2_resume(const emu_snapshot *snapshot)
@@ -258,7 +259,7 @@ bool serial_cx2_suspend(emu_snapshot *snapshot)
 }
 
 static inline void serial_cx2_int_check() {
-    /* Second UART shares INT_SERIAL — real hardware may have a separate line,
+    /* Second UART shares INT_SERIAL -- real hardware may have a separate line,
      * but sharing is safe since the OS checks both UART status registers. */
     int_set(INT_SERIAL, (serial_cx.int_status & serial_cx.int_mask)
                       | (serial_cx2.int_status & serial_cx2.int_mask));
@@ -273,7 +274,7 @@ uint32_t serial_cx2_read(uint32_t addr) {
     switch (addr & 0xFFFF) {
         case 0x000:
             if (!(serial_cx2.rx & 1))
-                error("Attempted to read empty RBR (UART2)");
+                return 0;
             uint8_t byte = serial_cx2.rx_char;
             serial_cx2.rx = 0;
             serial_cx2.int_status &= ~0x10;
@@ -309,6 +310,7 @@ void serial_cx2_write(uint32_t addr, uint32_t value) {
             serial_byte_out(value);
             return;
         case 0x004: return;
+        case 0x018: return; /* UARTFR is RO on hardware; ignore stray writes */
         case 0x020: return;
         case 0x024: return;
         case 0x028: return;

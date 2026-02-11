@@ -5,8 +5,20 @@
 #include <QTreeWidget>
 #include <QToolBar>
 #include <QLabel>
+#include <QLineEdit>
+#include <QComboBox>
+#include <QPlainTextEdit>
+#include <QSplitter>
+#include <QStackedWidget>
+#include <QTableWidget>
 #include <QString>
 #include <stdint.h>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include "core/flash.h"
+#include "core/nand_fs.h"
 
 class NandBrowserWidget : public QWidget
 {
@@ -15,33 +27,69 @@ public:
     explicit NandBrowserWidget(QWidget *parent = nullptr);
 
 public slots:
-    void openImage(const QString &path);
     void openCurrentFlash();
     void refresh();
 
+private slots:
+    void onTreeItemClicked(QTreeWidgetItem *item, int column);
+    void onTreeItemDoubleClicked(QTreeWidgetItem *item, int column);
+    void onTreeContextMenu(const QPoint &pos);
+    void onSearchTriggered();
+    void onSearchResultClicked(QTableWidgetItem *item);
+
 private:
-    struct PartitionInfo {
-        QString name;
-        size_t offset;
-        size_t size;
+    enum TreeItemRole {
+        RoleType = Qt::UserRole,        // "partition", "page", "fsdir", "fsfile"
+        RoleOffset = Qt::UserRole + 1,  // byte offset into NAND
+        RoleSize = Qt::UserRole + 2,    // byte size
+        RolePartIndex = Qt::UserRole + 3, // partition index
+        RoleFsPath = Qt::UserRole + 4,  // filesystem path (for fs nodes)
+        RoleInodeNum = Qt::UserRole + 5,
     };
 
-    struct NandInfo {
-        QString path;
-        bool isLarge;
-        uint16_t product;
-        QString hwType;
-        size_t totalSize;
-        PartitionInfo partitions[5]; /* Manuf, Boot2, Bootdata, Diags, Filesystem */
-    };
+    void doLoad();
+    void populatePartitions();
+    void populateFilesystemTree(QTreeWidgetItem *fsItem, int partIndex);
+    void addFsChildren(QTreeWidgetItem *parentItem, const NandFilesystem &fs,
+                       uint32_t parent_inode, int depth,
+                       std::set<uint32_t> &visited);
+    void showPartitionPages(int partIndex);
+    void showHexView(size_t offset, size_t size);
+    void showTextPreview(const std::vector<uint8_t> &data, const QString &title);
+    void exportPartition(int partIndex);
+    void importPartition(int partIndex);
+    void exportPage(size_t offset, size_t size);
+    void extractFile(const NandFsNode *node);
+    void editFile(const NandFsNode *node);
+    const NandFsNode *findFsNode(const QString &path);
 
-    void populateTree(const NandInfo &info);
-    NandInfo readNandImage(const QString &path);
+    static QString formatSize(size_t bytes);
+    static QString formatOffset(size_t offset);
 
-    QTreeWidget *m_tree;
+    // Widgets
     QToolBar *m_toolbar;
     QLabel *m_infoLabel;
-    QString m_currentPath;
+    QSplitter *m_splitter;
+    QTreeWidget *m_tree;
+    QStackedWidget *m_rightPane;
+
+    // Right pane pages
+    QWidget *m_welcomePage;
+    QTableWidget *m_pageTable;     // Page list for partition
+    QPlainTextEdit *m_hexView;     // Hex dump
+    QPlainTextEdit *m_textPreview; // Text preview
+
+    // Search
+    QLineEdit *m_searchEdit;
+    QComboBox *m_searchScope;
+    QTableWidget *m_searchResults;
+    QSplitter *m_vertSplitter;     // Top (main content) / bottom (search results)
+
+    // State
+    std::vector<flash_partition_info> m_partitions;
+    std::unique_ptr<NandFilesystem> m_filesystem;
+    bool m_fsValid = false;
+    int m_fsPartIndex = -1;  // Which partition index holds filesystem
 };
 
 #endif // NANDBROWSERWIDGET_H

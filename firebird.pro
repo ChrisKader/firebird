@@ -184,6 +184,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/mem.c \
     core/misc.c \
     core/mmu.c \
+    core/nspire_log_hook.cpp \
     core/schedule.c \
     core/serial.c \
     core/sha256.c \
@@ -237,6 +238,7 @@ HEADERS += \
     core/mem.h \
     core/misc.h \
     core/mmu.h \
+    core/nspire_log_hook.h \
     core/schedule.h \
     core/sha256.h \
     core/translate.h \

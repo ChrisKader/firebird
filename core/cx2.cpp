@@ -6,15 +6,40 @@
 #include "schedule.h"
 #include "interrupt.h"
 #include "keypad.h"
-extern "C" {
-#include "usblink.h"
-}
 
 /* 90140000 */
 struct aladdin_pmu_state aladdin_pmu;
+static struct {
+	uint32_t reg[0x100 / sizeof(uint32_t)];
+} tg2989_pmic;
+
+enum {
+	TG2989_PMIC_REG_ID_STATUS = 0x04u,
+	TG2989_PMIC_ID_READY_BIT = 0x00000001u,
+	TG2989_PMIC_ID_MODEL_SHIFT = 20,
+	TG2989_PMIC_ID_MODEL_MASK = 0x01F00000u,
+	TG2989_PMIC_ID_MODEL_TG2985 = 1u,
+	TG2989_PMIC_ID_VARIANT_SIGN = 0x80000000u,
+};
+
+static uint32_t tg2989_pmic_id_status_value(void)
+{
+	/* DIAGS reads 0x90100004 and decodes:
+	 *   bits[24:20] -> PMIC model bucket (0/2 => TG2989, 1 => TG2985)
+	 *   bit31 sign  -> variant suffix selection.
+	 * For our CX II target image, a non-negative value yields "...E".
+	 *   bit0        -> "ready" polling bit.
+	 * Default to TG2985E + ready.
+	 */
+	return TG2989_PMIC_ID_READY_BIT
+		| (TG2989_PMIC_ID_MODEL_TG2985 << TG2989_PMIC_ID_MODEL_SHIFT);
+}
 
 // Wakeup reason at PMU+0x00. Value 0x040000 = wakeupOnKey.
 static uint32_t wakeup_reason = 0x040000;
+// PMU+0x08: firmware performs ~100 R/W cycles; preserve writes.
+// Not in the snapshot struct to avoid breaking snapshot compatibility.
+static uint32_t aladdin_pmu_ctrl_08 = 0x2000;
 enum {
 	PMU_IRQ_MASK_INDEX = 0x50 >> 2,   // PMU+0x850
 	PMU_IRQ_PEND_INDEX = 0x54 >> 2,   // PMU+0x854
@@ -36,10 +61,13 @@ void aladdin_pmu_reset(void) {
 	memset(&aladdin_pmu, 0, sizeof(aladdin_pmu));
 	aladdin_pmu.clocks = 0x21020303;
 	wakeup_reason = 0x040000;
+	aladdin_pmu_ctrl_08 = 0x2000;
 	aladdin_pmu.disable[0] = 0;
 	aladdin_pmu.noidea[0] = 0x1A;
 	/* Keep PMU status free of low-power sticky flags at reset. */
 	aladdin_pmu.noidea[1] = 0x1;
+	/* Observed reads from 0x9014080C expect this bit high. */
+	aladdin_pmu.noidea[3] = 0x00100000;
 	// Special cases for 0x808-0x810, see aladdin_pmu_read
 	//aladdin_pmu.noidea[4] = 0x111;
 	aladdin_pmu.noidea[5] = 0x1;
@@ -54,15 +82,42 @@ void aladdin_pmu_reset(void) {
 	sched.clock_rates[CLOCK_APB] = cpu / 4;
 }
 
-static void aladdin_pmu_update_int()
+/* 90100000: TG2989 PMIC (minimal model for DIAGS/boot polling) */
+void tg2989_pmic_reset(void)
 {
-	int_set(INT_POWER, aladdin_pmu.int_state != 0);
+	memset(&tg2989_pmic, 0, sizeof(tg2989_pmic));
+	/* 0x04 is the PMIC ID/status word used by DIAGS and early boot code. */
+	tg2989_pmic.reg[TG2989_PMIC_REG_ID_STATUS >> 2] = tg2989_pmic_id_status_value();
 }
 
-static bool cx2_battery_override_active()
+uint32_t tg2989_pmic_read(uint32_t addr)
 {
-	return battery_mv_override >= 0
-		|| adc_battery_level_override >= 0;
+	uint32_t offset = addr & 0xFFFFu;
+	if (offset == TG2989_PMIC_REG_ID_STATUS)
+		return tg2989_pmic_id_status_value();
+	if (offset < 0x100u)
+		return tg2989_pmic.reg[offset >> 2];
+	return bad_read_word(addr);
+}
+
+void tg2989_pmic_write(uint32_t addr, uint32_t value)
+{
+	uint32_t offset = addr & 0xFFFFu;
+	if (offset < 0x100u) {
+		tg2989_pmic.reg[offset >> 2] = value;
+		if (offset == TG2989_PMIC_REG_ID_STATUS) {
+			/* Keep identity bits stable while still letting firmware store
+			 * any scratch/status bits in the remaining fields.
+			 */
+			const uint32_t fixed = TG2989_PMIC_ID_READY_BIT
+				| TG2989_PMIC_ID_MODEL_MASK
+				| TG2989_PMIC_ID_VARIANT_SIGN;
+			uint32_t dynamic = tg2989_pmic.reg[offset >> 2] & ~fixed;
+			tg2989_pmic.reg[offset >> 2] = dynamic | tg2989_pmic_id_status_value();
+		}
+		return;
+	}
+	bad_write_word(addr, value);
 }
 
 static int cx2_clamp_int(int value, int min, int max)
@@ -74,70 +129,35 @@ static int cx2_clamp_int(int value, int min, int max)
 	return value;
 }
 
-static int cx2_effective_battery_mv()
+static void aladdin_pmu_update_int()
 {
-	const int mv_min = 3000;
-	const int mv_max = 4200;
-
-	if (battery_mv_override >= 0)
-		return cx2_clamp_int(battery_mv_override, mv_min, mv_max);
-
-	if (adc_battery_level_override >= 0) {
-		int raw = cx2_clamp_int((int)adc_battery_level_override, 0, 930);
-		return mv_min + (raw * (mv_max - mv_min) + 465) / 930;
-	}
-
-	return mv_max;
+	uint32_t pending = aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX];
+	if (intr.active & ((1u << INT_ADC) | (1u << 13)))
+		pending |= PMU_IRQ_ADC_BIT;
+	bool on = (aladdin_pmu.int_state != 0)
+		|| ((pending & aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX]) != 0);
+	int_set(INT_POWER, on);
 }
 
-static uint32_t cx2_effective_adc_code()
-{
-	const int mv_min = 3000;
-	const int mv_max = 4200;
-	const int code_min = 0x098B;
-	const int code_max = 0x0C99;
-
-	int mv = cx2_effective_battery_mv();
-	int clamped_mv = cx2_clamp_int(mv, mv_min, mv_max);
-	uint32_t span_mv = (uint32_t)(mv_max - mv_min);
-	uint32_t span_code = (uint32_t)(code_max - code_min);
-	uint32_t pos_mv = (uint32_t)(clamped_mv - mv_min);
-	/* CX II battery code direction is inverse of the classical assumption:
-	 * lower mV should produce higher ADC code in the PMU battery field. */
-	return (uint32_t)(code_max - (pos_mv * span_code + span_mv / 2) / span_mv);
-}
-
-static charger_state_t cx2_effective_charger_state()
-{
-	if (cx2_battery_override_active()) {
-		if (charger_state_override >= CHARGER_DISCONNECTED
-				&& charger_state_override <= CHARGER_CHARGING)
-			return charger_state_override;
-		return (adc_charging_override > 0) ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
-	}
-	if (usb_cable_connected_override >= 0)
-		return usb_cable_connected_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
-
-	/* No manual battery override: charger follows live USB link state. */
-	return usblink_connected ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
-}
 
 static uint32_t aladdin_pmu_disable2_read_value()
 {
 	uint32_t value = aladdin_pmu.disable[2];
-	/* PMU+0x60 packs battery level in [15:6]. Keep it coherent with ADC model. */
-	uint32_t batt_field = (cx2_effective_adc_code() >> 2) & 0x03FFu;
+	charger_state_t charger = cx2_effective_charger_state();
+	/* PMU+0x60 packs a 10-bit battery field in [15:6]. */
+	uint32_t batt_field = adc_cx2_effective_battery_code() & 0x03FFu;
 	value &= ~0x0000FFC0u;
 	value |= batt_field << 6;
 
-	/* Charger state spans multiple sticky status bits in [20:16]. */
-	value &= ~0x001F0000u;
-	switch (cx2_effective_charger_state()) {
+	/* Keep charger state deterministic from the override/live USB model while
+	 * preserving firmware-owned bits outside the explicit charger field. */
+	value &= ~0x00030000u;
+	switch (charger) {
 	case CHARGER_CONNECTED_NOT_CHARGING:
-		value |= 0x00110000u;
+		value |= 0x00010000u;
 		break;
 	case CHARGER_CHARGING:
-		value |= 0x00130000u;
+		value |= 0x00030000u;
 		break;
 	default:
 		break;
@@ -148,9 +168,12 @@ static uint32_t aladdin_pmu_disable2_read_value()
 static uint32_t aladdin_pmu_disable0_read_value()
 {
 	uint32_t value = aladdin_pmu.disable[0];
-	/* Keep charger/power-source-present bit coherent with override. */
+	/* CX II UI paths treat 0x400 as battery-present and 0x100 as external
+	 * source present. Setting only 0x100 while disconnected leads to
+	 * "--%" in status while still showing a charge icon on home. */
+	value |= 0x00000400u;
 	if (cx2_effective_charger_state() == CHARGER_DISCONNECTED)
-		value &= ~0x00000500u;
+		value &= ~0x00000100u;
 	else
 		value |= 0x00000100u;
 	return value;
@@ -174,7 +197,7 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		{
 		case 0x00: return wakeup_reason;
 		case 0x04: return 0;
-		case 0x08: return 0x2000;
+		case 0x08: return aladdin_pmu_ctrl_08;
 		case 0x20: return aladdin_pmu_disable0_read_value();
 		case 0x24: return aladdin_pmu.int_state;
 		case 0x30: return aladdin_pmu.clocks;
@@ -186,11 +209,14 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 	else if(offset >= 0x800 && offset < 0x900)
 	{
 		if(offset == 0x808)
-			return 0x0021DB19; // efuse
+			return 0x010C9231; //0x0021DB19; // efuse
 		else if(offset == 0x80C)
 			return asic_user_flags << 20;
 		else if(offset == 0x810)
+		{
+			adc_cx2_background_step();
 			return 0x11 | ((keypad.key_map[0] & 1<<9) ? 0 : 0x100);
+		}
 		else if(offset == 0x850)
 			return aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX];
 		else if(offset == 0x854)
@@ -203,7 +229,7 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		}
 		else if(offset == 0x858)
 		{
-			// USB/charger PHY status register.
+			adc_cx2_background_step();
 			return aladdin_pmu_usb_phy_status_read_value();
 		}
 		else
@@ -222,7 +248,7 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 		{
 		case 0x00: return;
 		case 0x04: return; // No idea
-		case 0x08: return;
+		case 0x08: aladdin_pmu_ctrl_08 = value; return;
 		case 0x20:
 			if(value & 2)
 			{
@@ -279,9 +305,7 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 			/* 0xFFFFFFFF is used as a pre-write before read; only zero clears. */
 			if (value == 0) {
 				aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] &= ~PMU_IRQ_ADC_BIT;
-				if ((aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] & aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX]) == 0
-						&& (intr.active & ((1u << INT_ADC) | (1u << 13))) == 0)
-					int_set(INT_POWER, aladdin_pmu.int_state != 0);
+				aladdin_pmu_update_int();
 			}
 			return;
 		}
@@ -342,7 +366,13 @@ static struct cx2_backlight_state cx2_backlight;
 
 void cx2_backlight_reset()
 {
-	cx2_backlight.pwm_value = cx2_backlight.pwm_period = 0;
+	/* Default to brightest setting on cold boot. */
+	cx2_backlight.pwm_period = 255;
+	cx2_backlight.pwm_value = 0;
+	if (lcd_contrast_override >= 0)
+		hdq1w.lcd_contrast = (uint8_t)cx2_clamp_int(lcd_contrast_override, 0, LCD_CONTRAST_MAX);
+	else
+		hdq1w.lcd_contrast = LCD_CONTRAST_MAX;
 }
 
 uint32_t cx2_backlight_read(uint32_t addr)

@@ -115,6 +115,22 @@ bool flash_create_new(bool flag_large_nand, const char **preload_file, unsigned 
 bool flash_read_settings(uint32_t *sdram_size, uint32_t *product, uint32_t *features, uint32_t *asic_user_flags);
 void flash_set_bootorder(BootOrder order);
 
+/* Public API for NAND data access (used by NAND browser, filesystem parser, etc.) */
+const uint8_t *flash_get_nand_data(void);
+size_t flash_get_nand_size(void);
+
+struct flash_partition_info {
+    const char *name;
+    size_t offset;    /* byte offset into nand_data */
+    size_t size;      /* byte size */
+};
+
+/* Fill array with partition info for current NAND; returns count (up to max_parts) */
+int flash_get_partitions(struct flash_partition_info *parts, int max_parts);
+
+/* Write raw bytes into nand_data + mark blocks modified. Returns false if out of range. */
+bool flash_write_raw(size_t offset, const uint8_t *data, size_t size);
+
 #ifdef __cplusplus
 }
 

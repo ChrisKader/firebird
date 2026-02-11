@@ -181,10 +181,8 @@ void des_write_word(uint32_t addr, uint32_t value) {
         case 0x10010: case 0x10014:
         case 0x10018: case 0x1001C:
             des.key[(addr - 8) >> 2 & 7] = value;
-						emuprintf("DES KEY WRITE: addr=0x%08X value=0x%08X\n",
-											addr, value);
-						des.key_schedule_valid = false;
-						return;
+			des.key_schedule_valid = false;
+			return;
     }
     bad_write_word(addr, value);
 }

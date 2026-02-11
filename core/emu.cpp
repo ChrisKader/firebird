@@ -15,6 +15,7 @@
 #include "debug_api.h"
 #include "mmu.h"
 #include "gdbstub.h"
+#include "nspire_log_hook.h"
 #include "usblink_queue.h"
 #include "os/os.h"
 #include "schedule.h"
@@ -192,6 +193,7 @@ static void emu_reset()
     sched.items[SCHED_THROTTLE].clock = CLOCK_27M;
     sched.items[SCHED_THROTTLE].proc = throttle_interval_event;
 
+    nspire_log_hook_reset();
     memory_reset();
 }
 
@@ -457,6 +459,7 @@ void emu_cleanup()
         translate_deinit();
     #endif
 
+    nspire_log_hook_reset();
     memory_reset();
     memory_deinitialize();
     flash_close();

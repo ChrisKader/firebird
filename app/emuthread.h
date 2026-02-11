@@ -11,6 +11,7 @@ public:
 
     void doStuff(bool wait);
     void throttleTimerWait(unsigned int usec);
+    bool isPaused() const { return is_paused; }
 
     QString boot1, flash;
     unsigned int port_gdb = 0, port_rdbg = 0;
@@ -35,6 +36,7 @@ signals:
 
     // Debugging
     void debugStr(QString str);
+    void nlogStr(QString str);
     void debuggerEntered(bool state);
     void debugInputRequested(bool b);
 

@@ -245,7 +245,7 @@ void HwConfigWidget::applyBatteryOverride()
         battery_mv_override = -1;
         adc_battery_level_override = -1;
         adc_charging_override = -1;
-        charger_state_override = CHARGER_DISCONNECTED;
+        charger_state_override = CHARGER_AUTO;
     }
 }
 

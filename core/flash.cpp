@@ -502,6 +502,108 @@ size_t flash_partition_offset(Partition p, struct nand_metrics *nand_metrics, ui
     return (*(uint32_t *)(nand_data_ + parttable_cx[p - 1])) / 0x800 * 0x840;
 }
 
+// -------------------- Public NAND data access API --------------------
+
+const uint8_t *flash_get_nand_data(void)
+{
+    return nand_data;
+}
+
+size_t flash_get_nand_size(void)
+{
+    if (!nand_data)
+        return 0;
+    return (size_t)nand.metrics.page_size * nand.metrics.num_pages;
+}
+
+int flash_get_partitions(struct flash_partition_info *parts, int max_parts)
+{
+    if (!nand_data || max_parts <= 0)
+        return 0;
+
+    size_t total_size = flash_get_nand_size();
+
+    // CX II: block-aligned partitions (SPI NAND, page_size=0x840)
+    if (nand.metrics.page_size >= 0x800 && (*(uint16_t *)&nand_data[0] & 0xF0FF) == 0x0050)
+    {
+        uint32_t page_size = nand.metrics.page_size;
+        uint32_t pages_per_block = 1u << nand.metrics.log2_pages_per_block;
+        uint32_t block_size = page_size * pages_per_block;
+
+        struct { const char *name; int start_block; int end_block; } cx2_parts[] = {
+            {"Manufacturing",    0,   0},
+            {"Bootloader",       1,   4},
+            {"PTT Data",         5,   5},
+            {"DevCert",          7,   7},
+            {"OS Loader",        8,  10},
+            {"Installer",       11,  18},
+            {"Other Installer", 19,  26},
+            {"OS Data",         27,  28},
+            {"Diags",           29,  33},
+            {"OS File",         34,  113},
+            {"Logging",        114, 200},
+            {"Filesystem",     201,  -1},  // -1 = rest of NAND
+        };
+        int cx2_count = sizeof(cx2_parts) / sizeof(cx2_parts[0]);
+        int count = cx2_count < max_parts ? cx2_count : max_parts;
+        uint32_t max_block = nand.metrics.num_pages / pages_per_block;
+
+        for (int i = 0; i < count; i++)
+        {
+            parts[i].name = cx2_parts[i].name;
+            parts[i].offset = (size_t)cx2_parts[i].start_block * block_size;
+            uint32_t end = cx2_parts[i].end_block < 0
+                ? max_block - 1
+                : (uint32_t)cx2_parts[i].end_block;
+            parts[i].size = ((size_t)(end - cx2_parts[i].start_block + 1)) * block_size;
+            if (parts[i].offset + parts[i].size > total_size)
+                parts[i].size = total_size > parts[i].offset ? total_size - parts[i].offset : 0;
+        }
+        return count;
+    }
+
+    // Classic/CX: use flash_partition_offset()
+    static const char *names[] = {"Manufacturing", "Boot2", "Bootdata", "Diags", "Filesystem"};
+    int count = 5 < max_parts ? 5 : max_parts;
+    for (int i = 0; i < count; i++)
+    {
+        parts[i].name = names[i];
+        parts[i].offset = flash_partition_offset((Partition)i, &nand.metrics, nand_data);
+        if (i + 1 < 5)
+        {
+            size_t next = flash_partition_offset((Partition)(i + 1), &nand.metrics, nand_data);
+            parts[i].size = next > parts[i].offset ? next - parts[i].offset : 0;
+        }
+        else
+        {
+            parts[i].size = total_size > parts[i].offset ? total_size - parts[i].offset : 0;
+        }
+    }
+    return count;
+}
+
+bool flash_write_raw(size_t offset, const uint8_t *data, size_t size)
+{
+    if (!nand_data)
+        return false;
+    size_t total = flash_get_nand_size();
+    if (offset + size > total)
+        return false;
+
+    memcpy(nand_data + offset, data, size);
+
+    // Mark affected blocks as modified
+    uint32_t block_size = nand.metrics.page_size << nand.metrics.log2_pages_per_block;
+    uint32_t first_block = offset / block_size;
+    uint32_t last_block = (offset + size - 1) / block_size;
+    for (uint32_t b = first_block; b <= last_block; b++)
+        nand.nand_block_modified[b] = true;
+
+    return true;
+}
+
+// -------------------- Flash open / save --------------------
+
 bool flash_open(const char *filename)
 {
     bool large = false;

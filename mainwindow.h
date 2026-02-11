@@ -116,6 +116,7 @@ public slots:
     void debugInputRequested(bool b);
     void debuggerEntered(bool entered);
     void debugStr(QString str);
+    void nlogStr(QString str);
 
     //File transfer
     void changeProgress(int value);
@@ -146,6 +147,7 @@ private:
 
     void refillKitMenus();
     void updateWindowTitle();
+    void savePersistentUiState();
 
     // This changes the current GUI language to the one given in parameter, if available.
     // The change is persistent (saved in settings) if it was successful.
@@ -219,6 +221,7 @@ private:
 
     // Serial line buffer for forwarding to Console dock
     QString m_serialLineBuf;
+    bool m_serialPendingCR = false;
 
     // Window management
     bool focus_pause_enabled = false;

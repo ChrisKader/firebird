@@ -73,7 +73,7 @@
 
 MainWindow *main_window;
 // Only bump this for incompatible structural changes (e.g. nested QMainWindow
-// redesign).  Adding/removing individual docks does NOT require a bump —
+// redesign).  Adding/removing individual docks does NOT require a bump --
 // restoreState() gracefully skips missing docks and leaves new ones at their
 // default positions.
 static const constexpr int WindowStateVersion = 9;
@@ -505,6 +505,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Emu -> GUI (QueuedConnection as they're different threads)
     connect(&emu_thread, SIGNAL(serialChar(char)), this, SLOT(serialChar(char)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(debugStr(QString)), this, SLOT(debugStr(QString)), Qt::QueuedConnection);
+    connect(&emu_thread, SIGNAL(nlogStr(QString)), this, SLOT(nlogStr(QString)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(isBusy(bool)), this, SLOT(isBusy(bool)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(statusMsg(QString)), this, SLOT(showStatusMsg(QString)), Qt::QueuedConnection);
     connect(&emu_thread, SIGNAL(debugInputRequested(bool)), this, SLOT(debugInputRequested(bool)), Qt::QueuedConnection);
@@ -749,6 +750,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     // Load settings
     convertTabsToDocks();
+    if (m_debugDocks) {
+        const int extraHexDocks = qMax(0, settings->value(QStringLiteral("debugExtraHexDockCount"), 0).toInt());
+        m_debugDocks->ensureExtraHexDocks(extraHexDocks);
+    }
     retranslateDocks();
     setExtLCD(settings->value(QStringLiteral("extLCDVisible")).toBool());
     lcd.restoreGeometry(settings->value(QStringLiteral("extLCDGeometry")).toByteArray());
@@ -764,7 +769,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
             restored = content_window->restoreState(savedState, v);
     }
     if (!restored) {
-        qDebug("restoreState failed (size=%lld) — applying default layout",
+        qDebug("restoreState failed (size=%lld) -- applying default layout",
                (long long)savedState.size());
         resetDockLayout();
     }
@@ -777,15 +782,13 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     lcd_contrast_override = (int16_t)settings->value(QStringLiteral("hwBrightnessOverride"), -1).toInt();
     adc_keypad_type_override = (int16_t)settings->value(QStringLiteral("hwKeypadTypeOverride"), -1).toInt();
     battery_mv_override = settings->value(QStringLiteral("hwBatteryMvOverride"), -1).toInt();
-    if (battery_mv_override < 0 && adc_battery_level_override >= 0)
-        battery_mv_override = 3000 + (adc_battery_level_override * (4200 - 3000) + 465) / 930;
     int savedChargerState = settings->value(QStringLiteral("hwChargerStateOverride"), -1).toInt();
     if (savedChargerState >= CHARGER_DISCONNECTED && savedChargerState <= CHARGER_CHARGING)
         charger_state_override = (charger_state_t)savedChargerState;
     else if (adc_charging_override >= 0)
         charger_state_override = adc_charging_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
     else
-        charger_state_override = CHARGER_DISCONNECTED;
+        charger_state_override = CHARGER_AUTO;
     if (m_hwConfig)
         m_hwConfig->syncOverridesFromGlobals();
 
@@ -1004,6 +1007,16 @@ MainWindow::~MainWindow()
     delete flash_dialog;
     flash_dialog = nullptr;
 
+    savePersistentUiState();
+    delete settings;
+    delete ui;
+}
+
+void MainWindow::savePersistentUiState()
+{
+    if (!settings)
+        return;
+
     // Save external LCD geometry
     settings->setValue(QStringLiteral("extLCDGeometry"), lcd.saveGeometry());
     settings->setValue(QStringLiteral("extLCDVisible"), lcd.isVisible());
@@ -1013,6 +1026,8 @@ MainWindow::~MainWindow()
     qDebug("Saving windowState: %lld bytes, ver=%d", (long long)state.size(), WindowStateVersion);
     settings->setValue(QStringLiteral("windowState"), state);
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
+    if (m_debugDocks)
+        settings->setValue(QStringLiteral("debugExtraHexDockCount"), m_debugDocks->extraHexDockCount());
 
     settings->setValue(QStringLiteral("lcdKeypadLinked"), m_lcdKeypadLinked);
 
@@ -1025,8 +1040,6 @@ MainWindow::~MainWindow()
     settings->setValue(QStringLiteral("hwChargerStateOverride"), (int)charger_state_override);
 
     settings->sync();
-    delete settings;
-    delete ui;
 }
 
 void MainWindow::switchTranslator(const QLocale &locale)
@@ -1106,17 +1119,38 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 
 void MainWindow::serialChar(const char c)
 {
-    /* Buffer complete lines and forward to the Console dock with UART tag. */
-    if (c == '\n' || c == '\r') {
-        if (!m_serialLineBuf.isEmpty()) {
-            if (m_debugDocks && m_debugDocks->console())
-                m_debugDocks->console()->appendTaggedOutput(
-                    ConsoleTag::Uart, m_serialLineBuf + QStringLiteral("\n"));
+    auto emitUart = [this](const QString &out) {
+        if (m_debugDocks && m_debugDocks->console())
+            m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Uart, out);
+    };
+
+    /* Coalesce CRLF into a single newline-stamped record.
+     * Keep bare CR behavior for in-place progress updates. */
+    if (m_serialPendingCR) {
+        if (c == '\n') {
+            emitUart(m_serialLineBuf + QStringLiteral("\n"));
             m_serialLineBuf.clear();
+            m_serialPendingCR = false;
+            return;
         }
-    } else {
-        m_serialLineBuf += QLatin1Char(c);
+
+        emitUart(m_serialLineBuf + QStringLiteral("\r"));
+        m_serialLineBuf.clear();
+        m_serialPendingCR = false;
     }
+
+    if (c == '\r') {
+        m_serialPendingCR = true;
+        return;
+    }
+
+    if (c == '\n') {
+        emitUart(m_serialLineBuf + QStringLiteral("\n"));
+        m_serialLineBuf.clear();
+        return;
+    }
+
+    m_serialLineBuf += QLatin1Char(c);
 }
 
 void MainWindow::debugInputRequested(bool b)
@@ -1164,6 +1198,12 @@ void MainWindow::debugStr(QString str)
         }
 
     }
+}
+
+void MainWindow::nlogStr(QString str)
+{
+    if (m_debugDocks && m_debugDocks->console())
+        m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Nlog, str);
 }
 
 
@@ -1381,9 +1421,7 @@ void MainWindow::convertTabsToDocks()
     DockWidget *dock_files = nullptr;
     DockWidget *dock_keypad = nullptr;
 
-    /* All sidebar docks go in LeftDockWidgetArea, exclusively controlled
-     * by the activity bar.  No tabification -- only ONE is visible at a
-     * time, so the visible dock fills the full left column. */
+    /* Place converted docks in the left area as regular Qt docks. */
     for (const auto &pair : dock_pairs)
     {
         QWidget *tab = pair.tab;
@@ -1411,7 +1449,6 @@ void MainWindow::convertTabsToDocks()
         content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
         docks_menu->addAction(dw->toggleViewAction());
         m_dock_nand = dw;
-        dw->setVisible(false);
     }
 
     /* Create Hardware Configuration dock */
@@ -1426,7 +1463,6 @@ void MainWindow::convertTabsToDocks()
         content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
         docks_menu->addAction(dw->toggleViewAction());
         m_dock_hwconfig = dw;
-        dw->setVisible(false);
     }
 
     /* Add LCD and Controls dock toggle actions to the Docks menu */
@@ -1437,10 +1473,15 @@ void MainWindow::convertTabsToDocks()
         docks_menu->addAction(m_dock_controls->toggleViewAction());
     }
 
-    /* Start with only the "files" dock visible in the sidebar */
-    if (m_dock_keypad) m_dock_keypad->setVisible(false);
-    if (m_dock_nand)   m_dock_nand->setVisible(false);
-    if (m_dock_hwconfig) m_dock_hwconfig->setVisible(false);
+    /* Group file/keypad/NAND/HW config as regular left-area tabs. */
+    if (m_dock_files && m_dock_keypad)
+        content_window->tabifyDockWidget(m_dock_files, m_dock_keypad);
+    if (m_dock_files && m_dock_nand)
+        content_window->tabifyDockWidget(m_dock_files, m_dock_nand);
+    if (m_dock_files && m_dock_hwconfig)
+        content_window->tabifyDockWidget(m_dock_files, m_dock_hwconfig);
+    if (m_dock_files)
+        m_dock_files->raise();
 
     /* -- LCD/Keypad Link ---------------------------------------- */
     if (m_dock_keypad) {
@@ -1461,10 +1502,6 @@ void MainWindow::convertTabsToDocks()
     content_window->setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
     content_window->setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
     content_window->setCorner(Qt::BottomRightCorner, Qt::RightDockWidgetArea);
-
-    // Bias initial sidebar width to a comfortable default.
-    if (dock_files)
-        content_window->resizeDocks({dock_files}, {280}, Qt::Horizontal);
 
     /* Create the CEmu-style debugger docks via DebugDockManager */
     m_debugDocks = new DebugDockManager(content_window, material_icon_font, this);
@@ -1628,6 +1665,7 @@ void MainWindow::connectUSB()
     if (usblink_connected) {
         usb_cable_connected_override = 0;
         usblink_queue_reset();
+        usblink_reset();
     } else {
         usb_cable_connected_override = 1;
         usblink_connect();
@@ -1762,7 +1800,7 @@ void MainWindow::resetDockLayout()
         m_dock_controls->setVisible(true);
     }
 
-    /* Reset sidebar docks: all to LeftDockWidgetArea, only files visible */
+    /* Reset file/keypad/NAND/HW config docks as regular left-area tabs. */
     for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
                             static_cast<QDockWidget*>(m_dock_keypad),
                             static_cast<QDockWidget*>(m_dock_nand),
@@ -1770,12 +1808,18 @@ void MainWindow::resetDockLayout()
         if (dw) {
             dw->setFloating(false);
             content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
-            dw->setVisible(dw == m_dock_files);
+            dw->setVisible(true);
         }
     }
 
+    if (m_dock_files && m_dock_keypad)
+        content_window->tabifyDockWidget(m_dock_files, m_dock_keypad);
+    if (m_dock_files && m_dock_nand)
+        content_window->tabifyDockWidget(m_dock_files, m_dock_nand);
+    if (m_dock_files && m_dock_hwconfig)
+        content_window->tabifyDockWidget(m_dock_files, m_dock_hwconfig);
     if (m_dock_files)
-        content_window->resizeDocks({m_dock_files}, {280}, Qt::Horizontal);
+        m_dock_files->raise();
 
     if (m_debugDocks) m_debugDocks->resetLayout();
 }
@@ -1859,6 +1903,9 @@ void MainWindow::closeEvent(QCloseEvent *e)
 
     if (emu_thread.isRunning() && !emu_thread.stop())
         qDebug("Terminating emulator thread failed.");
+
+    // Persist layout/geometry while the full dock tree is still alive.
+    savePersistentUiState();
 
     QMainWindow::closeEvent(e);
 }

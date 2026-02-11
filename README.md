@@ -11,6 +11,11 @@ Download:
 
 * [Latest release](https://github.com/nspire-emus/firebird/releases/latest)
 
+Documentation:
+--------------
+
+* [CX II PMIC/ADC reverse-engineering notes](docs/cx2-pmic-register-map.md)
+
 Screenshots:
 -------------------
 

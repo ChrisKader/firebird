@@ -41,6 +41,14 @@ void gui_debug_vprintf(const char *fmt, va_list ap)
     emu_thread.debugStr(QString::vasprintf(fmt, ap));
 }
 
+void gui_nlog_printf(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    emu_thread.nlogStr(QString::vasprintf(fmt, ap));
+    va_end(ap);
+}
+
 void gui_status_printf(const char *fmt, ...)
 {
     va_list ap;

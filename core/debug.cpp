@@ -30,6 +30,7 @@
 #include "usblink_queue.h"
 #include "gdbstub.h"
 #include "debug_api.h"
+#include "nspire_log_hook.h"
 #include "os/os.h"
 
 std::string ln_target_folder;
@@ -205,6 +206,8 @@ int process_debug_cmd(char *cmdline) {
                     "ln s <file> - send a file\n"
                     "ln st <dir> - set target directory\n"
                     "mmu - dump memory mappings\n"
+                    "nlog [on|off|scan|status] - TI virtual log hook control\n"
+                    "nlog bypass [on|off|status] - bypass OS debug_log filters\n"
                     "n - continue until next instruction\n"
                     "pr <address> - port or memory read\n"
                     "pw <address> <value> - port or memory write\n"
@@ -224,6 +227,41 @@ int process_debug_cmd(char *cmdline) {
         backtrace(fp ? parse_expr(fp) : arm.reg[11]);
     } else if (!strcasecmp(cmd, "mmu")) {
         mmu_dump_tables();
+    } else if (!strcasecmp(cmd, "nlog")) {
+        char *sub = strtok(NULL, " \n\r");
+        if (!sub || !strcasecmp(sub, "status")) {
+            nspire_log_hook_status();
+        } else if (!strcasecmp(sub, "bypass")) {
+            char *mode = strtok(NULL, " \n\r");
+            if (!mode || !strcasecmp(mode, "status")) {
+                gui_nlog_printf("nlog: bypass enabled=%s installed=%s\n",
+                                nspire_log_hook_filter_bypass_is_enabled() ? "yes" : "no",
+                                nspire_log_hook_filter_bypass_is_installed() ? "yes" : "no");
+            } else if (!strcasecmp(mode, "on")) {
+                nspire_log_hook_set_filter_bypass(true);
+                gui_nlog_printf("nlog: bypass enabled=%s installed=%s\n",
+                                nspire_log_hook_filter_bypass_is_enabled() ? "yes" : "no",
+                                nspire_log_hook_filter_bypass_is_installed() ? "yes" : "no");
+            } else if (!strcasecmp(mode, "off")) {
+                nspire_log_hook_set_filter_bypass(false);
+                gui_nlog_printf("nlog: bypass enabled=%s installed=%s\n",
+                                nspire_log_hook_filter_bypass_is_enabled() ? "yes" : "no",
+                                nspire_log_hook_filter_bypass_is_installed() ? "yes" : "no");
+            } else {
+                gui_nlog_printf("nlog: bypass expects on/off/status\n");
+            }
+        } else if (!strcasecmp(sub, "on")) {
+            nspire_log_hook_set_enabled(true);
+            nspire_log_hook_status();
+        } else if (!strcasecmp(sub, "off")) {
+            nspire_log_hook_set_enabled(false);
+            nspire_log_hook_status();
+        } else if (!strcasecmp(sub, "scan")) {
+            nspire_log_hook_scan_now();
+            nspire_log_hook_status();
+        } else {
+            gui_nlog_printf("nlog: expected on/off/scan/status/bypass\n");
+        }
     } else if (!strcasecmp(cmd, "r")) {
         int i, show_spsr;
         uint32_t cpsr = get_cpsr();

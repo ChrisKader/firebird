@@ -23,6 +23,7 @@
 #include "usb_cx2.h"
 #include "cx2.h"
 #include "cpu.h"
+#include "nspire_log_hook.h"
 
 uint8_t   (*read_byte_map[64])(uint32_t addr);
 uint16_t  (*read_half_map[64])(uint32_t addr);
@@ -48,7 +49,9 @@ static bool mmio_trace_pc_enabled = false;
 
 static bool mmio_trace_in_scope(uint32_t addr)
 {
-    return (addr >= 0x900B0000u && addr < 0x900B1000u)
+    return (addr >= 0x90020000u && addr < 0x90030000u)
+        || (addr >= 0x900B0000u && addr < 0x900B1000u)
+        || (addr >= 0x90100000u && addr < 0x90110000u)
         || (addr >= 0x90140000u && addr < 0x90150000u);
 }
 
@@ -167,6 +170,7 @@ void memory_write_byte(uint32_t addr, uint8_t value) {
     if (flags & RF_READ_ONLY) { bad_write_byte(addr, value); return; }
     if (flags & DO_WRITE_ACTION) write_action(ptr);
     *ptr = value;
+    nspire_log_hook_on_memory_write(addr, 1);
 }
 void memory_write_half(uint32_t addr, uint16_t value) {
     uint16_t *ptr = phys_mem_ptr(addr, 2);
@@ -175,6 +179,7 @@ void memory_write_half(uint32_t addr, uint16_t value) {
     if (flags & RF_READ_ONLY) { bad_write_half(addr, value); return; }
     if (flags & DO_WRITE_ACTION) write_action(ptr);
     *ptr = value;
+    nspire_log_hook_on_memory_write(addr, 2);
 }
 void memory_write_word(uint32_t addr, uint32_t value) {
     uint32_t *ptr = phys_mem_ptr(addr, 4);
@@ -183,6 +188,7 @@ void memory_write_word(uint32_t addr, uint32_t value) {
     if (flags & RF_READ_ONLY) { bad_write_word(addr, value); return; }
     if (flags & DO_WRITE_ACTION) write_action(ptr);
     *ptr = value;
+    nspire_log_hook_on_memory_write(addr, 4);
 }
 
 /* The APB (Advanced Peripheral Bus) hosts peripherals that do not require
@@ -518,6 +524,8 @@ bool memory_initialize(uint32_t sdram_size)
             add_reset_proc(serial_cx2_reset);
             apb_set_map(0x08, unknown_9008_read, unknown_9008_write);
             apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word);
+            apb_set_map(0x10, tg2989_pmic_read, tg2989_pmic_write);
+            add_reset_proc(tg2989_pmic_reset);
             apb_set_map(0x12, memc_ddr_read, memc_ddr_write);
             add_reset_proc(memc_ddr_reset);
             apb_set_map(0x13, cx2_backlight_read, cx2_backlight_write);

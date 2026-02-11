@@ -11,9 +11,21 @@
 #include <QStringListModel>
 #include <QTextCursor>
 #include <QRegularExpression>
+#include <QMenu>
+#include <QToolButton>
 
 #include "ui/ansitextwriter.h"
 #include "ui/widgettheme.h"
+
+static bool hasAnsiEscape(const QString &s)
+{
+    return s.contains(QLatin1Char('\x1B'));
+}
+
+static bool needsControlProcessing(const QString &s)
+{
+    return s.contains(QLatin1Char('\r')) || hasAnsiEscape(s);
+}
 
 ConsoleWidget::ConsoleWidget(QWidget *parent)
     : QWidget(parent)
@@ -31,13 +43,15 @@ ConsoleWidget::ConsoleWidget(QWidget *parent)
     auto *toolbar = new QToolBar(this);
     toolbar->setIconSize(QSize(16, 16));
 
+    auto runCommand = [&](const QString &cmd) {
+        emit commandSubmitted(cmd);
+        appendOutput(QStringLiteral("> %1\n").arg(cmd));
+    };
+
     auto addQuick = [&](const QString &label, const QString &tip, const QString &cmd) {
         QAction *act = toolbar->addAction(label);
         act->setToolTip(tip);
-        connect(act, &QAction::triggered, this, [this, cmd]() {
-            emit commandSubmitted(cmd);
-            appendOutput(QStringLiteral("> %1\n").arg(cmd));
-        });
+        connect(act, &QAction::triggered, this, [runCommand, cmd]() { runCommand(cmd); });
     };
 
     addQuick(QStringLiteral("\u25B6"), tr("Continue"), QStringLiteral("c"));
@@ -46,6 +60,48 @@ ConsoleWidget::ConsoleWidget(QWidget *parent)
     addQuick(QStringLiteral("\u2191"), tr("Step Out"), QStringLiteral("finish"));
     toolbar->addSeparator();
     addQuick(QStringLiteral("Regs"), tr("Print Registers"), QStringLiteral("r"));
+    toolbar->addSeparator();
+
+    auto *nlogButton = new QToolButton(toolbar);
+    nlogButton->setText(QStringLiteral("NLOG"));
+    nlogButton->setToolTip(tr("Quick NLOG controls"));
+    nlogButton->setPopupMode(QToolButton::InstantPopup);
+    auto *nlogMenu = new QMenu(nlogButton);
+
+    auto addNlogAction = [&](const QString &label, const QString &tip, const QString &cmd) {
+        QAction *act = nlogMenu->addAction(label);
+        act->setToolTip(tip);
+        connect(act, &QAction::triggered, this, [runCommand, cmd]() { runCommand(cmd); });
+    };
+
+    addNlogAction(tr("On"), tr("Enable NLOG hooks"), QStringLiteral("nlog on"));
+    addNlogAction(tr("Off"), tr("Disable NLOG hooks"), QStringLiteral("nlog off"));
+    addNlogAction(tr("Status"), tr("Show NLOG status"), QStringLiteral("nlog status"));
+    addNlogAction(tr("Scan"), tr("Scan for NLOG hooks now"), QStringLiteral("nlog scan"));
+    nlogMenu->addSeparator();
+    addNlogAction(tr("Bypass On"), tr("Force bypass of dispatcher filters"), QStringLiteral("nlog bypass on"));
+    addNlogAction(tr("Bypass Off"), tr("Disable bypass of dispatcher filters"), QStringLiteral("nlog bypass off"));
+    addNlogAction(tr("Bypass Status"), tr("Show bypass status"), QStringLiteral("nlog bypass status"));
+    nlogButton->setMenu(nlogMenu);
+    toolbar->addWidget(nlogButton);
+    toolbar->addSeparator();
+
+    auto *filterLabel = new QLabel(tr("Filter:"), toolbar);
+    toolbar->addWidget(filterLabel);
+
+    m_filterInput = new QLineEdit(toolbar);
+    m_filterInput->setPlaceholderText(tr("contains..."));
+    m_filterInput->setClearButtonEnabled(true);
+    m_filterInput->setMaximumWidth(220);
+    connect(m_filterInput, &QLineEdit::textChanged, this, [this](const QString &text) {
+        m_filterText = text.trimmed();
+    });
+    toolbar->addWidget(m_filterInput);
+    toolbar->addSeparator();
+
+    QAction *clearToolbarAct = toolbar->addAction(tr("Clear"));
+    clearToolbarAct->setToolTip(tr("Clear console output"));
+    connect(clearToolbarAct, &QAction::triggered, this, &ConsoleWidget::clearConsoleOutput);
 
     layout->addWidget(toolbar);
 
@@ -54,6 +110,9 @@ ConsoleWidget::ConsoleWidget(QWidget *parent)
     m_output->setReadOnly(true);
     m_output->setFont(mono);
     m_output->setMaximumBlockCount(5000);
+    m_output->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(m_output, &QWidget::customContextMenuRequested,
+            this, &ConsoleWidget::showOutputContextMenu);
     layout->addWidget(m_output, 1);
 
     /* ANSI text writer for UART output (supports escape sequences) */
@@ -87,6 +146,10 @@ ConsoleWidget::ConsoleWidget(QWidget *parent)
         QStringLiteral("wm"), QStringLiteral("wf"),
         QStringLiteral("ss"), QStringLiteral("sr"),
         QStringLiteral("j"),
+        QStringLiteral("nlog on"), QStringLiteral("nlog off"),
+        QStringLiteral("nlog scan"), QStringLiteral("nlog status"),
+        QStringLiteral("nlog bypass on"), QStringLiteral("nlog bypass off"),
+        QStringLiteral("nlog bypass status"),
     };
 
     m_completer = new QCompleter(commands, this);
@@ -116,6 +179,13 @@ void ConsoleWidget::insertTimestamp()
     m_output->setTextCursor(cursor);
 }
 
+bool ConsoleWidget::lineMatchesFilter(const QString &line) const
+{
+    if (m_filterText.isEmpty())
+        return true;
+    return line.contains(m_filterText, Qt::CaseInsensitive);
+}
+
 static QColor tagColor(ConsoleTag tag)
 {
     const WidgetTheme &t = currentWidgetTheme();
@@ -123,6 +193,7 @@ static QColor tagColor(ConsoleTag tag)
     case ConsoleTag::Uart:  return t.consoleTagUart;
     case ConsoleTag::Debug: return t.consoleTagDebug;
     case ConsoleTag::Sys:   return t.consoleTagSys;
+    case ConsoleTag::Nlog:  return t.consoleTagSys;
     }
     return t.textMuted;
 }
@@ -133,6 +204,7 @@ static QString tagLabel(ConsoleTag tag)
     case ConsoleTag::Uart:  return QStringLiteral("[UART] ");
     case ConsoleTag::Debug: return QStringLiteral("[DBG]  ");
     case ConsoleTag::Sys:   return QStringLiteral("[SYS]  ");
+    case ConsoleTag::Nlog:  return QStringLiteral("[NLOG] ");
     }
     return QStringLiteral("[???]  ");
 }
@@ -243,12 +315,15 @@ void ConsoleWidget::appendOutput(const QString &text)
 
         QString segment = text.mid(pos, nl - pos);
 
-        if (!segment.isEmpty()) {
+        if (!segment.isEmpty() && lineMatchesFilter(segment)) {
             if (m_atLineStart) {
                 insertTimestamp();
                 m_atLineStart = false;
             }
-            insertStyledText(segment, t.text);
+            if (needsControlProcessing(segment))
+                insertAnsiText(segment);
+            else
+                insertStyledText(segment, t.text);
         }
 
         if (nl < text.size()) {
@@ -264,8 +339,9 @@ void ConsoleWidget::appendOutput(const QString &text)
 
 void ConsoleWidget::appendTaggedOutput(ConsoleTag tag, const QString &text)
 {
-    /* Each line gets: [MM:SS.mmm] [TAG] <body>
-     * Body formatting depends on the source tag. */
+    /* Each tagged line gets: [MM:SS.mmm] [TAG] <body>
+     * Keep tagged line state across calls so CR-based progress output can
+     * overwrite in place instead of creating a new timestamp/tag line. */
     const WidgetTheme &t = currentWidgetTheme();
     int pos = 0;
     while (pos <= text.size()) {
@@ -273,26 +349,66 @@ void ConsoleWidget::appendTaggedOutput(ConsoleTag tag, const QString &text)
         if (nl < 0) nl = text.size();
 
         QString line = text.mid(pos, nl - pos);
+        if (tag == ConsoleTag::Nlog) {
+            QString sanitized;
+            sanitized.reserve(line.size());
+            for (const QChar ch : line) {
+                const ushort u = ch.unicode();
+                if (u == 0x1B || u == 0x0A || u == 0x0D || u == 0x09 || (u >= 0x20 && u != 0x7F))
+                    sanitized.append(ch);
+            }
+            line.swap(sanitized);
+        }
 
-        if (!line.isEmpty()) {
-            insertTimestamp();
-            insertTag(tag);
+        if (!line.isEmpty() && lineMatchesFilter(line)) {
+            if (!m_taggedAtLineStart && m_hasActiveTaggedTag && m_activeTaggedTag != tag) {
+                insertStyledText(QStringLiteral("\n"), t.text);
+                m_taggedAtLineStart = true;
+            }
+
+            if (m_taggedAtLineStart) {
+                insertTimestamp();
+                insertTag(tag);
+                m_taggedAtLineStart = false;
+                m_hasActiveTaggedTag = true;
+                m_activeTaggedTag = tag;
+            }
 
             switch (tag) {
             case ConsoleTag::Uart:
                 insertAnsiText(line);
                 break;
             case ConsoleTag::Debug:
-                insertDebugFormattedText(line);
+                if (needsControlProcessing(line))
+                    insertAnsiText(line);
+                else
+                    insertDebugFormattedText(line);
                 break;
             case ConsoleTag::Sys:
-                insertStyledText(line, t.text);
+                if (needsControlProcessing(line))
+                    insertAnsiText(line);
+                else
+                    insertStyledText(line, t.text);
+                break;
+            case ConsoleTag::Nlog:
+                if (needsControlProcessing(line))
+                    insertAnsiText(line);
+                else
+                    insertStyledText(line, t.text);
+                break;
+            default:
+                if (needsControlProcessing(line))
+                    insertAnsiText(line);
+                else
+                    insertStyledText(line, t.text);
                 break;
             }
         }
 
-        if (nl < text.size())
+        if (nl < text.size()) {
             insertStyledText(QStringLiteral("\n"), t.text);
+            m_taggedAtLineStart = true;
+        }
 
         pos = nl + 1;
     }
@@ -326,6 +442,36 @@ void ConsoleWidget::onReturnPressed()
     m_input->clear();
 
     emit commandSubmitted(cmd);
+}
+
+void ConsoleWidget::clearConsoleOutput()
+{
+    if (!m_output)
+        return;
+    m_output->clear();
+    m_elapsed.restart();
+    m_atLineStart = true;
+    m_taggedAtLineStart = true;
+    m_hasActiveTaggedTag = false;
+    m_activeTaggedTag = ConsoleTag::Sys;
+    if (m_ansiWriter)
+        m_ansiWriter->resetFormat();
+}
+
+void ConsoleWidget::showOutputContextMenu(const QPoint &pos)
+{
+    if (!m_output)
+        return;
+
+    QMenu *menu = m_output->createStandardContextMenu();
+    QAction *first = menu->actions().isEmpty() ? nullptr : menu->actions().first();
+    QAction *clearAct = new QAction(tr("Clear"), menu);
+    connect(clearAct, &QAction::triggered, this, &ConsoleWidget::clearConsoleOutput);
+    menu->insertAction(first, clearAct);
+    if (first)
+        menu->insertSeparator(first);
+    menu->exec(m_output->viewport()->mapToGlobal(pos));
+    delete menu;
 }
 
 bool ConsoleWidget::eventFilter(QObject *obj, QEvent *event)

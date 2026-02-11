@@ -6,15 +6,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include "emu.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 extern bool on_irq;
-
-// We can't include emu.h here, so only a "forward-typedef"
-typedef struct emu_snapshot emu_snapshot;
 
 void sdramctl_write_word(uint32_t addr, uint32_t value);
 
@@ -229,11 +227,16 @@ void adc_reset();
 uint32_t adc_read_word(uint32_t addr);
 void adc_write_word(uint32_t addr, uint32_t value);
 
+// CX2 battery/charger helpers (defined in misc.c, used by cx2.cpp too)
+bool cx2_battery_override_active(void);
+charger_state_t cx2_effective_charger_state(void);
+
 // CX2: 0x900B0000
 uint32_t adc_cx2_read_word(uint32_t addr);
 void adc_cx2_write_word(uint32_t addr, uint32_t value);
 void adc_cx2_background_step(void);
 void adc_cx2_clear_pending(void);
+uint32_t adc_cx2_effective_battery_code(void);
 
 // The peripherals in misc.c have trivial suspend/resume ops, so don't need
 // separate functions each. Note: serial/serial_cx is in serial.c instead.

@@ -26,6 +26,10 @@ void aladdin_pmu_reset(void);
 void aladdin_pmu_set_wakeup_reason(uint32_t reason);
 void aladdin_pmu_set_adc_pending(bool on);
 
+uint32_t tg2989_pmic_read(uint32_t addr);
+void tg2989_pmic_write(uint32_t addr, uint32_t value);
+void tg2989_pmic_reset(void);
+
 uint32_t memc_ddr_read(uint32_t addr);
 void memc_ddr_write(uint32_t addr, uint32_t value);
 void memc_ddr_reset(void);

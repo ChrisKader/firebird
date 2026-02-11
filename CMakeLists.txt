@@ -28,6 +28,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/emu.cpp core/emu.h
     core/fieldparser.cpp core/fieldparser.h
     core/flash.cpp core/flash.h
+    core/nand_fs.cpp core/nand_fs.h
     core/gdbstub.c core/gdbstub.h
     core/gif.cpp core/gif.h
     core/interrupt.c core/interrupt.h
@@ -37,6 +38,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/mem.c core/mem.h
     core/misc.c core/misc.h
     core/mmu.c core/mmu.h
+    core/nspire_log_hook.cpp core/nspire_log_hook.h
     core/os/os.h
     core/schedule.c core/schedule.h
     core/serial.c
@@ -78,6 +80,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     debugger/lcdstate/lcdstatewidget.cpp debugger/lcdstate/lcdstatewidget.h
     debugger/gotodialog.cpp debugger/gotodialog.h
     debugger/nandbrowser/nandbrowserwidget.cpp debugger/nandbrowser/nandbrowserwidget.h
+    debugger/nandbrowser/nandfileeditor.cpp debugger/nandbrowser/nandfileeditor.h
     debugger/hwconfig/hwconfigwidget.cpp debugger/hwconfig/hwconfigwidget.h
     debugger/mmuviewer/mmuviewerwidget.cpp debugger/mmuviewer/mmuviewerwidget.h
     # Dialogs

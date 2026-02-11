@@ -40,6 +40,8 @@ public:
     void refreshIcons();
     void retranslate();
     void setEditMode(bool enabled);
+    void ensureExtraHexDocks(int count);
+    int extraHexDockCount() const { return m_hexViewCount > 1 ? (m_hexViewCount - 1) : 0; }
 
     DisassemblyWidget *disassembly() const { return m_disasmWidget; }
     HexViewWidget *hexView() const { return m_hexWidget; }

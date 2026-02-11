@@ -267,6 +267,14 @@ void DebugDockManager::addHexViewDock()
     m_extraHexWidgets.append(widget);
 }
 
+void DebugDockManager::ensureExtraHexDocks(int count)
+{
+    if (count <= 0)
+        return;
+    while (extraHexDockCount() < count)
+        addHexViewDock();
+}
+
 void DebugDockManager::refreshIcons()
 {
     using namespace MaterialIcons;
