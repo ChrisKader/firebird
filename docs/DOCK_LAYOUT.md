@@ -44,6 +44,10 @@ Changing this order can break persisted layouts because `restoreState` requires 
 
 - Docks use stable `objectName` values to preserve persisted layout identity.
 - Utility docks now behave as regular docks (no forced dedicated sidebar column).
+- Debug dock auto-show behavior respects `dockFocusPolicy`:
+  - `Always Raise`
+  - `Raise on Explicit Actions`
+  - `Never Raise Automatically`
 
 ## Related code
 

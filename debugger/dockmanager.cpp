@@ -87,6 +87,24 @@ DebugDockManager::DebugDockManager(QMainWindow *host, const QFont &iconFont,
 {
 }
 
+void DebugDockManager::setDockFocusPolicy(DockFocusPolicy policy)
+{
+    m_dockFocusPolicy = policy;
+}
+
+void DebugDockManager::showDock(DockWidget *dock, bool explicitUserAction)
+{
+    if (!dock)
+        return;
+    dock->show();
+
+    const bool shouldRaise =
+        (m_dockFocusPolicy == DockFocusPolicy::Always) ||
+        (m_dockFocusPolicy == DockFocusPolicy::ExplicitOnly && explicitUserAction);
+    if (shouldRaise)
+        dock->raise();
+}
+
 void DebugDockManager::createDocks(QMenu *docksMenu)
 {
     auto makeDock = [&](const QString &title, QWidget *widget, DebugDockId id,
@@ -193,68 +211,59 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     connect(m_disasmWidget, &DisassemblyWidget::addressSelected,
             this, [this](uint32_t addr) {
                 m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
+                showDock(m_hexDock, true);
             });
 
     /* Hex view -> navigate to disassembly */
     connect(m_hexWidget, &HexViewWidget::gotoDisassembly,
             this, [this](uint32_t addr) {
                 m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
+                showDock(m_disasmDock, true);
             });
 
     /* Breakpoint/Watchpoint double-click -> navigate disassembly */
     connect(m_breakpointWidget, &BreakpointWidget::goToAddress,
             this, [this](uint32_t addr) {
                 m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
+                showDock(m_disasmDock, true);
             });
     connect(m_watchpointWidget, &WatchpointWidget::goToAddress,
             this, [this](uint32_t addr) {
                 m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
+                showDock(m_hexDock, true);
             });
 
     /* Port monitor -> navigate to hex view */
     connect(m_portMonitorWidget, &PortMonitorWidget::goToAddress,
             this, [this](uint32_t addr) {
                 m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
+                showDock(m_hexDock, true);
             });
 
     /* Stack -> navigate to disassembly (for return addresses) */
     connect(m_stackWidget, &StackWidget::goToAddress,
             this, [this](uint32_t addr) {
                 m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
+                showDock(m_disasmDock, true);
             });
 
     /* Stack -> navigate to hex view */
     connect(m_stackWidget, &StackWidget::gotoDisassembly,
             this, [this](uint32_t addr) {
                 m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
+                showDock(m_disasmDock, true);
             });
 
     /* Register widget -> navigate to hex view / disassembly */
     connect(m_registerWidget, &RegisterWidget::goToAddress,
             this, [this](uint32_t addr) {
                 m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
+                showDock(m_hexDock, true);
             });
     connect(m_registerWidget, &RegisterWidget::gotoDisassembly,
             this, [this](uint32_t addr) {
                 m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
+                showDock(m_disasmDock, true);
             });
 
     /* Console -> debugger commands */
@@ -279,12 +288,10 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
             uint32_t addr = dlg.getAddress();
             if (dlg.getTarget() == GoToDialog::Disassembly) {
                 m_disasmWidget->goToAddress(addr);
-                m_disasmDock->show();
-                m_disasmDock->raise();
+                showDock(m_disasmDock, true);
             } else {
                 m_hexWidget->goToAddress(addr);
-                m_hexDock->show();
-                m_hexDock->raise();
+                showDock(m_hexDock, true);
             }
         }
     });
@@ -516,7 +523,7 @@ void DebugDockManager::raise()
     auto autoShow = [this](DockWidget *dock) {
         if (!dock) return;
         if (!dock->isVisible()) {
-            dock->setVisible(true);
+            showDock(dock, false);
             m_autoShownDocks.insert(dock);
         }
     };
@@ -528,7 +535,7 @@ void DebugDockManager::raise()
     autoShow(m_breakpointDock);
     autoShow(m_consoleDock);
 
-    if (m_disasmDock) m_disasmDock->raise();
+    showDock(m_disasmDock, false);
 }
 
 void DebugDockManager::hideAutoShown()

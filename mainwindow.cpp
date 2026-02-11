@@ -8,6 +8,7 @@
 #include <QFrame>
 #include <QMenuBar>
 #include <QLabel>
+#include <QActionGroup>
 #include <QMimeData>
 #include <QDockWidget>
 #include <QHBoxLayout>
@@ -124,6 +125,7 @@ static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOve
 static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
 static constexpr const char *kSettingLayoutProfile = "layoutProfile";
 static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
+static constexpr const char *kSettingDockFocusPolicy = "dockFocusPolicy";
 static constexpr const char *kLayoutSchemaQMainWindowV1 = "firebird.qmainwindow.layout.v1";
 
 struct HwOverrides {
@@ -1881,6 +1883,41 @@ void MainWindow::convertTabsToDocks()
         }
     });
 
+    QMenu *focusMenu = docks_menu->addMenu(tr("Dock Focus Policy"));
+    QActionGroup *focusGroup = new QActionGroup(focusMenu);
+    focusGroup->setExclusive(true);
+
+    QAction *focusAlwaysAction = focusMenu->addAction(tr("Always Raise"));
+    focusAlwaysAction->setCheckable(true);
+    focusAlwaysAction->setData(static_cast<int>(DebugDockManager::DockFocusPolicy::Always));
+    focusGroup->addAction(focusAlwaysAction);
+
+    QAction *focusExplicitAction = focusMenu->addAction(tr("Raise on Explicit Actions"));
+    focusExplicitAction->setCheckable(true);
+    focusExplicitAction->setData(static_cast<int>(DebugDockManager::DockFocusPolicy::ExplicitOnly));
+    focusGroup->addAction(focusExplicitAction);
+
+    QAction *focusNeverAction = focusMenu->addAction(tr("Never Raise Automatically"));
+    focusNeverAction->setCheckable(true);
+    focusNeverAction->setData(static_cast<int>(DebugDockManager::DockFocusPolicy::Never));
+    focusGroup->addAction(focusNeverAction);
+
+    auto applyDockFocusPolicy = [this](int value) {
+        DebugDockManager::DockFocusPolicy policy = DebugDockManager::DockFocusPolicy::Always;
+        if (value == static_cast<int>(DebugDockManager::DockFocusPolicy::ExplicitOnly))
+            policy = DebugDockManager::DockFocusPolicy::ExplicitOnly;
+        else if (value == static_cast<int>(DebugDockManager::DockFocusPolicy::Never))
+            policy = DebugDockManager::DockFocusPolicy::Never;
+        settings->setValue(QString::fromLatin1(kSettingDockFocusPolicy), static_cast<int>(policy));
+        if (m_debugDocks)
+            m_debugDocks->setDockFocusPolicy(policy);
+    };
+    connect(focusGroup, &QActionGroup::triggered, this, [applyDockFocusPolicy](QAction *action) {
+        if (!action)
+            return;
+        applyDockFocusPolicy(action->data().toInt());
+    });
+
     docks_menu->addSeparator();
 
     /* STEP 2: Convert hidden legacy tabs into regular docks. */
@@ -1975,6 +2012,20 @@ void MainWindow::convertTabsToDocks()
     m_debugDocks->createDocks(docks_menu);
     connect(m_debugDocks.get(), &DebugDockManager::debugCommand,
             this, &MainWindow::debuggerCommand);
+
+    int savedFocusPolicy = settings->value(QString::fromLatin1(kSettingDockFocusPolicy),
+                                           static_cast<int>(DebugDockManager::DockFocusPolicy::Always)).toInt();
+    if (savedFocusPolicy < static_cast<int>(DebugDockManager::DockFocusPolicy::Always) ||
+        savedFocusPolicy > static_cast<int>(DebugDockManager::DockFocusPolicy::Never)) {
+        savedFocusPolicy = static_cast<int>(DebugDockManager::DockFocusPolicy::Always);
+    }
+    applyDockFocusPolicy(savedFocusPolicy);
+    for (QAction *action : focusGroup->actions()) {
+        if (action && action->data().toInt() == savedFocusPolicy) {
+            action->setChecked(true);
+            break;
+        }
+    }
 
     setUIEditMode(editmode_toggle->isChecked());
 

@@ -30,6 +30,12 @@ class DebugDockManager : public QObject
 {
     Q_OBJECT
 public:
+    enum class DockFocusPolicy {
+        Always = 0,
+        ExplicitOnly = 1,
+        Never = 2,
+    };
+
     explicit DebugDockManager(QMainWindow *host, const QFont &iconFont,
                               QObject *parent = nullptr);
 
@@ -47,6 +53,8 @@ public:
     int extraHexDockCount() const { return m_hexViewCount > 1 ? (m_hexViewCount - 1) : 0; }
     QJsonObject serializeDockStates() const;
     void restoreDockStates(const QJsonObject &stateRoot);
+    void setDockFocusPolicy(DockFocusPolicy policy);
+    DockFocusPolicy dockFocusPolicy() const { return m_dockFocusPolicy; }
 
     DisassemblyWidget *disassembly() const { return m_disasmWidget; }
     HexViewWidget *hexView() const { return m_hexWidget; }
@@ -108,6 +116,9 @@ private:
     QMenu *m_docksMenu = nullptr;
     int m_hexViewCount = 1;
     uint32_t m_dirtyFlags = DIRTY_ALL;
+    DockFocusPolicy m_dockFocusPolicy = DockFocusPolicy::Always;
+
+    void showDock(DockWidget *dock, bool explicitUserAction);
 };
 
 #endif // DEBUGDOCKMANAGER_H
