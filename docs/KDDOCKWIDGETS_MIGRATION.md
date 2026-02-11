@@ -6,7 +6,7 @@ This file tracks Phase 1 dependency groundwork for KDDockWidgets migration.
 
 - CMake option: `FIREBIRD_ENABLE_KDDOCKWIDGETS` (default: `OFF`)
 - When enabled:
-  - Requires `find_package(KDDockWidgets 2.4 REQUIRED)`
+  - Requires `find_package(KDDockWidgets 2.4 EXACT REQUIRED)`
   - Defines `FIREBIRD_USE_KDDOCKWIDGETS=1`
   - Links against an exported KDDockWidgets target if available
 

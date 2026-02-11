@@ -179,7 +179,7 @@ target_compile_definitions(firebird-emu PRIVATE
 )
 
 if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
-    find_package(KDDockWidgets 2.4 REQUIRED)
+    find_package(KDDockWidgets 2.4 EXACT REQUIRED)
     target_compile_definitions(firebird-emu PRIVATE FIREBIRD_USE_KDDOCKWIDGETS=1)
 
     if(TARGET KDDockWidgets::KDDockWidgets)
