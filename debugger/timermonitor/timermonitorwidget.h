@@ -6,12 +6,16 @@
 #include <QComboBox>
 #include <QTimer>
 
-class TimerMonitorWidget : public QWidget
+#include "ui/dockstate.h"
+
+class TimerMonitorWidget : public QWidget, public DockStateSerializable
 {
     Q_OBJECT
 
 public:
     explicit TimerMonitorWidget(QWidget *parent = nullptr);
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 public slots:
     void refresh();

@@ -10,12 +10,16 @@
 #include <QElapsedTimer>
 #include <QVector>
 
-class KeyHistoryWidget : public QWidget
+#include "ui/dockstate.h"
+
+class KeyHistoryWidget : public QWidget, public DockStateSerializable
 {
     Q_OBJECT
 
 public:
     explicit KeyHistoryWidget(QWidget *parent = nullptr);
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 public slots:
     void addEntry(const QString &keyName, bool pressed);

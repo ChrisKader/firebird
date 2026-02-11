@@ -8,6 +8,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QFontDatabase>
+#include <QJsonObject>
 
 #include "core/debug_api.h"
 #include "ui/widgettheme.h"
@@ -244,6 +245,63 @@ MemoryVisualizerWidget::MemoryVisualizerWidget(QWidget *parent)
             refresh();
         }
     });
+}
+
+QJsonObject MemoryVisualizerWidget::serializeState() const
+{
+    QJsonObject state;
+    state.insert(QStringLiteral("baseAddr"), QStringLiteral("%1").arg(m_baseAddr, 8, 16, QLatin1Char('0')));
+    state.insert(QStringLiteral("imageWidth"), m_imgWidth);
+    state.insert(QStringLiteral("imageHeight"), m_imgHeight);
+    state.insert(QStringLiteral("bpp"), m_bpp);
+    state.insert(QStringLiteral("zoom"), m_zoomLevel);
+    if (m_autoRefresh)
+        state.insert(QStringLiteral("autoRefresh"), m_autoRefresh->isChecked());
+    return state;
+}
+
+void MemoryVisualizerWidget::restoreState(const QJsonObject &state)
+{
+    bool ok = false;
+    uint32_t baseAddr = state.value(QStringLiteral("baseAddr")).toString().toUInt(&ok, 16);
+    if (!ok) {
+        const int fallback = state.value(QStringLiteral("baseAddr")).toInt(-1);
+        if (fallback >= 0) {
+            baseAddr = static_cast<uint32_t>(fallback);
+            ok = true;
+        }
+    }
+    if (ok) {
+        m_baseAddr = baseAddr;
+        if (m_addrEdit)
+            m_addrEdit->setText(QStringLiteral("%1").arg(m_baseAddr, 8, 16, QLatin1Char('0')));
+    }
+
+    if (m_widthSpin)
+        m_widthSpin->setValue(state.value(QStringLiteral("imageWidth")).toInt(m_widthSpin->value()));
+    if (m_heightSpin)
+        m_heightSpin->setValue(state.value(QStringLiteral("imageHeight")).toInt(m_heightSpin->value()));
+
+    if (m_bppCombo) {
+        const int bpp = state.value(QStringLiteral("bpp")).toInt(m_bpp);
+        int idx = m_bppCombo->findData(bpp);
+        if (idx < 0)
+            idx = m_bppCombo->currentIndex();
+        m_bppCombo->setCurrentIndex(idx);
+    }
+
+    int zoom = state.value(QStringLiteral("zoom")).toInt(m_zoomLevel);
+    if (zoom < 1)
+        zoom = 1;
+    if (zoom > 8)
+        zoom = 8;
+    m_zoomLevel = zoom;
+    updateZoomLabel();
+
+    if (m_autoRefresh)
+        m_autoRefresh->setChecked(state.value(QStringLiteral("autoRefresh")).toBool(m_autoRefresh->isChecked()));
+
+    refresh();
 }
 
 void MemoryVisualizerWidget::updateZoomLabel()

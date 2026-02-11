@@ -6,12 +6,16 @@
 #include <QComboBox>
 #include <QTimer>
 
-class LCDStateWidget : public QWidget
+#include "ui/dockstate.h"
+
+class LCDStateWidget : public QWidget, public DockStateSerializable
 {
     Q_OBJECT
 
 public:
     explicit LCDStateWidget(QWidget *parent = nullptr);
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
 public slots:
     void refresh();

@@ -7,6 +7,7 @@
 #include <QTextStream>
 #include <QAction>
 #include <QSet>
+#include <QJsonObject>
 
 KeyHistoryWidget::KeyHistoryWidget(QWidget *parent)
     : QWidget(parent)
@@ -72,6 +73,27 @@ KeyHistoryWidget::KeyHistoryWidget(QWidget *parent)
     m_statsLabel = new QLabel(this);
     m_statsLabel->setContentsMargins(4, 2, 4, 2);
     layout->addWidget(m_statsLabel);
+}
+
+QJsonObject KeyHistoryWidget::serializeState() const
+{
+    QJsonObject state;
+    if (m_filterEdit)
+        state.insert(QStringLiteral("filterText"), m_filterEdit->text());
+    if (m_fontSizeSpin)
+        state.insert(QStringLiteral("fontSize"), m_fontSizeSpin->value());
+    return state;
+}
+
+void KeyHistoryWidget::restoreState(const QJsonObject &state)
+{
+    if (m_fontSizeSpin) {
+        const int size = state.value(QStringLiteral("fontSize")).toInt(m_fontSizeSpin->value());
+        if (size >= m_fontSizeSpin->minimum() && size <= m_fontSizeSpin->maximum())
+            m_fontSizeSpin->setValue(size);
+    }
+    if (m_filterEdit)
+        m_filterEdit->setText(state.value(QStringLiteral("filterText")).toString());
 }
 
 void KeyHistoryWidget::addEntry(const QString &keyName, bool pressed)

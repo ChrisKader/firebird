@@ -38,7 +38,7 @@ Changing this order can break persisted layouts because `restoreState` requires 
 - Profiles are stored as JSON files in `AppConfigLocation/layouts/`.
 - Each profile uses the same JSON schema (`windowStateBase64` + dock metadata) as the migration bridge.
 - Profiles also store `debugDockState` for per-widget options (for example disassembly address,
-  register display format, and console filter/history).
+  register display format, console filter/history, refresh rates, and memory-visualizer parameters).
 - The selected profile is persisted (`layoutProfile`) and attempted first during startup before legacy `windowState` fallback.
 
 ## Design notes

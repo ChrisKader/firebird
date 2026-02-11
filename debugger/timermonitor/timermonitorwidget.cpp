@@ -50,6 +50,23 @@ TimerMonitorWidget::TimerMonitorWidget(QWidget *parent)
     layout->addWidget(m_tree);
 }
 
+QJsonObject TimerMonitorWidget::serializeState() const
+{
+    QJsonObject state;
+    if (m_refreshCombo)
+        state.insert(QStringLiteral("refreshIndex"), m_refreshCombo->currentIndex());
+    return state;
+}
+
+void TimerMonitorWidget::restoreState(const QJsonObject &state)
+{
+    if (!m_refreshCombo)
+        return;
+    const int idx = state.value(QStringLiteral("refreshIndex")).toInt(m_refreshCombo->currentIndex());
+    if (idx >= 0 && idx < m_refreshCombo->count())
+        m_refreshCombo->setCurrentIndex(idx);
+}
+
 void TimerMonitorWidget::onAutoRefreshChanged(int index)
 {
     m_refreshTimer->stop();

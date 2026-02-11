@@ -13,14 +13,18 @@
 #include <QImage>
 #include <stdint.h>
 
+#include "ui/dockstate.h"
+
 class LegendWidget;
 
-class MemoryVisualizerWidget : public QWidget
+class MemoryVisualizerWidget : public QWidget, public DockStateSerializable
 {
     Q_OBJECT
 
 public:
     explicit MemoryVisualizerWidget(QWidget *parent = nullptr);
+    QJsonObject serializeState() const override;
+    void restoreState(const QJsonObject &state) override;
 
     enum BPP { BPP_1 = 0, BPP_4, BPP_8, BPP_16_RGB565 };
 
