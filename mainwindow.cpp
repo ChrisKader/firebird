@@ -231,6 +231,20 @@ static void addDockWidgetCompat(QMainWindow *window,
 #endif
 }
 
+static void tabifyDockWidgetCompat(QMainWindow *window, DockWidget *first, DockWidget *second)
+{
+    if (!window || !first || !second)
+        return;
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    if (asKDDMainWindow(window)) {
+        first->addDockWidgetAsTab(second);
+        return;
+    }
+#else
+    window->tabifyDockWidget(first, second);
+#endif
+}
+
 static Qt::DockWidgetArea dockAreaFromString(const QString &name)
 {
     if (name == QLatin1String("left"))
@@ -2752,31 +2766,45 @@ void MainWindow::setUIEditMode(bool e)
 
 void MainWindow::resetDockLayout()
 {
-    /* Reset LCD and Controls docks to RightDockWidgetArea (main area) */
+    /* Core left rail: Screen, Controls, Keypad. */
     if (m_dock_lcd) {
         m_dock_lcd->setFloating(false);
-        addDockWidgetCompat(content_window, m_dock_lcd, Qt::RightDockWidgetArea);
+        addDockWidgetCompat(content_window, m_dock_lcd, Qt::LeftDockWidgetArea);
         m_dock_lcd->setVisible(true);
     }
+
     if (m_dock_controls) {
         m_dock_controls->setFloating(false);
-        addDockWidgetCompat(content_window, m_dock_controls, Qt::RightDockWidgetArea);
+        addDockWidgetCompat(content_window,
+                            m_dock_controls,
+                            m_dock_lcd ? Qt::BottomDockWidgetArea : Qt::LeftDockWidgetArea,
+                            m_dock_lcd);
         m_dock_controls->setVisible(true);
     }
 
     /* Keep the keypad dock visible by default. */
     if (m_dock_keypad) {
         m_dock_keypad->setFloating(false);
-        addDockWidgetCompat(content_window, m_dock_keypad, Qt::RightDockWidgetArea);
+        DockWidget *relative = m_dock_controls ? m_dock_controls : m_dock_lcd;
+        addDockWidgetCompat(content_window,
+                            m_dock_keypad,
+                            relative ? Qt::BottomDockWidgetArea : Qt::LeftDockWidgetArea,
+                            relative);
         m_dock_keypad->setVisible(true);
     }
 
-    /* Utility docks stay optional by default. */
+    /* Utility docks stay optional by default and tab into the left-rail utility slot. */
+    DockWidget *utilityAnchor = m_dock_keypad ? m_dock_keypad : (m_dock_controls ? m_dock_controls : m_dock_lcd);
     for (DockWidget *dw : {m_dock_files, m_dock_nand, m_dock_hwconfig}) {
         if (!dw)
             continue;
         dw->setFloating(false);
-        addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea, nullptr, true);
+        if (utilityAnchor) {
+            addDockWidgetCompat(content_window, dw, Qt::BottomDockWidgetArea, utilityAnchor, true);
+            tabifyDockWidgetCompat(content_window, utilityAnchor, dw);
+        } else {
+            addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea, nullptr, true);
+        }
         dw->setVisible(false);
     }
 

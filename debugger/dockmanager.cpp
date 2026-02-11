@@ -739,8 +739,7 @@ void DebugDockManager::resetLayout()
 
     /* Bottom area groups:
      * - Memory: Memory, Memory Visualizer, MMU Viewer, extra Memory views
-     * - System: Port Monitor, Timer Monitor, LCD State, Cycle Counter
-     * - Debug tools: Console, Breakpoints, Watchpoints, Key History
+     * - Console: Console, Breakpoints, Watchpoints, Port Monitor, Key History, timers/stats
      */
     auto placeGroup = [this](DockWidget *anchor, const QList<DockWidget *> &tabs) -> DockWidget * {
         if (!anchor)
@@ -761,16 +760,12 @@ void DebugDockManager::resetLayout()
     for (DockWidget *extra : m_extraHexDocks)
         memoryTabs.append(extra);
     DockWidget *memoryRoot = placeGroup(m_hexDock, memoryTabs);
-    DockWidget *systemRoot = placeGroup(m_portMonitorDock,
-                                        { m_timerMonitorDock, m_lcdStateDock, m_cycleCounterDock });
     DockWidget *debugToolsRoot = placeGroup(m_consoleDock,
-                                            { m_breakpointDock, m_watchpointDock, m_keyHistoryDock });
+                                            { m_breakpointDock, m_watchpointDock, m_portMonitorDock,
+                                              m_keyHistoryDock, m_timerMonitorDock, m_lcdStateDock,
+                                              m_cycleCounterDock });
 
-    if (memoryRoot && systemRoot)
-        splitDockWidgetCompat(m_host, memoryRoot, systemRoot, Qt::Horizontal);
-    if (systemRoot && debugToolsRoot)
-        splitDockWidgetCompat(m_host, systemRoot, debugToolsRoot, Qt::Horizontal);
-    else if (memoryRoot && debugToolsRoot)
+    if (memoryRoot && debugToolsRoot)
         splitDockWidgetCompat(m_host, memoryRoot, debugToolsRoot, Qt::Horizontal);
 
     if (m_hexDock)
@@ -786,7 +781,6 @@ void DebugDockManager::resetLayout()
     QList<DockWidget *> vTargets;
     QList<int> vSizes;
     if (memoryRoot) { vTargets << memoryRoot; vSizes << 200; }
-    else if (systemRoot) { vTargets << systemRoot; vSizes << 200; }
     else if (debugToolsRoot) { vTargets << debugToolsRoot; vSizes << 200; }
     if (!vTargets.isEmpty())
         resizeDocksCompat(m_host, vTargets, vSizes, Qt::Vertical);
