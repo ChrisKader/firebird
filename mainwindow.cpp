@@ -620,6 +620,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->actionRestart, SIGNAL(triggered()), this, SLOT(restart()));
     connect(ui->actionDebugger, SIGNAL(triggered()), &emu_thread, SLOT(enterDebugger()));
     connect(ui->actionLaunch_IDA, SIGNAL(triggered()), this, SLOT(launchIdaInstantDebugging()));
+    if (ui->actionLaunch_IDA) {
+        ui->actionLaunch_IDA->setToolTip(tr("Experimental: launch IDA and attach to Firebird GDB server"));
+        ui->actionLaunch_IDA->setStatusTip(tr("Experimental feature; not covered by automated tests."));
+    }
     connect(ui->actionConfiguration, SIGNAL(triggered()), this, SLOT(openConfiguration()));
     connect(ui->actionPause, SIGNAL(toggled(bool)), &emu_thread, SLOT(setPaused(bool)));
     connect(ui->buttonSpeed, SIGNAL(clicked(bool)), &emu_thread, SLOT(setTurboMode(bool)));
@@ -1742,7 +1746,8 @@ void MainWindow::launchIdaInstantDebugging()
     if (!proc->waitForStarted())
     {
         QMessageBox::warning(this, tr("Launch failed"),
-                             tr("Failed to launch IDA at %1").arg(ida_path));
+                             tr("Failed to launch IDA at %1 (%2)")
+                                 .arg(ida_path, proc->errorString()));
         proc->deleteLater();
     }
 }
