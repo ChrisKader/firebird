@@ -198,8 +198,8 @@ private:
     QSettings *settings = nullptr;
 
 
-    // Second LCDWidget for use as external window
-    LCDWidget lcd{this, Qt::Window};
+    // Second LCDWidget shown in an optional floating dock
+    LCDWidget lcd{this};
 
     // The about dialog
     FBAboutDialog aboutDialog{this};
@@ -255,6 +255,7 @@ private:
     // LCD and Controls docks (extracted from ui->frame)
     DockWidget *m_dock_lcd = nullptr;
     DockWidget *m_dock_controls = nullptr;
+    DockWidget *m_dock_ext_lcd = nullptr;
 
     // NAND browser & HW config widgets
     NandBrowserWidget *m_nandBrowser = nullptr;

@@ -100,6 +100,7 @@ static const constexpr int WindowStateVersion = 9;
 
 enum class MainDockId {
     LCD,
+    ExternalLCD,
     Controls,
     NandBrowser,
     HwConfig,
@@ -109,6 +110,7 @@ static const char *mainDockObjectName(MainDockId id)
 {
     switch (id) {
     case MainDockId::LCD:         return "dockLCD";
+    case MainDockId::ExternalLCD: return "dockExternalLCD";
     case MainDockId::Controls:    return "dockControls";
     case MainDockId::NandBrowser: return "dockNandBrowser";
     case MainDockId::HwConfig:    return "dockHwConfig";
@@ -888,7 +890,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     connect(ui->actionConnect, SIGNAL(triggered()), this, SLOT(connectUSB()));
     connect(ui->buttonUSB, SIGNAL(clicked(bool)), this, SLOT(connectUSB()));
     connect(ui->actionLCD_Window, SIGNAL(triggered(bool)), this, SLOT(setExtLCD(bool)));
-    connect(&lcd, SIGNAL(closed()), ui->actionLCD_Window, SLOT(toggle()));
     connect(ui->actionXModem, SIGNAL(triggered()), this, SLOT(xmodemSend()));
     connect(ui->actionSwitch_to_Mobile_UI, SIGNAL(triggered()), this, SLOT(switchToMobileUI()));
     connect(ui->actionLeavePTT, &QAction::triggered, the_qml_bridge, &QMLBridge::sendExitPTT);
@@ -1077,8 +1078,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         m_debugDocks->ensureExtraHexDocks(extraHexDocks);
     }
     retranslateDocks();
+    if (m_dock_ext_lcd)
+        m_dock_ext_lcd->restoreGeometry(settings->value(QStringLiteral("extLCDGeometry")).toByteArray());
     setExtLCD(settings->value(QStringLiteral("extLCDVisible")).toBool());
-    lcd.restoreGeometry(settings->value(QStringLiteral("extLCDGeometry")).toByteArray());
     restoreGeometry(settings->value(QStringLiteral("windowGeometry")).toByteArray());
 
     // Restore dock layout.  Try the current version first; on version mismatch
@@ -1409,9 +1411,11 @@ void MainWindow::savePersistentUiState()
     if (!settings)
         return;
 
-    // Save external LCD geometry
-    settings->setValue(QStringLiteral("extLCDGeometry"), lcd.saveGeometry());
-    settings->setValue(QStringLiteral("extLCDVisible"), lcd.isVisible());
+    // Save external LCD dock geometry
+    settings->setValue(QStringLiteral("extLCDGeometry"),
+                       m_dock_ext_lcd ? m_dock_ext_lcd->saveGeometry() : QByteArray());
+    settings->setValue(QStringLiteral("extLCDVisible"),
+                       m_dock_ext_lcd ? m_dock_ext_lcd->isVisible() : false);
 
     // Save MainWindow state and geometry
     QByteArray state = content_window->saveState(WindowStateVersion);
@@ -2082,6 +2086,21 @@ void MainWindow::convertTabsToDocks()
                                      Qt::RightDockWidgetArea,
                                      docks_menu);
 
+    /* External LCD as an optional floating dock (instead of a separate window). */
+    m_dock_ext_lcd = createMainDock(tr("Screen (External)"),
+                                    &lcd,
+                                    QString::fromLatin1(mainDockObjectName(MainDockId::ExternalLCD)),
+                                    Qt::RightDockWidgetArea,
+                                    docks_menu,
+                                    QIcon(),
+                                    false);
+    m_dock_ext_lcd->setFloating(true);
+    m_dock_ext_lcd->hide();
+    connect(m_dock_ext_lcd, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+        if (ui && ui->actionLCD_Window)
+            ui->actionLCD_Window->setChecked(visible);
+    });
+
     /* Add LCD and Controls dock toggle actions to the Docks menu */
     if (m_dock_lcd) {
         docks_menu->addAction(m_dock_lcd->toggleViewAction());
@@ -2320,12 +2339,19 @@ void MainWindow::usblinkChanged(bool state)
 
 void MainWindow::setExtLCD(bool state)
 {
-    if (state)
-        lcd.show();
-    else
-        lcd.hide();
+    if (!m_dock_ext_lcd)
+        return;
 
-    ui->actionLCD_Window->setChecked(state);
+    if (state) {
+        m_dock_ext_lcd->setFloating(true);
+        m_dock_ext_lcd->show();
+        m_dock_ext_lcd->raise();
+    } else {
+        m_dock_ext_lcd->hide();
+    }
+
+    if (ui && ui->actionLCD_Window)
+        ui->actionLCD_Window->setChecked(m_dock_ext_lcd->isVisible());
 }
 
 bool MainWindow::resume()
