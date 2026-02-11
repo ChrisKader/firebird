@@ -49,6 +49,7 @@
 #include <QCloseEvent>
 #include <QDir>
 #include <QFileInfo>
+#include <QDesktopServices>
 
 #include <array>
 #include <utility>
@@ -201,6 +202,120 @@ static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteAr
     }
     root.insert(QStringLiteral("docks"), docks);
     return root;
+}
+
+static QString layoutProfilesDirPath()
+{
+    const QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation);
+    if (configDir.isEmpty())
+        return QString();
+    return configDir + QStringLiteral("/layouts");
+}
+
+static QString layoutProfilePath(const QString &profileName)
+{
+    return layoutProfilesDirPath() + QLatin1Char('/') + profileName + QStringLiteral(".json");
+}
+
+static bool ensureLayoutProfilesDir(QString *errorOut = nullptr)
+{
+    const QString dirPath = layoutProfilesDirPath();
+    if (dirPath.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("layout profile config directory is unavailable");
+        return false;
+    }
+    QDir dir(dirPath);
+    if (dir.exists())
+        return true;
+    if (QDir().mkpath(dirPath))
+        return true;
+    if (errorOut)
+        *errorOut = QStringLiteral("could not create profile directory: %1").arg(dirPath);
+    return false;
+}
+
+static bool saveLayoutProfile(QMainWindow *window, const QString &profileName, int version, QString *errorOut = nullptr)
+{
+    if (!window) {
+        if (errorOut)
+            *errorOut = QStringLiteral("window is null");
+        return false;
+    }
+    if (!ensureLayoutProfilesDir(errorOut))
+        return false;
+
+    const QByteArray state = window->saveState(version);
+    const QJsonObject layoutJson = exportLegacyDockLayoutJson(window, state, version);
+    const QJsonDocument doc(layoutJson);
+
+    const QString filePath = layoutProfilePath(profileName);
+    QFile file(filePath);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (errorOut)
+            *errorOut = QStringLiteral("could not open %1 for write").arg(filePath);
+        return false;
+    }
+    file.write(doc.toJson(QJsonDocument::Indented));
+    file.close();
+    return true;
+}
+
+static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName, int fallbackVersion,
+                                 QString *errorOut = nullptr)
+{
+    if (!window) {
+        if (errorOut)
+            *errorOut = QStringLiteral("window is null");
+        return false;
+    }
+
+    const QString filePath = layoutProfilePath(profileName);
+    QFile file(filePath);
+    if (!file.exists()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("profile does not exist: %1").arg(filePath);
+        return false;
+    }
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (errorOut)
+            *errorOut = QStringLiteral("could not open %1 for read").arg(filePath);
+        return false;
+    }
+
+    QJsonParseError parseError = {};
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &parseError);
+    file.close();
+    if (parseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("invalid JSON in %1").arg(filePath);
+        return false;
+    }
+
+    const QJsonObject root = doc.object();
+    const QString stateBase64 = root.value(QStringLiteral("windowStateBase64")).toString();
+    if (stateBase64.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("windowStateBase64 missing in %1").arg(filePath);
+        return false;
+    }
+
+    const QByteArray state = QByteArray::fromBase64(stateBase64.toLatin1());
+    if (state.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("windowStateBase64 decode failed in %1").arg(filePath);
+        return false;
+    }
+
+    const int profileVersion = root.value(QStringLiteral("windowStateVersion")).toInt(fallbackVersion);
+    for (int version = profileVersion; version >= 1; --version) {
+        if (window->restoreState(state, version))
+            return true;
+    }
+
+    if (errorOut)
+        *errorOut = QStringLiteral("restoreState failed for all versions in %1").arg(filePath);
+    return false;
 }
 
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
@@ -1571,6 +1686,68 @@ void MainWindow::convertTabsToDocks()
     QAction *resetLayoutAction = new QAction(tr("Reset Layout"), this);
     connect(resetLayoutAction, &QAction::triggered, this, &MainWindow::resetDockLayout);
     docks_menu->addAction(resetLayoutAction);
+
+    QMenu *layouts_menu = docks_menu->addMenu(tr("Layouts"));
+
+    const auto saveLayoutProfileAction = [this](const QString &profileName) {
+        QString error;
+        if (!saveLayoutProfile(content_window, profileName, WindowStateVersion, &error)) {
+            QMessageBox::warning(this, tr("Save layout failed"),
+                                 tr("Could not save layout profile '%1': %2")
+                                     .arg(profileName, error));
+            return;
+        }
+        showStatusMsg(tr("Saved layout profile '%1'").arg(profileName));
+    };
+
+    const auto loadLayoutProfileAction = [this](const QString &profileName) {
+        QString error;
+        if (!restoreLayoutProfile(content_window, profileName, WindowStateVersion, &error)) {
+            QMessageBox::warning(this, tr("Load layout failed"),
+                                 tr("Could not load layout profile '%1': %2")
+                                     .arg(profileName, error));
+            return;
+        }
+        if (m_debugDocks)
+            m_debugDocks->refreshIcons();
+        showStatusMsg(tr("Loaded layout profile '%1'").arg(profileName));
+    };
+
+    QAction *loadDefaultLayoutAction = layouts_menu->addAction(tr("Load Default"));
+    QAction *loadDebugLayoutAction = layouts_menu->addAction(tr("Load Debugging"));
+    QAction *loadCustomLayoutAction = layouts_menu->addAction(tr("Load Custom"));
+    layouts_menu->addSeparator();
+    QAction *saveDefaultLayoutAction = layouts_menu->addAction(tr("Save As Default"));
+    QAction *saveDebugLayoutAction = layouts_menu->addAction(tr("Save As Debugging"));
+    QAction *saveCustomLayoutAction = layouts_menu->addAction(tr("Save As Custom"));
+    layouts_menu->addSeparator();
+    QAction *openLayoutFolderAction = layouts_menu->addAction(tr("Open Layout Folder"));
+
+    connect(loadDefaultLayoutAction, &QAction::triggered, this,
+            [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("default")); });
+    connect(loadDebugLayoutAction, &QAction::triggered, this,
+            [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("debugging")); });
+    connect(loadCustomLayoutAction, &QAction::triggered, this,
+            [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("custom")); });
+    connect(saveDefaultLayoutAction, &QAction::triggered, this,
+            [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("default")); });
+    connect(saveDebugLayoutAction, &QAction::triggered, this,
+            [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("debugging")); });
+    connect(saveCustomLayoutAction, &QAction::triggered, this,
+            [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("custom")); });
+    connect(openLayoutFolderAction, &QAction::triggered, this, [this]() {
+        QString error;
+        if (!ensureLayoutProfilesDir(&error)) {
+            QMessageBox::warning(this, tr("Open layout folder failed"),
+                                 tr("Could not open layout folder: %1").arg(error));
+            return;
+        }
+        const QString dirPath = layoutProfilesDirPath();
+        if (!QDesktopServices::openUrl(QUrl::fromLocalFile(dirPath))) {
+            QMessageBox::warning(this, tr("Open layout folder failed"),
+                                 tr("Could not open layout folder: %1").arg(dirPath));
+        }
+    });
 
     docks_menu->addSeparator();
 

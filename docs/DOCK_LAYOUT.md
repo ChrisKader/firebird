@@ -20,6 +20,14 @@ Changing this order can break persisted layouts because `restoreState` requires 
 - Layout state is restored with version fallback from `WindowStateVersion` down to `1`.
 - If restore fails for all versions, default dock layout is applied.
 
+## Layout Profiles
+
+- `Docks -> Layouts` includes profile actions for:
+  - Load: `default`, `debugging`, `custom`
+  - Save as: `default`, `debugging`, `custom`
+- Profiles are stored as JSON files in `AppConfigLocation/layouts/`.
+- Each profile uses the same JSON schema (`windowStateBase64` + dock metadata) as the migration bridge.
+
 ## Design notes
 
 - Docks use stable `objectName` values to preserve persisted layout identity.
