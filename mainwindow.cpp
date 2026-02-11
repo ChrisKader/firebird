@@ -2013,10 +2013,12 @@ void MainWindow::convertTabsToDocks()
 
     QAction *loadDefaultLayoutAction = layouts_menu->addAction(tr("Load Default"));
     QAction *loadDebugLayoutAction = layouts_menu->addAction(tr("Load Debugging"));
+    QAction *loadWidescreenLayoutAction = layouts_menu->addAction(tr("Load Widescreen"));
     QAction *loadCustomLayoutAction = layouts_menu->addAction(tr("Load Custom"));
     layouts_menu->addSeparator();
     QAction *saveDefaultLayoutAction = layouts_menu->addAction(tr("Save As Default"));
     QAction *saveDebugLayoutAction = layouts_menu->addAction(tr("Save As Debugging"));
+    QAction *saveWidescreenLayoutAction = layouts_menu->addAction(tr("Save As Widescreen"));
     QAction *saveCustomLayoutAction = layouts_menu->addAction(tr("Save As Custom"));
     layouts_menu->addSeparator();
     QAction *openLayoutFolderAction = layouts_menu->addAction(tr("Open Layout Folder"));
@@ -2025,12 +2027,16 @@ void MainWindow::convertTabsToDocks()
             [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("default")); });
     connect(loadDebugLayoutAction, &QAction::triggered, this,
             [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("debugging")); });
+    connect(loadWidescreenLayoutAction, &QAction::triggered, this,
+            [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("widescreen")); });
     connect(loadCustomLayoutAction, &QAction::triggered, this,
             [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("custom")); });
     connect(saveDefaultLayoutAction, &QAction::triggered, this,
             [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("default")); });
     connect(saveDebugLayoutAction, &QAction::triggered, this,
             [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("debugging")); });
+    connect(saveWidescreenLayoutAction, &QAction::triggered, this,
+            [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("widescreen")); });
     connect(saveCustomLayoutAction, &QAction::triggered, this,
             [saveLayoutProfileAction]() { saveLayoutProfileAction(QStringLiteral("custom")); });
     connect(openLayoutFolderAction, &QAction::triggered, this, [this]() {

@@ -35,8 +35,8 @@ Changing this order can break persisted layouts because `restoreState` requires 
 ## Layout Profiles
 
 - `Docks -> Layouts` includes profile actions for:
-  - Load: `default`, `debugging`, `custom`
-  - Save as: `default`, `debugging`, `custom`
+  - Load: `default`, `debugging`, `widescreen`, `custom`
+  - Save as: `default`, `debugging`, `widescreen`, `custom`
 - Profiles are stored as JSON files in `AppConfigLocation/layouts/`.
 - Each profile uses the same JSON schema (`windowStateBase64` + dock metadata) as the migration bridge.
 - Profiles also store `debugDockState` for per-widget options (for example disassembly address,
