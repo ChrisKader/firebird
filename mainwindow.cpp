@@ -59,6 +59,7 @@
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/MainWindow.h>
     #include <kddockwidgets/KDDockWidgets.h>
+    #include <kddockwidgets/LayoutSaver.h>
 #endif
 
 #include "core/debug.h"
@@ -87,11 +88,10 @@
 #include "debugger/nandbrowser/nandbrowserwidget.h"
 #include "debugger/hwconfig/hwconfigwidget.h"
 
-// Only bump this for incompatible structural changes (e.g. nested QMainWindow
-// redesign).  Adding/removing individual docks does NOT require a bump --
-// restoreState() gracefully skips missing docks and leaves new ones at their
-// default positions.
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
+// Legacy saveState version kept only for non-KDD fallback builds.
 static const constexpr int WindowStateVersion = 9;
+#endif
 
 enum class MainDockId {
     LCD,
@@ -120,10 +120,12 @@ static constexpr const char *kSettingHwKeypadTypeOverride = "hwKeypadTypeOverrid
 static constexpr const char *kSettingHwBatteryMvOverride = "hwBatteryMvOverride";
 static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOverride";
 static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
+static constexpr const char *kSettingDockLayoutJson = "dockLayoutJson";
 static constexpr const char *kSettingLayoutProfile = "layoutProfile";
 static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
 static constexpr const char *kSettingDockFocusPolicy = "dockFocusPolicy";
-static constexpr const char *kLayoutSchemaQMainWindowV1 = "firebird.qmainwindow.layout.v1";
+static constexpr const char *kLayoutSchemaKDDV1 = "firebird.kdd.layout.v1";
+static constexpr const char *kLayoutSchemaLegacyQMainWindowV1 = "firebird.qmainwindow.layout.v1";
 static constexpr int kMaxLayoutHistoryEntries = 10;
 static constexpr const char *kSettingLayoutMigrationNoticeShown = "layoutMigrationNoticeShown";
 
@@ -219,12 +221,77 @@ static void addDockWidgetCompat(QMainWindow *window,
 #endif
 }
 
-static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteArray &state, int version)
+static Qt::DockWidgetArea dockAreaFromString(const QString &name)
+{
+    if (name == QLatin1String("left"))
+        return Qt::LeftDockWidgetArea;
+    if (name == QLatin1String("right"))
+        return Qt::RightDockWidgetArea;
+    if (name == QLatin1String("top"))
+        return Qt::TopDockWidgetArea;
+    if (name == QLatin1String("bottom"))
+        return Qt::BottomDockWidgetArea;
+    return Qt::RightDockWidgetArea;
+}
+
+static QByteArray serializeDockLayout(QMainWindow *window)
+{
+    if (!window)
+        return QByteArray();
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    if (asKDDMainWindow(window)) {
+        KDDockWidgets::LayoutSaver saver;
+        return saver.serializeLayout();
+    }
+#else
+    return window->saveState(WindowStateVersion);
+#endif
+    return QByteArray();
+}
+
+static bool restoreDockLayout(QMainWindow *window,
+                              const QByteArray &layoutData,
+                              QString *errorOut = nullptr)
+{
+    if (!window) {
+        if (errorOut)
+            *errorOut = QStringLiteral("window is null");
+        return false;
+    }
+    if (layoutData.isEmpty()) {
+        if (errorOut)
+            *errorOut = QStringLiteral("layout data is empty");
+        return false;
+    }
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    if (asKDDMainWindow(window)) {
+        KDDockWidgets::LayoutSaver saver;
+        if (saver.restoreLayout(layoutData))
+            return true;
+        if (errorOut)
+            *errorOut = QStringLiteral("LayoutSaver::restoreLayout failed");
+        return false;
+    }
+#else
+    for (int version = WindowStateVersion; version >= 1; --version) {
+        if (window->restoreState(layoutData, version))
+            return true;
+    }
+    if (errorOut)
+        *errorOut = QStringLiteral("restoreState failed for all supported versions");
+    return false;
+#endif
+    if (errorOut)
+        *errorOut = QStringLiteral("unsupported window type for dock layout restore");
+    return false;
+}
+
+static QJsonObject makeDockLayoutJson(QMainWindow *window)
 {
     QJsonObject root;
-    root.insert(QStringLiteral("schema"), QString::fromLatin1(kLayoutSchemaQMainWindowV1));
-    root.insert(QStringLiteral("windowStateVersion"), version);
-    root.insert(QStringLiteral("windowStateBase64"), QString::fromLatin1(state.toBase64()));
+    root.insert(QStringLiteral("schema"), QString::fromLatin1(kLayoutSchemaKDDV1));
+    root.insert(QStringLiteral("layoutBase64"),
+                QString::fromLatin1(serializeDockLayout(window).toBase64()));
 
     QJsonArray docks;
     if (window) {
@@ -251,37 +318,84 @@ static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteAr
     return root;
 }
 
-static bool extractWindowStateFromLayoutObject(const QJsonObject &root,
-                                               QByteArray *stateOut,
-                                               int *versionOut,
-                                               QString *errorOut = nullptr)
+static bool extractLayoutDataFromObject(const QJsonObject &root,
+                                        QByteArray *layoutOut,
+                                        QString *errorOut = nullptr)
 {
-    const QString schema = root.value(QStringLiteral("schema")).toString();
-    if (!schema.isEmpty() && schema != QLatin1String(kLayoutSchemaQMainWindowV1)) {
+    const QString layoutBase64 = root.value(QStringLiteral("layoutBase64")).toString();
+    if (layoutBase64.isEmpty()) {
         if (errorOut)
-            *errorOut = QStringLiteral("unsupported layout schema: %1").arg(schema);
+            *errorOut = QStringLiteral("layoutBase64 missing");
         return false;
     }
 
-    const QString stateBase64 = root.value(QStringLiteral("windowStateBase64")).toString();
-    if (stateBase64.isEmpty()) {
+    const QByteArray layoutData = QByteArray::fromBase64(layoutBase64.toLatin1());
+    if (layoutData.isEmpty()) {
         if (errorOut)
-            *errorOut = QStringLiteral("windowStateBase64 missing");
+            *errorOut = QStringLiteral("layoutBase64 decode failed");
         return false;
     }
 
-    const QByteArray state = QByteArray::fromBase64(stateBase64.toLatin1());
-    if (state.isEmpty()) {
-        if (errorOut)
-            *errorOut = QStringLiteral("windowStateBase64 decode failed");
-        return false;
-    }
-
-    if (stateOut)
-        *stateOut = state;
-    if (versionOut)
-        *versionOut = root.value(QStringLiteral("windowStateVersion")).toInt(WindowStateVersion);
+    if (layoutOut)
+        *layoutOut = layoutData;
     return true;
+}
+
+static bool restoreLegacyDockHints(QMainWindow *window,
+                                   const QJsonObject &root,
+                                   QString *errorOut = nullptr)
+{
+    if (!window) {
+        if (errorOut)
+            *errorOut = QStringLiteral("window is null");
+        return false;
+    }
+
+    const QJsonArray docks = root.value(QStringLiteral("docks")).toArray();
+    bool restoredAny = false;
+    for (const QJsonValue &value : docks) {
+        if (!value.isObject())
+            continue;
+        const QJsonObject dockState = value.toObject();
+        const QString objectName = dockState.value(QStringLiteral("objectName")).toString();
+        if (objectName.isEmpty())
+            continue;
+
+        DockWidget *dock = window->findChild<DockWidget *>(objectName);
+        if (!dock)
+            continue;
+
+        const bool floating = dockState.value(QStringLiteral("floating")).toBool(false);
+        if (floating) {
+            dock->setFloating(true);
+        } else {
+            dock->setFloating(false);
+            const Qt::DockWidgetArea area =
+                dockAreaFromString(dockState.value(QStringLiteral("area")).toString());
+            addDockWidgetCompat(window, dock, area);
+        }
+
+        const QByteArray geometry = QByteArray::fromBase64(
+            dockState.value(QStringLiteral("geometryBase64")).toString().toLatin1());
+        if (!geometry.isEmpty())
+            dock->restoreGeometry(geometry);
+
+        if (dockState.contains(QStringLiteral("visible")))
+            dock->setVisible(dockState.value(QStringLiteral("visible")).toBool(true));
+
+        const QString title = dockState.value(QStringLiteral("title")).toString();
+        if (!title.isEmpty())
+            dock->setWindowTitle(title);
+
+        restoredAny = true;
+    }
+
+    if (restoredAny)
+        return true;
+
+    if (errorOut)
+        *errorOut = QStringLiteral("legacy layout did not match any current docks");
+    return false;
 }
 
 static QString layoutProfilesDirPath()
@@ -331,7 +445,6 @@ static bool ensureLayoutProfilesDir(QString *errorOut = nullptr)
 
 static bool saveLayoutProfile(QMainWindow *window,
                               const QString &profileName,
-                              int version,
                               const QJsonObject &debugDockState = QJsonObject(),
                               QString *errorOut = nullptr)
 {
@@ -343,8 +456,7 @@ static bool saveLayoutProfile(QMainWindow *window,
     if (!ensureLayoutProfilesDir(errorOut))
         return false;
 
-    const QByteArray state = window->saveState(version);
-    QJsonObject layoutJson = exportLegacyDockLayoutJson(window, state, version);
+    QJsonObject layoutJson = makeDockLayoutJson(window);
     if (!debugDockState.isEmpty())
         layoutJson.insert(QStringLiteral("debugDockState"), debugDockState);
     const QJsonDocument doc(layoutJson);
@@ -361,7 +473,7 @@ static bool saveLayoutProfile(QMainWindow *window,
     return true;
 }
 
-static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName, int fallbackVersion,
+static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName,
                                  QString *errorOut = nullptr,
                                  QJsonObject *debugDockStateOut = nullptr)
 {
@@ -400,25 +512,38 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
     if (debugDockStateOut)
         *debugDockStateOut = root.value(QStringLiteral("debugDockState")).toObject();
 
-    QByteArray state;
-    int profileVersion = fallbackVersion;
-    QString stateParseError;
-    if (!extractWindowStateFromLayoutObject(root, &state, &profileVersion, &stateParseError)) {
-        const QString backupPath = backupCorruptLayoutProfile(filePath);
+    const QString schema = root.value(QStringLiteral("schema")).toString();
+    if (schema == QLatin1String(kLayoutSchemaKDDV1) || root.contains(QStringLiteral("layoutBase64"))) {
+        QByteArray layoutData;
+        QString parseError;
+        if (!extractLayoutDataFromObject(root, &layoutData, &parseError)) {
+            const QString backupPath = backupCorruptLayoutProfile(filePath);
+            if (errorOut)
+                *errorOut = backupPath.isEmpty()
+                        ? QStringLiteral("%1 in %2").arg(parseError, filePath)
+                        : QStringLiteral("%1 in %2 (backup: %3)").arg(parseError, filePath, backupPath);
+            return false;
+        }
+        QString restoreError;
+        if (restoreDockLayout(window, layoutData, &restoreError))
+            return true;
         if (errorOut)
-            *errorOut = backupPath.isEmpty()
-                    ? QStringLiteral("%1 in %2").arg(stateParseError, filePath)
-                    : QStringLiteral("%1 in %2 (backup: %3)").arg(stateParseError, filePath, backupPath);
+            *errorOut = QStringLiteral("%1 in %2").arg(restoreError, filePath);
         return false;
     }
 
-    for (int version = profileVersion; version >= 1; --version) {
-        if (window->restoreState(state, version))
+    if (schema == QLatin1String(kLayoutSchemaLegacyQMainWindowV1) ||
+        root.contains(QStringLiteral("windowStateBase64")) ||
+        root.contains(QStringLiteral("docks"))) {
+        if (restoreLegacyDockHints(window, root, errorOut))
             return true;
+        if (errorOut && errorOut->isEmpty())
+            *errorOut = QStringLiteral("legacy layout restore failed for %1").arg(filePath);
+        return false;
     }
 
     if (errorOut)
-        *errorOut = QStringLiteral("restoreState failed for all versions in %1").arg(filePath);
+        *errorOut = QStringLiteral("unsupported layout schema in %1: %2").arg(filePath, schema);
     return false;
 }
 
@@ -428,10 +553,12 @@ void MainWindow::applyStandardDockFeatures(DockWidget *dw) const
 {
     if (!dw)
         return;
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
     dw->setAllowedAreas(Qt::AllDockWidgetAreas);
     dw->setFeatures(QDockWidget::DockWidgetClosable |
                     QDockWidget::DockWidgetMovable |
                     QDockWidget::DockWidgetFloatable);
+#endif
 }
 
 DockWidget *MainWindow::createMainDock(const QString &title,
@@ -1152,7 +1279,7 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
 
     /* Dock/window initialization order is significant:
      * 1) create all main/debug docks (including dynamic extra hex docks),
-     * 2) restore geometry/window state against those concrete dock objects,
+     * 2) restore geometry/dock layout against those concrete dock objects,
      * 3) apply post-restore links/theme behavior.
      * Reordering these steps can silently break layout restoration. */
     convertTabsToDocks();
@@ -1166,20 +1293,15 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     setExtLCD(settings->value(QStringLiteral("extLCDVisible")).toBool());
     restoreGeometry(settings->value(QStringLiteral("windowGeometry")).toByteArray());
 
-    // Restore dock layout.  Try the current version first; on version mismatch
-    // attempt older versions so the user's layout survives dock additions/removals.
-    // Only fall back to the default layout if nothing works at all.
-    QByteArray savedState = settings->value(QStringLiteral("windowState")).toByteArray();
+    // Restore dock layout from profiles first, then settings fallback.
     bool restored = false;
-    bool restoredFromLegacyWindowState = false;
     bool restoredFromLegacyLayoutJson = false;
     const QString startupProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
     QJsonObject restoredDebugDockState;
     const QString autoProfile = startupProfile.isEmpty() ? QStringLiteral("default") : startupProfile;
     if (!autoProfile.isEmpty()) {
         QString profileError;
-        if (restoreLayoutProfile(content_window, autoProfile, WindowStateVersion,
-                                 &profileError, &restoredDebugDockState)) {
+        if (restoreLayoutProfile(content_window, autoProfile, &profileError, &restoredDebugDockState)) {
             restored = true;
         } else if (!startupProfile.isEmpty()) {
             qDebug("profile restore failed (%s): %s",
@@ -1187,11 +1309,16 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
                    profileError.toUtf8().constData());
         }
     }
-    if (!restored && !savedState.isEmpty()) {
-        for (int v = WindowStateVersion; v >= 1 && !restored; --v)
-            restored = content_window->restoreState(savedState, v);
-        if (restored)
-            restoredFromLegacyWindowState = true;
+    if (!restored) {
+        const QByteArray settingsLayout = QByteArray::fromBase64(
+            settings->value(QString::fromLatin1(kSettingDockLayoutJson)).toByteArray());
+        if (!settingsLayout.isEmpty()) {
+            QString restoreError;
+            restored = restoreDockLayout(content_window, settingsLayout, &restoreError);
+            if (!restored)
+                qDebug("dock layout restore from settings failed: %s",
+                       restoreError.toUtf8().constData());
+        }
     }
     if (!restored) {
         const QString layoutJsonText = settings->value(QString::fromLatin1(kSettingWindowLayoutJson)).toString();
@@ -1199,22 +1326,20 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
             QJsonParseError parseError = {};
             const QJsonDocument doc = QJsonDocument::fromJson(layoutJsonText.toUtf8(), &parseError);
             if (parseError.error == QJsonParseError::NoError && doc.isObject()) {
-                QByteArray stateFromJson;
-                int jsonVersion = WindowStateVersion;
-                if (extractWindowStateFromLayoutObject(doc.object(), &stateFromJson, &jsonVersion)) {
-                    for (int v = jsonVersion; v >= 1 && !restored; --v)
-                        restored = content_window->restoreState(stateFromJson, v);
+                QString legacyError;
+                restored = restoreLegacyDockHints(content_window, doc.object(), &legacyError);
+                if (!restored) {
+                    qDebug("legacy layout restore failed: %s", legacyError.toUtf8().constData());
+                } else {
                     if (restoredDebugDockState.isEmpty())
                         restoredDebugDockState = doc.object().value(QStringLiteral("debugDockState")).toObject();
-                    if (restored)
-                        restoredFromLegacyLayoutJson = true;
+                    restoredFromLegacyLayoutJson = true;
                 }
             }
         }
     }
     if (!restored) {
-        qDebug("restoreState failed (size=%lld) -- applying default layout",
-               (long long)savedState.size());
+        qDebug("dock layout restore failed -- applying default layout");
         resetDockLayout();
     }
 
@@ -1233,12 +1358,12 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     if (!startupProfile.isEmpty() || restored) {
         settings->setValue(QString::fromLatin1(kSettingLayoutProfile), autoProfile);
     }
-    if (restoredFromLegacyWindowState || restoredFromLegacyLayoutJson) {
+    if (restoredFromLegacyLayoutJson) {
         const QJsonObject debugDockState = m_debugDocks ? m_debugDocks->serializeDockStates()
                                                         : QJsonObject();
         QString migrateError;
         bool migrated = false;
-        if (!saveLayoutProfile(content_window, autoProfile, WindowStateVersion, debugDockState, &migrateError)) {
+        if (!saveLayoutProfile(content_window, autoProfile, debugDockState, &migrateError)) {
             qDebug("legacy layout migration to profile '%s' failed: %s",
                    autoProfile.toUtf8().constData(),
                    migrateError.toUtf8().constData());
@@ -1249,11 +1374,6 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
 
         QString backupPath;
         QString backupJson = settings->value(QString::fromLatin1(kSettingWindowLayoutJson)).toString();
-        if (backupJson.isEmpty()) {
-            const QByteArray currentState = content_window->saveState(WindowStateVersion);
-            const QJsonObject backupObj = exportLegacyDockLayoutJson(content_window, currentState, WindowStateVersion);
-            backupJson = QString::fromUtf8(QJsonDocument(backupObj).toJson(QJsonDocument::Indented));
-        }
         if (!backupJson.isEmpty()) {
             QString dirError;
             if (ensureLayoutProfilesDir(&dirError)) {
@@ -1537,11 +1657,12 @@ void MainWindow::savePersistentUiState()
     settings->setValue(QStringLiteral("extLCDVisible"),
                        m_dock_ext_lcd ? m_dock_ext_lcd->isVisible() : false);
 
-    // Save MainWindow state and geometry
-    QByteArray state = content_window->saveState(WindowStateVersion);
-    qDebug("Saving windowState: %lld bytes, ver=%d", (long long)state.size(), WindowStateVersion);
-    settings->setValue(QStringLiteral("windowState"), state);
-    QJsonObject layoutJson = exportLegacyDockLayoutJson(content_window, state, WindowStateVersion);
+    // Save dock layout and geometry
+    const QByteArray layoutData = serializeDockLayout(content_window);
+    qDebug("Saving dock layout: %lld bytes", (long long)layoutData.size());
+    settings->setValue(QString::fromLatin1(kSettingDockLayoutJson),
+                       QString::fromLatin1(layoutData.toBase64()));
+    QJsonObject layoutJson = makeDockLayoutJson(content_window);
     QJsonObject debugDockState;
     if (m_debugDocks) {
         debugDockState = m_debugDocks->serializeDockStates();
@@ -1559,7 +1680,7 @@ void MainWindow::savePersistentUiState()
         activeProfile = QStringLiteral("default");
     settings->setValue(QString::fromLatin1(kSettingLayoutProfile), activeProfile);
     QString profileError;
-    if (!saveLayoutProfile(content_window, activeProfile, WindowStateVersion, debugDockState, &profileError)) {
+    if (!saveLayoutProfile(content_window, activeProfile, debugDockState, &profileError)) {
         qDebug("save layout profile '%s' failed: %s",
                activeProfile.toUtf8().constData(),
                profileError.toUtf8().constData());
@@ -1593,7 +1714,7 @@ void MainWindow::captureLayoutHistorySnapshot()
     if (m_layoutHistoryApplying || !content_window)
         return;
 
-    const QByteArray state = content_window->saveState(WindowStateVersion);
+    const QByteArray state = serializeDockLayout(content_window);
     if (state.isEmpty())
         return;
     if (!m_layoutUndoHistory.isEmpty() && m_layoutUndoHistory.last() == state) {
@@ -1625,9 +1746,7 @@ void MainWindow::undoLayoutChange()
     const QByteArray target = m_layoutUndoHistory.last();
 
     m_layoutHistoryApplying = true;
-    bool restored = false;
-    for (int version = WindowStateVersion; version >= 1 && !restored; --version)
-        restored = content_window->restoreState(target, version);
+    const bool restored = restoreDockLayout(content_window, target);
     m_layoutHistoryApplying = false;
 
     if (restored) {
@@ -1648,9 +1767,7 @@ void MainWindow::redoLayoutChange()
     const QByteArray target = m_layoutRedoHistory.takeLast();
 
     m_layoutHistoryApplying = true;
-    bool restored = false;
-    for (int version = WindowStateVersion; version >= 1 && !restored; --version)
-        restored = content_window->restoreState(target, version);
+    const bool restored = restoreDockLayout(content_window, target);
     m_layoutHistoryApplying = false;
 
     if (restored) {
@@ -2008,7 +2125,7 @@ void MainWindow::convertTabsToDocks()
 {
     /* Legacy name kept for compatibility with existing call sites.
      * This function is the authoritative dock construction routine for
-     * desktop UI mode and runs before restoreState(). */
+     * desktop UI mode and runs before layout restore. */
     /* STEP 1: Build dock-management menu and layout actions. */
     // Create "Docks" menu to make closing and opening docks more intuitive
     QMenu *docks_menu = new QMenu(tr("Docks"), this);
@@ -2043,8 +2160,7 @@ void MainWindow::convertTabsToDocks()
         const QJsonObject debugDockState = m_debugDocks ? m_debugDocks->serializeDockStates()
                                                         : QJsonObject();
         QString error;
-        if (!saveLayoutProfile(content_window, profileName, WindowStateVersion,
-                               debugDockState, &error)) {
+        if (!saveLayoutProfile(content_window, profileName, debugDockState, &error)) {
             QMessageBox::warning(this, tr("Save layout failed"),
                                  tr("Could not save layout profile '%1': %2")
                                      .arg(profileName, error));
@@ -2057,8 +2173,7 @@ void MainWindow::convertTabsToDocks()
     const auto loadLayoutProfileAction = [this](const QString &profileName) {
         QString error;
         QJsonObject debugDockState;
-        if (!restoreLayoutProfile(content_window, profileName, WindowStateVersion,
-                                  &error, &debugDockState)) {
+        if (!restoreLayoutProfile(content_window, profileName, &error, &debugDockState)) {
             QMessageBox::warning(this, tr("Load layout failed"),
                                  tr("Could not load layout profile '%1': %2")
                                      .arg(profileName, error));
