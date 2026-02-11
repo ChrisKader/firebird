@@ -2,15 +2,21 @@
 #define QMLBRIDGE_H
 
 #include <QObject>
+#include <QPointer>
 #include <QtQml>
 
 #include "kitmodel.h"
+
+class EmuThread;
+#ifndef MOBILE_UI
+class MainWindow;
+#endif
 
 class QMLBridge : public QObject
 {
     Q_OBJECT
 public:
-    explicit QMLBridge(QObject *parent = 0);
+    explicit QMLBridge(EmuThread *emuThread, QObject *parent = 0);
     ~QMLBridge();
 
     Q_PROPERTY(unsigned int gdbPort READ getGDBPort WRITE setGDBPort NOTIFY gdbPortChanged)
@@ -132,6 +138,9 @@ public:
     Q_INVOKABLE bool saveDialogSupported();
 
     void setActive(bool b);
+#ifndef MOBILE_UI
+    void setMainWindow(MainWindow *window);
+#endif
 
     void notifyButtonStateChanged(int row, int col, bool state);
     void touchpadStateChanged();
@@ -178,6 +187,7 @@ signals:
 
 private:
     static void usblink_progress_changed(int percent, void *qml_bridge_p);
+    EmuThread &emuThread() const;
 
     int current_kit_id = -1;
     QString fallback_snapshot_path;
@@ -186,9 +196,12 @@ private:
     KitModel kit_model;
     QSettings settings;
     bool is_active = false;
+    EmuThread *m_emuThread = nullptr;
+#ifndef MOBILE_UI
+    QPointer<MainWindow> m_mainWindow;
+#endif
 };
 
-extern QMLBridge *the_qml_bridge;
 QMLBridge *qmlBridgeInstance();
 
 #endif // QMLBRIDGE_H

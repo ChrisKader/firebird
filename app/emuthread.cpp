@@ -19,16 +19,26 @@
 #include "core/emu.h"
 #include "core/usblink_queue.h"
 
-EmuThread emu_thread;
+namespace {
+
+EmuThread *g_emu_thread = nullptr;
+
+EmuThread &requireEmuThread()
+{
+    assert(g_emu_thread != nullptr);
+    return *g_emu_thread;
+}
+
+} // namespace
 
 EmuThread *emuThreadInstance()
 {
-    return &emu_thread;
+    return g_emu_thread;
 }
 
 void gui_do_stuff(bool wait)
 {
-    emu_thread.doStuff(wait);
+    requireEmuThread().doStuff(wait);
 }
 
 void gui_debug_printf(const char *fmt, ...)
@@ -43,14 +53,14 @@ void gui_debug_printf(const char *fmt, ...)
 
 void gui_debug_vprintf(const char *fmt, va_list ap)
 {
-    emu_thread.debugStr(QString::vasprintf(fmt, ap));
+    requireEmuThread().debugStr(QString::vasprintf(fmt, ap));
 }
 
 void gui_nlog_printf(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    emu_thread.nlogStr(QString::vasprintf(fmt, ap));
+    requireEmuThread().nlogStr(QString::vasprintf(fmt, ap));
     va_end(ap);
 }
 
@@ -58,7 +68,7 @@ void gui_status_printf(const char *fmt, ...)
 {
     va_list ap;
     va_start(ap, fmt);
-    emu_thread.statusMsg(QString::vasprintf(fmt, ap));
+    requireEmuThread().statusMsg(QString::vasprintf(fmt, ap));
     va_end(ap);
 }
 
@@ -69,7 +79,7 @@ void gui_perror(const char *msg)
 
 void gui_debugger_entered_or_left(bool entered)
 {
-    emu_thread.debuggerEntered(entered);
+    requireEmuThread().debuggerEntered(entered);
 }
 
 static debug_input_cb debug_callback;
@@ -77,12 +87,12 @@ static debug_input_cb debug_callback;
 void gui_debugger_request_input(debug_input_cb callback)
 {
     debug_callback = callback;
-    emu_thread.debugInputRequested(callback != nullptr);
+    requireEmuThread().debugInputRequested(callback != nullptr);
 }
 
 void gui_putchar(char c)
 {
-    emu_thread.serialChar(c);
+    requireEmuThread().serialChar(c);
 }
 
 int gui_getchar()
@@ -93,42 +103,48 @@ int gui_getchar()
 
 void gui_set_busy(bool busy)
 {
-    emit emu_thread.isBusy(busy);
+    emit requireEmuThread().isBusy(busy);
 }
 
 void gui_show_speed(double d)
 {
-    emit emu_thread.speedChanged(d);
+    emit requireEmuThread().speedChanged(d);
 }
 
 void gui_usblink_changed(bool state)
 {
-    emit emu_thread.usblinkChanged(state);
+    emit requireEmuThread().usblinkChanged(state);
 }
 
 void throttle_timer_off()
 {
-    emu_thread.setTurboMode(true);
+    requireEmuThread().setTurboMode(true);
 }
 
 void throttle_timer_on()
 {
-    emu_thread.setTurboMode(false);
+    requireEmuThread().setTurboMode(false);
 }
 
 void throttle_timer_wait(unsigned int usec)
 {
-    emu_thread.throttleTimerWait(usec);
+    requireEmuThread().throttleTimerWait(usec);
 }
 
 EmuThread::EmuThread(QObject *parent) :
     QThread(parent)
 {
-    // There can only be one instance, this global one.
-    assert(&emu_thread == this);
+    assert(g_emu_thread == nullptr);
+    g_emu_thread = this;
 
     // Set default settings
     debug_on_start = debug_on_warn = false;
+}
+
+EmuThread::~EmuThread()
+{
+    if (g_emu_thread == this)
+        g_emu_thread = nullptr;
 }
 
 //Called occasionally, only way to do something in the same thread the emulator runs in.

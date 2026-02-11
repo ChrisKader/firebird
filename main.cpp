@@ -111,7 +111,8 @@ int main(int argc, char **argv)
 
     migrateSettings();
 
-    QMLBridge qmlBridge;
+    EmuThread emuThread;
+    QMLBridge qmlBridge(&emuThread);
     QQmlEngine::setObjectOwnership(&qmlBridge, QQmlEngine::CppOwnership);
 
     // Register QMLBridge for Keypad<->Emu communication
@@ -124,8 +125,8 @@ int main(int argc, char **argv)
     qmlRegisterType<KitModel>("Firebird.Emu", 1, 0, "KitModel");
 
     #ifndef MOBILE_UI
-        MainWindow mw;
-        setMainWindow(&mw);
+        MainWindow mw(&qmlBridge, &emuThread);
+        qmlBridge.setMainWindow(&mw);
     #else
         QQmlApplicationEngine engine;
         engine.addImportPath(QStringLiteral("qrc:/qml/qml/"));
@@ -151,7 +152,7 @@ int main(int argc, char **argv)
      * if the app exits through a different path (Cmd+Q on macOS, signal,
      * etc.) the thread might still be alive. QThread::~QThread calls
      * abort() if the thread is still running. */
-    emu_thread.stop();
+    emuThread.stop();
 
 #if !defined(NO_TRANSLATION) && defined(IS_IOS_BUILD)
     // New in recent iOS versions: due to some kernel/system bug, if we leave a process

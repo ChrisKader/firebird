@@ -170,14 +170,21 @@ void NandBrowserWidget::openCurrentFlash()
         return;
     }
 
+    EmuThread *emu = emuThreadInstance();
+    if (!emu)
+    {
+        m_infoLabel->setText(tr("Emulator thread unavailable"));
+        return;
+    }
+
     // Check if the emulator is running and needs to be paused.
     // If already paused, skip the delay and don't unpause afterward.
-    bool needsPause = emu_thread.isRunning() && !emu_thread.isPaused();
+    bool needsPause = emu->isRunning() && !emu->isPaused();
 
     if (needsPause)
     {
         m_infoLabel->setText(tr("Pausing emulator..."));
-        emu_thread.setPaused(true);
+        emu->setPaused(true);
     }
     else
     {
@@ -186,10 +193,10 @@ void NandBrowserWidget::openCurrentFlash()
 
     // Defer heavy work so the emu thread has time to reach its pause loop.
     // No delay needed if already paused or not running.
-    QTimer::singleShot(needsPause ? 200 : 0, this, [this, needsPause]() {
+    QTimer::singleShot(needsPause ? 200 : 0, this, [this, needsPause, emu]() {
         doLoad();
         if (needsPause)
-            emu_thread.setPaused(false);
+            emu->setPaused(false);
     });
 }
 
@@ -763,10 +770,17 @@ void NandBrowserWidget::onSearchTriggered()
 
     m_infoLabel->setText(tr("Searching..."));
 
+    EmuThread *emu = emuThreadInstance();
+    if (!emu)
+    {
+        m_infoLabel->setText(tr("Emulator thread unavailable"));
+        return;
+    }
+
     // Pause emulator for consistent reads
-    bool needsPause = emu_thread.isRunning() && !emu_thread.isPaused();
+    bool needsPause = emu->isRunning() && !emu->isPaused();
     if (needsPause)
-        emu_thread.setPaused(true);
+        emu->setPaused(true);
 
     QByteArray needle = query.toUtf8();
     int needleLen = needle.size();
@@ -826,7 +840,7 @@ void NandBrowserWidget::onSearchTriggered()
     }
 
     if (needsPause)
-        emu_thread.setPaused(false);
+        emu->setPaused(false);
 
     m_searchResults->resizeColumnsToContents();
     m_infoLabel->setText(tr("Search: %1 results for \"%2\"%3")

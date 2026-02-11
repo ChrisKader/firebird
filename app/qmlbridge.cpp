@@ -17,21 +17,25 @@
 #include "ui/framebuffer.h"
 #include "ui/keypadbridge.h"
 
-QMLBridge *the_qml_bridge = nullptr;
+namespace {
+QMLBridge *g_qml_bridge = nullptr;
+}
 
 QMLBridge *qmlBridgeInstance()
 {
-    return the_qml_bridge;
+    return g_qml_bridge;
 }
 
-QMLBridge::QMLBridge(QObject *parent) : QObject(parent)
+QMLBridge::QMLBridge(EmuThread *emuThread, QObject *parent) : QObject(parent)
 #ifdef IS_IOS_BUILD
 /* This is needed for iOS, as the app location changes at reinstall */
 , settings(QStandardPaths::writableLocation(QStandardPaths::AppConfigLocation) + QStringLiteral("/firebird.ini"), QSettings::IniFormat)
 #endif
+, m_emuThread(emuThread)
 {
-    assert(the_qml_bridge == nullptr);
-    the_qml_bridge = this;
+    assert(g_qml_bridge == nullptr);
+    assert(m_emuThread != nullptr);
+    g_qml_bridge = this;
 
     //Migrate old settings
     if(settings.contains(QStringLiteral("usbdir")) && !settings.contains(QStringLiteral("usbdirNew")))
@@ -77,7 +81,14 @@ QMLBridge::QMLBridge(QObject *parent) : QObject(parent)
 
 QMLBridge::~QMLBridge()
 {
-    the_qml_bridge = nullptr;
+    if (g_qml_bridge == this)
+        g_qml_bridge = nullptr;
+}
+
+EmuThread &QMLBridge::emuThread() const
+{
+    assert(m_emuThread != nullptr);
+    return *m_emuThread;
 }
 
 unsigned int QMLBridge::getGDBPort()
@@ -267,7 +278,7 @@ void QMLBridge::setUSBDir(QString dir)
 
 bool QMLBridge::getIsRunning()
 {
-    return emu_thread.isRunning();
+    return emuThread().isRunning();
 }
 
 QString QMLBridge::getVersion()
@@ -355,9 +366,14 @@ int QMLBridge::kitIndexForID(unsigned int id)
 #ifndef MOBILE_UI
 void QMLBridge::switchUIMode(bool mobile_ui)
 {
-    MainWindow *window = getMainWindow();
+    MainWindow *window = m_mainWindow.data();
     if (window)
         window->switchUIMode(mobile_ui);
+}
+
+void QMLBridge::setMainWindow(MainWindow *window)
+{
+    m_mainWindow = window;
 }
 #endif
 
@@ -448,15 +464,15 @@ void QMLBridge::setActive(bool b)
 
     if(b)
     {
-        connect(&emu_thread, SIGNAL(speedChanged(double)), this, SLOT(speedChanged(double)), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(turboModeChanged(bool)), this, SIGNAL(turboModeChanged()), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(stopped()), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(started(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(suspended(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(resumed(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(started(bool)), this, SLOT(started(bool)), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(resumed(bool)), this, SLOT(resumed(bool)), Qt::QueuedConnection);
-        connect(&emu_thread, SIGNAL(suspended(bool)), this, SLOT(suspended(bool)), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(speedChanged(double)), this, SLOT(speedChanged(double)), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(turboModeChanged(bool)), this, SIGNAL(turboModeChanged()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(stopped()), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(started(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(suspended(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(resumed(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(started(bool)), this, SLOT(started(bool)), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(resumed(bool)), this, SLOT(resumed(bool)), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(suspended(bool)), this, SLOT(suspended(bool)), Qt::QueuedConnection);
 
         // We might have missed some events.
         turboModeChanged();
@@ -465,15 +481,15 @@ void QMLBridge::setActive(bool b)
     }
     else
     {
-        disconnect(&emu_thread, SIGNAL(speedChanged(double)), this, SLOT(speedChanged(double)));
-        disconnect(&emu_thread, SIGNAL(turboModeChanged(bool)), this, SIGNAL(turboModeChanged()));
-        disconnect(&emu_thread, SIGNAL(stopped()), this, SIGNAL(isRunningChanged()));
-        disconnect(&emu_thread, SIGNAL(started(bool)), this, SIGNAL(isRunningChanged()));
-        disconnect(&emu_thread, SIGNAL(suspended(bool)), this, SIGNAL(isRunningChanged()));
-        disconnect(&emu_thread, SIGNAL(resumed(bool)), this, SIGNAL(isRunningChanged()));
-        disconnect(&emu_thread, SIGNAL(started(bool)), this, SLOT(started(bool)));
-        disconnect(&emu_thread, SIGNAL(resumed(bool)), this, SLOT(resumed(bool)));
-        disconnect(&emu_thread, SIGNAL(suspended(bool)), this, SLOT(suspended(bool)));
+        disconnect(&emuThread(), SIGNAL(speedChanged(double)), this, SLOT(speedChanged(double)));
+        disconnect(&emuThread(), SIGNAL(turboModeChanged(bool)), this, SIGNAL(turboModeChanged()));
+        disconnect(&emuThread(), SIGNAL(stopped()), this, SIGNAL(isRunningChanged()));
+        disconnect(&emuThread(), SIGNAL(started(bool)), this, SIGNAL(isRunningChanged()));
+        disconnect(&emuThread(), SIGNAL(suspended(bool)), this, SIGNAL(isRunningChanged()));
+        disconnect(&emuThread(), SIGNAL(resumed(bool)), this, SIGNAL(isRunningChanged()));
+        disconnect(&emuThread(), SIGNAL(started(bool)), this, SLOT(started(bool)));
+        disconnect(&emuThread(), SIGNAL(resumed(bool)), this, SLOT(resumed(bool)));
+        disconnect(&emuThread(), SIGNAL(suspended(bool)), this, SLOT(suspended(bool)));
     }
 
     is_active = b;
@@ -492,7 +508,7 @@ void QMLBridge::usblink_progress_changed(int percent, void *qml_bridge_p)
 
 void QMLBridge::setTurboMode(bool b)
 {
-    emu_thread.setTurboMode(b);
+    emuThread().setTurboMode(b);
 }
 
 int QMLBridge::getLcdScaleMode()
@@ -552,18 +568,18 @@ void QMLBridge::setMobileHeight(int h)
 
 bool QMLBridge::restart()
 {
-    if(emu_thread.isRunning() && !emu_thread.stop())
+    if(emuThread().isRunning() && !emuThread().stop())
     {
         toastMessage(tr("Could not stop emulation"));
         return false;
     }
 
-    emu_thread.port_gdb = getGDBEnabled() ? getGDBPort() : 0;
-    emu_thread.port_rdbg = getRDBEnabled() ? getRDBPort() : 0;
+    emuThread().port_gdb = getGDBEnabled() ? getGDBPort() : 0;
+    emuThread().port_rdbg = getRDBEnabled() ? getRDBPort() : 0;
 
-    if(!emu_thread.boot1.isEmpty() && !emu_thread.flash.isEmpty()) {
+    if(!emuThread().boot1.isEmpty() && !emuThread().flash.isEmpty()) {
         toastMessage(tr("Starting emulation"));
-        emu_thread.start();
+        emuThread().start();
         return true;
     } else {
         toastMessage(tr("No boot1 or flash selected.\nSwipe keypad left for configuration."));
@@ -573,12 +589,12 @@ bool QMLBridge::restart()
 
 void QMLBridge::setPaused(bool b)
 {
-    emu_thread.setPaused(b);
+    emuThread().setPaused(b);
 }
 
 void QMLBridge::reset()
 {
-    emu_thread.reset();
+    emuThread().reset();
 }
 
 void QMLBridge::suspend()
@@ -586,7 +602,7 @@ void QMLBridge::suspend()
     toastMessage(tr("Suspending emulation"));
     auto snapshot_path = getSnapshotPath();
     if(!snapshot_path.isEmpty())
-        emu_thread.suspend(snapshot_path);
+        emuThread().suspend(snapshot_path);
     else {
         toastMessage(tr("The current kit does not have a snapshot file configured"));
         emit emuSuspended(false);
@@ -597,12 +613,12 @@ void QMLBridge::resume()
 {
     toastMessage(tr("Resuming emulation"));
 
-    emu_thread.port_gdb = getGDBEnabled() ? getGDBPort() : 0;
-    emu_thread.port_rdbg = getRDBEnabled() ? getRDBPort() : 0;
+    emuThread().port_gdb = getGDBEnabled() ? getGDBPort() : 0;
+    emuThread().port_rdbg = getRDBEnabled() ? getRDBPort() : 0;
 
     auto snapshot_path = getSnapshotPath();
     if(!snapshot_path.isEmpty())
-        emu_thread.resume(snapshot_path);
+        emuThread().resume(snapshot_path);
     else
         toastMessage(tr("The current kit does not have a snapshot file configured"));
 }
@@ -640,8 +656,8 @@ const Kit *QMLBridge::useKit(unsigned int id)
         return nullptr;
 
     auto &&kit = kit_model.getKits()[kitIndex];
-    emu_thread.boot1 = kit.boot1;
-    emu_thread.flash = kit.flash;
+    emuThread().boot1 = kit.boot1;
+    emuThread().flash = kit.flash;
     fallback_snapshot_path = kit.snapshot;
 
     return &kit;
@@ -649,7 +665,7 @@ const Kit *QMLBridge::useKit(unsigned int id)
 
 bool QMLBridge::stop()
 {
-    return emu_thread.stop();
+    return emuThread().stop();
 }
 
 bool QMLBridge::saveFlash()
@@ -659,12 +675,12 @@ bool QMLBridge::saveFlash()
 
 QString QMLBridge::getBoot1Path()
 {
-    return emu_thread.boot1;
+    return emuThread().boot1;
 }
 
 QString QMLBridge::getFlashPath()
 {
-    return emu_thread.flash;
+    return emuThread().flash;
 }
 
 QString QMLBridge::getSnapshotPath()

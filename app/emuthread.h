@@ -8,6 +8,7 @@ class EmuThread : public QThread
     Q_OBJECT
 public:
     explicit EmuThread(QObject *parent = 0);
+    ~EmuThread() override;
 
     void doStuff(bool wait);
     void throttleTimerWait(unsigned int usec);
@@ -64,7 +65,6 @@ private:
     std::string debug_input, snapshot_path;
 };
 
-extern EmuThread emu_thread;
 EmuThread *emuThreadInstance();
 
 #endif // EMUTHREAD_H

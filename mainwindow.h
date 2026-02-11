@@ -2,6 +2,7 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QPointer>
 #include <QSettings>
 #include <QLabel>
 #include <QQuickWidget>
@@ -54,7 +55,7 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    explicit MainWindow(QWidget *parent = 0);
+    explicit MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget *parent = 0);
     ~MainWindow();
 
 public slots:
@@ -141,6 +142,9 @@ public:
     void switchUIMode(bool mobile_ui);
 
 private:
+    QMLBridge *qmlBridge() const { return m_qmlBridge.data(); }
+    EmuThread &emuThread() const;
+
     void setActive(bool b);
 
     void suspendToPath(QString path);
@@ -166,7 +170,7 @@ private:
 
     // QMLBridge is used as settings storage,
     // so the settings have to be read from there
-    // and emu_thread configured appropriately.
+    // and EmuThread configured appropriately.
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
     void applyWidgetTheme();
@@ -185,6 +189,8 @@ protected:
 private:
     Ui::MainWindow *ui = nullptr;
     QMainWindow *content_window = nullptr;
+    QPointer<QMLBridge> m_qmlBridge;
+    EmuThread *m_emuThread = nullptr;
 
     QTranslator appTranslator;
 
@@ -273,10 +279,5 @@ private:
     bool m_layoutHistoryApplying = false;
 
 };
-
-// Used as global instance by EmuThread and friends
-extern MainWindow *main_window;
-MainWindow *getMainWindow();
-void setMainWindow(MainWindow *window);
 
 #endif // MAINWINDOW_H
