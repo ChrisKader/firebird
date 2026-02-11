@@ -81,10 +81,24 @@ MainWindow *main_window;
 // default positions.
 static const constexpr int WindowStateVersion = 9;
 
-static constexpr const char *kDockObjectLCD = "dockLCD";
-static constexpr const char *kDockObjectControls = "dockControls";
-static constexpr const char *kDockObjectNandBrowser = "dockNandBrowser";
-static constexpr const char *kDockObjectHwConfig = "dockHwConfig";
+enum class MainDockId {
+    LCD,
+    Controls,
+    NandBrowser,
+    HwConfig,
+};
+
+static const char *mainDockObjectName(MainDockId id)
+{
+    switch (id) {
+    case MainDockId::LCD:         return "dockLCD";
+    case MainDockId::Controls:    return "dockControls";
+    case MainDockId::NandBrowser: return "dockNandBrowser";
+    case MainDockId::HwConfig:    return "dockHwConfig";
+    }
+    return "dockUnknown";
+}
+
 static constexpr const char *kSettingHwBatteryOverride = "hwBatteryOverride";
 static constexpr const char *kSettingHwChargingOverride = "hwChargingOverride";
 static constexpr const char *kSettingHwBrightnessOverride = "hwBrightnessOverride";
@@ -320,7 +334,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     {
         m_dock_lcd = createMainDock(tr("Screen"),
                                     ui->lcdView,
-                                    QString::fromLatin1(kDockObjectLCD),
+                                    QString::fromLatin1(mainDockObjectName(MainDockId::LCD)),
                                     Qt::RightDockWidgetArea);
         connect(ui->lcdView, &LCDWidget::scaleChanged, this, [this](int percent) {
             m_dock_lcd->setWindowTitle(tr("Screen") + QStringLiteral(" (%1%)").arg(percent));
@@ -369,7 +383,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
         m_dock_controls = createMainDock(tr("Controls"),
                                          controlsWidget,
-                                         QString::fromLatin1(kDockObjectControls),
+                                         QString::fromLatin1(mainDockObjectName(MainDockId::Controls)),
                                          Qt::RightDockWidgetArea);
     }
 
@@ -1491,7 +1505,7 @@ void MainWindow::convertTabsToDocks()
     m_nandBrowser = new NandBrowserWidget(content_window);
     m_dock_nand = createMainDock(tr("NAND Browser"),
                                  m_nandBrowser,
-                                 QString::fromLatin1(kDockObjectNandBrowser),
+                                 QString::fromLatin1(mainDockObjectName(MainDockId::NandBrowser)),
                                  Qt::RightDockWidgetArea,
                                  docks_menu);
 
@@ -1499,7 +1513,7 @@ void MainWindow::convertTabsToDocks()
     m_hwConfig = new HwConfigWidget(content_window);
     m_dock_hwconfig = createMainDock(tr("Hardware Config"),
                                      m_hwConfig,
-                                     QString::fromLatin1(kDockObjectHwConfig),
+                                     QString::fromLatin1(mainDockObjectName(MainDockId::HwConfig)),
                                      Qt::RightDockWidgetArea,
                                      docks_menu);
 
