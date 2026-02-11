@@ -14,13 +14,13 @@
 // Miscellaneous hardware modules deemed too trivial to get their own files
 
 /* Hardware configuration overrides (GUI-settable, declared in emu.h) */
-volatile int16_t adc_battery_level_override = -1;
-volatile int8_t  adc_charging_override = -1;
-volatile int16_t lcd_contrast_override = -1;
-volatile int16_t adc_keypad_type_override = -1;
-volatile int battery_mv_override = -1;
-volatile charger_state_t charger_state_override = CHARGER_AUTO;
-volatile int8_t usb_cable_connected_override = -1;
+int16_t adc_battery_level_override = -1;
+int8_t  adc_charging_override = -1;
+int16_t lcd_contrast_override = -1;
+int16_t adc_keypad_type_override = -1;
+int battery_mv_override = -1;
+charger_state_t charger_state_override = CHARGER_AUTO;
+int8_t usb_cable_connected_override = -1;
 
 /* 8FFF0000 */
 void sdramctl_write_word(uint32_t addr, uint32_t value) {

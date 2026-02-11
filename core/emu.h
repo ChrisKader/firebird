@@ -57,11 +57,11 @@ extern bool turbo_mode;
  * -1 = use defaults; >= 0 = override value. */
 /* Live-tuned from UI thread while read by emulation thread.
  * Use the hw_override_* accessors below for atomic load/store semantics. */
-extern volatile int16_t adc_battery_level_override;  /* 0-930 ADC raw value */
-extern volatile int8_t  adc_charging_override;       /* 0 = not charging, 1 = charging */
-extern volatile int16_t lcd_contrast_override;       /* 0-147 */
+extern int16_t adc_battery_level_override;  /* 0-930 ADC raw value */
+extern int8_t  adc_charging_override;       /* 0 = not charging, 1 = charging */
+extern int16_t lcd_contrast_override;       /* 0-147 */
 #define LCD_CONTRAST_MAX 147
-extern volatile int16_t adc_keypad_type_override;    /* -1 = default (73) */
+extern int16_t adc_keypad_type_override;    /* -1 = default (73) */
 
 typedef enum charger_state {
     CHARGER_AUTO = -1,
@@ -70,9 +70,9 @@ typedef enum charger_state {
     CHARGER_CHARGING,
 } charger_state_t;
 
-extern volatile int battery_mv_override;             /* millivolts, -1 = default */
-extern volatile charger_state_t charger_state_override;
-extern volatile int8_t usb_cable_connected_override; /* -1 = follow link state, 0/1 = force */
+extern int battery_mv_override;             /* millivolts, -1 = default */
+extern charger_state_t charger_state_override;
+extern int8_t usb_cable_connected_override; /* -1 = follow link state, 0/1 = force */
 
 static inline int16_t hw_override_get_adc_battery_level(void)
 {
