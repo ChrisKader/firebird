@@ -12,6 +12,7 @@
 #include <QMimeData>
 #include <QDockWidget>
 #include <QHBoxLayout>
+#include <QBoxLayout>
 #include <QShortcut>
 #include <QTimer>
 #include <QKeySequence>
@@ -52,6 +53,7 @@
 #include <QFileInfo>
 #include <QDesktopServices>
 #include <QDateTime>
+#include <QAbstractButton>
 
 #include <array>
 #include <utility>
@@ -124,10 +126,62 @@ static constexpr const char *kSettingDockLayoutJson = "dockLayoutJson";
 static constexpr const char *kSettingLayoutProfile = "layoutProfile";
 static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
 static constexpr const char *kSettingDockFocusPolicy = "dockFocusPolicy";
+static constexpr const char *kSettingGroupCorePanels = "groupCorePanels";
 static constexpr const char *kLayoutSchemaKDDV1 = "firebird.kdd.layout.v1";
 static constexpr const char *kLayoutSchemaLegacyQMainWindowV1 = "firebird.qmainwindow.layout.v1";
 static constexpr int kMaxLayoutHistoryEntries = 10;
 static constexpr const char *kSettingLayoutMigrationNoticeShown = "layoutMigrationNoticeShown";
+
+class AdaptiveControlsWidget : public QWidget
+{
+public:
+    explicit AdaptiveControlsWidget(QWidget *parent = nullptr)
+        : QWidget(parent),
+          m_layout(new QBoxLayout(QBoxLayout::LeftToRight, this))
+    {
+        m_layout->setContentsMargins(4, 2, 4, 2);
+        m_layout->setSpacing(6);
+        m_layout->setAlignment(Qt::AlignCenter);
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+        refreshDirection();
+    }
+
+    void addControl(QWidget *widget)
+    {
+        if (!widget)
+            return;
+        tuneControl(widget);
+        m_layout->addWidget(widget, 0, Qt::AlignCenter);
+        refreshDirection();
+    }
+
+protected:
+    void resizeEvent(QResizeEvent *event) override
+    {
+        QWidget::resizeEvent(event);
+        refreshDirection();
+    }
+
+private:
+    void tuneControl(QWidget *widget)
+    {
+        if (auto *button = qobject_cast<QAbstractButton *>(widget)) {
+            button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+            button->setMinimumHeight(24);
+        }
+    }
+
+    void refreshDirection()
+    {
+        const bool vertical = height() > (width() + width() / 4);
+        m_layout->setDirection(vertical ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
+        m_layout->setAlignment(vertical ? (Qt::AlignTop | Qt::AlignHCenter) : Qt::AlignCenter);
+        setMaximumHeight(vertical ? QWIDGETSIZE_MAX : 64);
+        setMinimumHeight(vertical ? 120 : 34);
+    }
+
+    QBoxLayout *m_layout = nullptr;
+};
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -439,6 +493,34 @@ static QString layoutProfilePath(const QString &profileName)
     return layoutProfilesDirPath() + QLatin1Char('/') + profileName + QStringLiteral(".json");
 }
 
+static bool seedBuiltInLayoutProfile(const QString &profileName, QString *errorOut = nullptr)
+{
+    if (profileName != QLatin1String("default"))
+        return true;
+
+    const QString targetPath = layoutProfilePath(profileName);
+    if (QFile::exists(targetPath))
+        return true;
+
+    QFile builtIn(QStringLiteral(":/layouts/default.json"));
+    if (!builtIn.open(QIODevice::ReadOnly)) {
+        if (errorOut)
+            *errorOut = QStringLiteral("built-in default layout is unavailable");
+        return false;
+    }
+
+    QFile out(targetPath);
+    if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (errorOut)
+            *errorOut = QStringLiteral("could not create %1").arg(targetPath);
+        return false;
+    }
+
+    out.write(builtIn.readAll());
+    out.close();
+    return true;
+}
+
 static QString backupCorruptLayoutProfile(const QString &filePath)
 {
     QFileInfo info(filePath);
@@ -510,6 +592,15 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
             *errorOut = QStringLiteral("window is null");
         return false;
     }
+
+    QString dirError;
+    if (!ensureLayoutProfilesDir(&dirError)) {
+        if (errorOut)
+            *errorOut = dirError;
+        return false;
+    }
+    if (!seedBuiltInLayoutProfile(profileName, errorOut))
+        return false;
 
     const QString filePath = layoutProfilePath(profileName);
     QFile file(filePath);
@@ -748,8 +839,16 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     controlSize.setHeight(qMax(controlSize.height(), ui->buttonReset->sizeHint().height()));
     controlSize.setHeight(qMax(controlSize.height(), ui->buttonScreenshot->sizeHint().height()));
     controlSize.setHeight(qMax(controlSize.height(), ui->buttonUSB->sizeHint().height()));
-    ui->buttonSpeed->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-    ui->buttonSpeed->setFixedSize(controlSize);
+    const QSize compactControlSize(qMax(28, controlSize.width() - 4),
+                                   qMax(24, controlSize.height() - 6));
+    for (QToolButton *button : {ui->buttonPlayPause, ui->buttonReset, ui->buttonScreenshot, ui->buttonUSB}) {
+        if (!button)
+            continue;
+        button->setMinimumSize(compactControlSize);
+        button->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+    }
+    ui->buttonSpeed->setSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum);
+    ui->buttonSpeed->setMinimumSize(compactControlSize);
     applyMaterialGlyphPush(ui->buttonSpeed, 0xE9E4, tr("Toggle turbo mode"));
     ui->buttonSpeed->setCheckable(true);
 
@@ -858,19 +957,15 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
 
     // Extract control buttons from ui->frame into their own dock
     {
-        auto *controlsWidget = new QWidget(content_window);
-        controlsWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
-        auto *controlsLayout = new QHBoxLayout(controlsWidget);
-        controlsLayout->setContentsMargins(4, 2, 4, 2);
-        controlsLayout->setSpacing(8);
-        controlsLayout->setAlignment(Qt::AlignHCenter);
+        auto *controlsWidget = new AdaptiveControlsWidget(content_window);
+        controlsWidget->setMinimumWidth(120);
 
         // Reparent buttons from the .ui frame into this new widget
-        controlsLayout->addWidget(ui->buttonPlayPause);
-        controlsLayout->addWidget(ui->buttonReset);
-        controlsLayout->addWidget(ui->buttonScreenshot);
-        controlsLayout->addWidget(ui->buttonUSB);
-        controlsLayout->addWidget(ui->buttonSpeed);
+        controlsWidget->addControl(ui->buttonPlayPause);
+        controlsWidget->addControl(ui->buttonReset);
+        controlsWidget->addControl(ui->buttonScreenshot);
+        controlsWidget->addControl(ui->buttonUSB);
+        controlsWidget->addControl(ui->buttonSpeed);
 
         // Debug toggle button
         {
@@ -879,7 +974,7 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
             debugBtn->setIconSize(QSize(24, 24));
             debugBtn->setCheckable(true);
             applyMaterialGlyph(debugBtn, 0xE868, tr("Enter debugger"));
-            controlsLayout->addWidget(debugBtn);
+            controlsWidget->addControl(debugBtn);
             debugger_toggle_button = debugBtn;
             debugBtn->setEnabled(ui->actionDebugger->isEnabled());
             connect(ui->actionDebugger, &QAction::changed, debugBtn, [this, debugBtn]() {
@@ -2202,6 +2297,18 @@ void MainWindow::convertTabsToDocks()
 
     docks_menu->addAction(editmode_toggle);
 
+    QAction *groupCorePanelsAction = new QAction(tr("Group Screen/Controls/Keypad"), this);
+    groupCorePanelsAction->setCheckable(true);
+    groupCorePanelsAction->setChecked(settings->value(QString::fromLatin1(kSettingGroupCorePanels), false).toBool());
+    connect(groupCorePanelsAction, &QAction::toggled, this, [this](bool grouped) {
+        settings->setValue(QString::fromLatin1(kSettingGroupCorePanels), grouped);
+        resetDockLayout();
+        showStatusMsg(grouped
+                      ? tr("Core panels grouped")
+                      : tr("Core panels ungrouped"));
+    });
+    docks_menu->addAction(groupCorePanelsAction);
+
     QAction *resetLayoutAction = new QAction(tr("Reset Layout"), this);
     connect(resetLayoutAction, &QAction::triggered, this, &MainWindow::resetDockLayout);
     docks_menu->addAction(resetLayoutAction);
@@ -2315,7 +2422,8 @@ void MainWindow::convertTabsToDocks()
             [loadDefaultLayoutAction, loadDebugLayoutAction,
              loadWidescreenLayoutAction, loadCustomLayoutAction]() {
         loadDefaultLayoutAction->setEnabled(
-            QFile::exists(layoutProfilePath(QStringLiteral("default"))));
+            QFile::exists(layoutProfilePath(QStringLiteral("default"))) ||
+            QFile::exists(QStringLiteral(":/layouts/default.json")));
         loadDebugLayoutAction->setEnabled(
             QFile::exists(layoutProfilePath(QStringLiteral("debugging"))));
         loadWidescreenLayoutAction->setEnabled(
@@ -2800,6 +2908,8 @@ void MainWindow::setUIEditMode(bool e)
 
 void MainWindow::resetDockLayout()
 {
+    const bool groupCorePanels = settings->value(QString::fromLatin1(kSettingGroupCorePanels), false).toBool();
+
     /* Core left rail: Screen, Controls, Keypad. */
     if (m_dock_lcd) {
         m_dock_lcd->setFloating(false);
@@ -2825,6 +2935,12 @@ void MainWindow::resetDockLayout()
                             relative ? Qt::BottomDockWidgetArea : Qt::LeftDockWidgetArea,
                             relative);
         m_dock_keypad->setVisible(true);
+    }
+
+    if (groupCorePanels && m_dock_lcd && m_dock_controls && m_dock_keypad) {
+        tabifyDockWidgetCompat(content_window, m_dock_lcd, m_dock_controls);
+        tabifyDockWidgetCompat(content_window, m_dock_lcd, m_dock_keypad);
+        m_dock_lcd->raise();
     }
 
     /* Utility docks stay optional by default and tab into the left-rail utility slot. */
