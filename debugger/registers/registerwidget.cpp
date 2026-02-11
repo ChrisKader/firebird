@@ -9,6 +9,7 @@
 #include <QMenu>
 #include <QClipboard>
 #include <QApplication>
+#include <QSignalBlocker>
 
 #include "core/debug_api.h"
 #include "ui/widgettheme.h"
@@ -292,16 +293,17 @@ QJsonObject RegisterWidget::serializeState() const
 void RegisterWidget::restoreState(const QJsonObject &state)
 {
     if (m_formatCombo) {
+        const QSignalBlocker block(*m_formatCombo);
         const int idx = state.value(QStringLiteral("displayFormat")).toInt(m_formatCombo->currentIndex());
         if (idx >= 0 && idx < m_formatCombo->count())
             m_formatCombo->setCurrentIndex(idx);
     }
     if (m_modeCombo) {
+        const QSignalBlocker block(*m_modeCombo);
         const int idx = state.value(QStringLiteral("modeIndex")).toInt(m_modeCombo->currentIndex());
         if (idx >= 0 && idx < m_modeCombo->count())
             m_modeCombo->setCurrentIndex(idx);
     }
-    refresh();
 }
 
 void RegisterWidget::refreshCP15()
