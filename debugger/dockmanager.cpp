@@ -311,6 +311,7 @@ void DebugDockManager::addHexViewDock()
     }
 
     m_extraHexWidgets.append(widget);
+    m_extraHexDocks.append(dw);
 }
 
 void DebugDockManager::ensureExtraHexDocks(int count)
@@ -346,14 +347,17 @@ void DebugDockManager::refreshIcons()
 
 void DebugDockManager::refreshAll()
 {
-    auto refreshNow = [](auto *widget) {
-        if (widget)
+    auto refreshNow = [](auto *widget, bool enabled = true) {
+        if (widget && enabled)
             widget->refresh();
+    };
+    auto dockVisible = [](DockWidget *dock) {
+        return dock && dock->isVisible();
     };
 
     /* Refresh high-priority widgets immediately (disassembly, registers). */
-    refreshNow(m_disasmWidget);
-    refreshNow(m_registerWidget);
+    refreshNow(m_disasmWidget, dockVisible(m_disasmDock));
+    refreshNow(m_registerWidget, dockVisible(m_registerDock));
 
     /* Stagger remaining widgets across separate event-loop iterations
      * so no single callback blocks the UI for too long.  Each widget
@@ -364,18 +368,22 @@ void DebugDockManager::refreshAll()
 
     /* Lightweight widgets first (tables with few rows, no MMIO reads). */
     defer(0, [this]() {
-        if (m_breakpointWidget)
+        if (m_breakpointWidget && m_breakpointDock && m_breakpointDock->isVisible())
             m_breakpointWidget->refresh();
-        if (m_watchpointWidget)
+        if (m_watchpointWidget && m_watchpointDock && m_watchpointDock->isVisible())
             m_watchpointWidget->refresh();
     });
 
     defer(0, [this]() {
-        if (m_hexWidget)
+        if (m_hexWidget && m_hexDock && m_hexDock->isVisible())
             m_hexWidget->refresh();
-        for (HexViewWidget *hw : m_extraHexWidgets)
-            if (hw)
+        const int n = qMin(m_extraHexWidgets.size(), m_extraHexDocks.size());
+        for (int i = 0; i < n; i++) {
+            HexViewWidget *hw = m_extraHexWidgets.at(i);
+            DockWidget *dock = m_extraHexDocks.at(i);
+            if (hw && dock && dock->isVisible())
                 hw->refresh();
+        }
     });
 
     /* Heavier widgets each get their own iteration. */
@@ -385,13 +393,18 @@ void DebugDockManager::refreshAll()
                 widget->refresh();
         });
     };
-    deferRefresh(m_stackWidget);
-    deferRefresh(m_portMonitorWidget);
-    deferRefresh(m_timerMonitorWidget);
-    deferRefresh(m_lcdStateWidget);
-    deferRefresh(m_mmuViewerWidget);
-    deferRefresh(m_memVisWidget);
-    deferRefresh(m_cycleCounterWidget);
+    const auto deferRefreshIfVisible = [&](auto *widget, DockWidget *dock) {
+        if (!dock || !dock->isVisible())
+            return;
+        deferRefresh(widget);
+    };
+    deferRefreshIfVisible(m_stackWidget, m_stackDock);
+    deferRefreshIfVisible(m_portMonitorWidget, m_portMonitorDock);
+    deferRefreshIfVisible(m_timerMonitorWidget, m_timerMonitorDock);
+    deferRefreshIfVisible(m_lcdStateWidget, m_lcdStateDock);
+    deferRefreshIfVisible(m_mmuViewerWidget, m_mmuViewerDock);
+    deferRefreshIfVisible(m_memVisWidget, m_memVisDock);
+    deferRefreshIfVisible(m_cycleCounterWidget, m_cycleCounterDock);
 }
 
 void DebugDockManager::retranslate()

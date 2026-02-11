@@ -88,6 +88,7 @@ private:
 
     QSet<DockWidget *> m_autoShownDocks;
     QList<HexViewWidget *> m_extraHexWidgets;
+    QList<DockWidget *> m_extraHexDocks;
     QMenu *m_docksMenu = nullptr;
     int m_hexViewCount = 1;
 };
