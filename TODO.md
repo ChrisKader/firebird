@@ -1,3 +1,9 @@
+##On-going:
+* KDDocks Migration.
+
+##UI:
+* Make Battery State emulation actually work.
+
 ##CX II:
 * Check other aladdin PMU bits
 * Refactor flash code, split controllers and image manipulation?
