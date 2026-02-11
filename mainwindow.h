@@ -31,6 +31,7 @@ class MainWindow;
 class QResizeEvent;
 class QToolButton;
 class QTableWidget;
+class QDockWidget;
 class QQuickWidgetLessBroken : public QQuickWidget
 {
     Q_OBJECT
@@ -159,6 +160,7 @@ private:
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
     void applyWidgetTheme();
+    void applyStandardDockFeatures(QDockWidget *dw) const;
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

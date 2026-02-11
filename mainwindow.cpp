@@ -47,6 +47,9 @@
 #include <QDir>
 #include <QFileInfo>
 
+#include <array>
+#include <utility>
+
 #include "core/debug.h"
 #include "core/emu.h"
 #include "core/flash.h"
@@ -78,8 +81,22 @@ MainWindow *main_window;
 // default positions.
 static const constexpr int WindowStateVersion = 9;
 
+static constexpr const char *kDockObjectLCD = "dockLCD";
+static constexpr const char *kDockObjectControls = "dockControls";
+static constexpr const char *kDockObjectNandBrowser = "dockNandBrowser";
+static constexpr const char *kDockObjectHwConfig = "dockHwConfig";
+
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
 
+void MainWindow::applyStandardDockFeatures(QDockWidget *dw) const
+{
+    if (!dw)
+        return;
+    dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+    dw->setFeatures(QDockWidget::DockWidgetClosable |
+                    QDockWidget::DockWidgetMovable |
+                    QDockWidget::DockWidgetFloatable);
+}
 
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
@@ -269,10 +286,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
     // Extract LCDWidget from ui->frame into its own dock
     {
         m_dock_lcd = new DockWidget(tr("Screen"), content_window);
-        m_dock_lcd->setObjectName(QStringLiteral("dockLCD"));
+        m_dock_lcd->setObjectName(QString::fromLatin1(kDockObjectLCD));
         m_dock_lcd->hideTitlebar(true);
-        m_dock_lcd->setAllowedAreas(Qt::AllDockWidgetAreas);
-        m_dock_lcd->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        applyStandardDockFeatures(m_dock_lcd);
         m_dock_lcd->setWidget(ui->lcdView);
         content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_lcd);
         connect(ui->lcdView, &LCDWidget::scaleChanged, this, [this](int percent) {
@@ -321,10 +337,9 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         }
 
         m_dock_controls = new DockWidget(tr("Controls"), content_window);
-        m_dock_controls->setObjectName(QStringLiteral("dockControls"));
+        m_dock_controls->setObjectName(QString::fromLatin1(kDockObjectControls));
         m_dock_controls->hideTitlebar(true);
-        m_dock_controls->setAllowedAreas(Qt::AllDockWidgetAreas);
-        m_dock_controls->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        applyStandardDockFeatures(m_dock_controls);
         m_dock_controls->setWidget(controlsWidget);
         content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_controls);
     }
@@ -748,7 +763,11 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         fp->setChecked(focus_pause_enabled);
     }
 
-    // Load settings
+    /* Dock/window initialization order is significant:
+     * 1) create all main/debug docks (including dynamic extra hex docks),
+     * 2) restore geometry/window state against those concrete dock objects,
+     * 3) apply post-restore links/theme behavior.
+     * Reordering these steps can silently break layout restoration. */
     convertTabsToDocks();
     if (m_debugDocks) {
         const int extraHexDocks = qMax(0, settings->value(QStringLiteral("debugExtraHexDockCount"), 0).toInt());
@@ -1032,12 +1051,16 @@ void MainWindow::savePersistentUiState()
     settings->setValue(QStringLiteral("lcdKeypadLinked"), m_lcdKeypadLinked);
 
     // Save HW config overrides
-    settings->setValue(QStringLiteral("hwBatteryOverride"), (int)adc_battery_level_override);
-    settings->setValue(QStringLiteral("hwChargingOverride"), (int)adc_charging_override);
-    settings->setValue(QStringLiteral("hwBrightnessOverride"), (int)lcd_contrast_override);
-    settings->setValue(QStringLiteral("hwKeypadTypeOverride"), (int)adc_keypad_type_override);
-    settings->setValue(QStringLiteral("hwBatteryMvOverride"), battery_mv_override);
-    settings->setValue(QStringLiteral("hwChargerStateOverride"), (int)charger_state_override);
+    const std::array<std::pair<const char *, int>, 6> hwOverrides = {{
+        { "hwBatteryOverride", static_cast<int>(adc_battery_level_override) },
+        { "hwChargingOverride", static_cast<int>(adc_charging_override) },
+        { "hwBrightnessOverride", static_cast<int>(lcd_contrast_override) },
+        { "hwKeypadTypeOverride", static_cast<int>(adc_keypad_type_override) },
+        { "hwBatteryMvOverride", battery_mv_override },
+        { "hwChargerStateOverride", static_cast<int>(charger_state_override) },
+    }};
+    for (const auto &entry : hwOverrides)
+        settings->setValue(QString::fromLatin1(entry.first), entry.second);
 
     settings->sync();
 }
@@ -1368,6 +1391,9 @@ void MainWindow::updateUIActionState(bool emulation_running)
 
 void MainWindow::convertTabsToDocks()
 {
+    /* Legacy name kept for compatibility with existing call sites.
+     * This function is the authoritative dock construction routine for
+     * desktop UI mode and runs before restoreState(). */
     // Create "Docks" menu to make closing and opening docks more intuitive
     QMenu *docks_menu = new QMenu(tr("Docks"), this);
     ui->menubar->insertMenu(ui->menuAbout->menuAction(), docks_menu);
@@ -1405,8 +1431,7 @@ void MainWindow::convertTabsToDocks()
         dw->setWindowIcon(tab_icon);
         // objectName must be a stable, untranslated identifier for saveState/restoreState
         dw->setObjectName(tab->objectName());
-        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-        dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
+        applyStandardDockFeatures(dw);
 
         // Fill "Docks" menu
         QAction *action = dw->toggleViewAction();
@@ -1421,7 +1446,7 @@ void MainWindow::convertTabsToDocks()
     DockWidget *dock_files = nullptr;
     DockWidget *dock_keypad = nullptr;
 
-    /* Place converted docks in the left area as regular Qt docks. */
+    /* Place converted legacy tab pages as regular docks (no dedicated sidebar column). */
     for (const auto &pair : dock_pairs)
     {
         QWidget *tab = pair.tab;
@@ -1430,40 +1455,33 @@ void MainWindow::convertTabsToDocks()
         if (tab == ui->tabFiles)         dock_files = dw;
         else if (tab == ui->tab)         dock_keypad = dw;
 
-        content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+        content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
     }
 
-    /* Store sidebar dock pointers for activity bar wiring */
+    /* Keep pointers for layout reset/re-link behavior. */
     m_dock_files = dock_files;
     m_dock_keypad = dock_keypad;
 
-    /* Create NAND Browser dock */
-    {
-        m_nandBrowser = new NandBrowserWidget(content_window);
-        auto *dw = new DockWidget(tr("NAND Browser"), content_window);
+    auto createStandardDock = [this, docks_menu](const QString &title,
+                                                 const char *objectName,
+                                                 QWidget *widget) -> DockWidget * {
+        auto *dw = new DockWidget(title, content_window);
         dw->hideTitlebar(true);
-        dw->setObjectName(QStringLiteral("dockNandBrowser"));
-        dw->setWidget(m_nandBrowser);
-        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-        dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
-        content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+        dw->setObjectName(QString::fromLatin1(objectName));
+        dw->setWidget(widget);
+        applyStandardDockFeatures(dw);
+        content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
         docks_menu->addAction(dw->toggleViewAction());
-        m_dock_nand = dw;
-    }
+        return dw;
+    };
+
+    /* Create NAND Browser dock */
+    m_nandBrowser = new NandBrowserWidget(content_window);
+    m_dock_nand = createStandardDock(tr("NAND Browser"), kDockObjectNandBrowser, m_nandBrowser);
 
     /* Create Hardware Configuration dock */
-    {
-        m_hwConfig = new HwConfigWidget(content_window);
-        auto *dw = new DockWidget(tr("Hardware Config"), content_window);
-        dw->hideTitlebar(true);
-        dw->setObjectName(QStringLiteral("dockHwConfig"));
-        dw->setWidget(m_hwConfig);
-        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-        dw->setFeatures(QDockWidget::DockWidgetClosable | QDockWidget::DockWidgetMovable | QDockWidget::DockWidgetFloatable);
-        content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
-        docks_menu->addAction(dw->toggleViewAction());
-        m_dock_hwconfig = dw;
-    }
+    m_hwConfig = new HwConfigWidget(content_window);
+    m_dock_hwconfig = createStandardDock(tr("Hardware Config"), kDockObjectHwConfig, m_hwConfig);
 
     /* Add LCD and Controls dock toggle actions to the Docks menu */
     if (m_dock_lcd) {
@@ -1472,16 +1490,6 @@ void MainWindow::convertTabsToDocks()
     if (m_dock_controls) {
         docks_menu->addAction(m_dock_controls->toggleViewAction());
     }
-
-    /* Group file/keypad/NAND/HW config as regular left-area tabs. */
-    if (m_dock_files && m_dock_keypad)
-        content_window->tabifyDockWidget(m_dock_files, m_dock_keypad);
-    if (m_dock_files && m_dock_nand)
-        content_window->tabifyDockWidget(m_dock_files, m_dock_nand);
-    if (m_dock_files && m_dock_hwconfig)
-        content_window->tabifyDockWidget(m_dock_files, m_dock_hwconfig);
-    if (m_dock_files)
-        m_dock_files->raise();
 
     /* -- LCD/Keypad Link ---------------------------------------- */
     if (m_dock_keypad) {
@@ -1497,11 +1505,7 @@ void MainWindow::convertTabsToDocks()
         });
     }
 
-    // Hint Qt about corner preferences so the left/bottom docks stay grouped, keeping the LCD central.
-    content_window->setCorner(Qt::TopLeftCorner, Qt::LeftDockWidgetArea);
-    content_window->setCorner(Qt::BottomLeftCorner, Qt::LeftDockWidgetArea);
-    content_window->setCorner(Qt::TopRightCorner, Qt::RightDockWidgetArea);
-    content_window->setCorner(Qt::BottomRightCorner, Qt::RightDockWidgetArea);
+    // Keep default corner behavior so all docks behave like regular Qt docks.
 
     /* Create the CEmu-style debugger docks via DebugDockManager */
     m_debugDocks = new DebugDockManager(content_window, material_icon_font, this);
@@ -1735,6 +1739,9 @@ void MainWindow::suspendToFile()
 
 static QString stateSlotPath(int slot)
 {
+    /* Slots 1..9 live next to the active kit snapshot when available.
+     * If no kit snapshot is configured, fall back to app data storage so
+     * quick-save/load still works for ad-hoc sessions. */
     QString snapshot_path = the_qml_bridge ? the_qml_bridge->getSnapshotPath() : QString();
     QString dir;
     if (!snapshot_path.isEmpty())
@@ -1800,26 +1807,17 @@ void MainWindow::resetDockLayout()
         m_dock_controls->setVisible(true);
     }
 
-    /* Reset file/keypad/NAND/HW config docks as regular left-area tabs. */
+    /* Reset file/keypad/NAND/HW config docks as regular docks. */
     for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
                             static_cast<QDockWidget*>(m_dock_keypad),
                             static_cast<QDockWidget*>(m_dock_nand),
                             static_cast<QDockWidget*>(m_dock_hwconfig)}) {
         if (dw) {
             dw->setFloating(false);
-            content_window->addDockWidget(Qt::LeftDockWidgetArea, dw);
+            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
             dw->setVisible(true);
         }
     }
-
-    if (m_dock_files && m_dock_keypad)
-        content_window->tabifyDockWidget(m_dock_files, m_dock_keypad);
-    if (m_dock_files && m_dock_nand)
-        content_window->tabifyDockWidget(m_dock_files, m_dock_nand);
-    if (m_dock_files && m_dock_hwconfig)
-        content_window->tabifyDockWidget(m_dock_files, m_dock_hwconfig);
-    if (m_dock_files)
-        m_dock_files->raise();
 
     if (m_debugDocks) m_debugDocks->resetLayout();
 }

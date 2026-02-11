@@ -26,6 +26,58 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
+namespace {
+
+enum class DebugDockId {
+    Disasm,
+    Registers,
+    Stack,
+    Memory,
+    Breakpoints,
+    Watchpoints,
+    PortMonitor,
+    KeyHistory,
+    Console,
+    MemVis,
+    CycleCounter,
+    TimerMonitor,
+    LCDState,
+    MMUViewer,
+};
+
+const char *dockObjectName(DebugDockId id)
+{
+    switch (id) {
+    case DebugDockId::Disasm:       return "dockDisasm";
+    case DebugDockId::Registers:    return "dockRegisters";
+    case DebugDockId::Stack:        return "dockStack";
+    case DebugDockId::Memory:       return "dockMemory";
+    case DebugDockId::Breakpoints:  return "dockBreakpoints";
+    case DebugDockId::Watchpoints:  return "dockWatchpoints";
+    case DebugDockId::PortMonitor:  return "dockPortMonitor";
+    case DebugDockId::KeyHistory:   return "dockKeyHistory";
+    case DebugDockId::Console:      return "dockConsole";
+    case DebugDockId::MemVis:       return "dockMemVis";
+    case DebugDockId::CycleCounter: return "dockCycleCounter";
+    case DebugDockId::TimerMonitor: return "dockTimerMonitor";
+    case DebugDockId::LCDState:     return "dockLCDState";
+    case DebugDockId::MMUViewer:    return "dockMMUViewer";
+    }
+    return "dockUnknown";
+}
+
+void applyStandardDockFeatures(QDockWidget *dw)
+{
+    if (!dw)
+        return;
+    dw->setAllowedAreas(Qt::AllDockWidgetAreas);
+    dw->setFeatures(QDockWidget::DockWidgetClosable |
+                    QDockWidget::DockWidgetMovable |
+                    QDockWidget::DockWidgetFloatable);
+}
+
+} // namespace
+
 DebugDockManager::DebugDockManager(QMainWindow *host, const QFont &iconFont,
                                    QObject *parent)
     : QObject(parent), m_host(host), m_iconFont(iconFont)
@@ -34,16 +86,13 @@ DebugDockManager::DebugDockManager(QMainWindow *host, const QFont &iconFont,
 
 void DebugDockManager::createDocks(QMenu *docksMenu)
 {
-    auto makeDock = [&](const QString &title, QWidget *widget, const QString &objName,
+    auto makeDock = [&](const QString &title, QWidget *widget, DebugDockId id,
                         Qt::DockWidgetArea area) -> DockWidget * {
         auto *dw = new DockWidget(title, m_host);
         dw->hideTitlebar(true);
-        dw->setObjectName(objName);
+        dw->setObjectName(QString::fromLatin1(dockObjectName(id)));
         dw->setWidget(widget);
-        dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-        dw->setFeatures(QDockWidget::DockWidgetClosable |
-                        QDockWidget::DockWidgetMovable |
-                        QDockWidget::DockWidgetFloatable);
+        applyStandardDockFeatures(dw);
         m_host->addDockWidget(area, dw);
 
         QAction *action = dw->toggleViewAction();
@@ -74,39 +123,39 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     docksMenu->addSeparator();
 
     m_disasmDock = makeDock(tr("Disassembly"), m_disasmWidget,
-                            QStringLiteral("dockDisasm"), Qt::RightDockWidgetArea);
+                            DebugDockId::Disasm, Qt::RightDockWidgetArea);
     m_registerDock = makeDock(tr("Registers"), m_registerWidget,
-                              QStringLiteral("dockRegisters"), Qt::RightDockWidgetArea);
+                              DebugDockId::Registers, Qt::RightDockWidgetArea);
     m_stackDock = makeDock(tr("Stack"), m_stackWidget,
-                            QStringLiteral("dockStack"), Qt::RightDockWidgetArea);
+                           DebugDockId::Stack, Qt::RightDockWidgetArea);
 
     /* Tab Registers and Stack together */
     m_host->tabifyDockWidget(m_registerDock, m_stackDock);
     m_registerDock->raise();
 
     m_hexDock = makeDock(tr("Memory"), m_hexWidget,
-                         QStringLiteral("dockMemory"), Qt::BottomDockWidgetArea);
+                         DebugDockId::Memory, Qt::BottomDockWidgetArea);
     m_breakpointDock = makeDock(tr("Breakpoints"), m_breakpointWidget,
-                                QStringLiteral("dockBreakpoints"), Qt::BottomDockWidgetArea);
+                                DebugDockId::Breakpoints, Qt::BottomDockWidgetArea);
     m_watchpointDock = makeDock(tr("Watchpoints"), m_watchpointWidget,
-                                QStringLiteral("dockWatchpoints"), Qt::BottomDockWidgetArea);
+                                DebugDockId::Watchpoints, Qt::BottomDockWidgetArea);
     m_portMonitorDock = makeDock(tr("Port Monitor"), m_portMonitorWidget,
-                                 QStringLiteral("dockPortMonitor"), Qt::BottomDockWidgetArea);
+                                 DebugDockId::PortMonitor, Qt::BottomDockWidgetArea);
     m_keyHistoryDock = makeDock(tr("Key History"), m_keyHistoryWidget,
-                                QStringLiteral("dockKeyHistory"), Qt::BottomDockWidgetArea);
+                                DebugDockId::KeyHistory, Qt::BottomDockWidgetArea);
 
     m_consoleDock = makeDock(tr("Console"), m_consoleWidget,
-                              QStringLiteral("dockConsole"), Qt::BottomDockWidgetArea);
+                             DebugDockId::Console, Qt::BottomDockWidgetArea);
     m_memVisDock = makeDock(tr("Memory Visualizer"), m_memVisWidget,
-                             QStringLiteral("dockMemVis"), Qt::BottomDockWidgetArea);
+                            DebugDockId::MemVis, Qt::BottomDockWidgetArea);
     m_cycleCounterDock = makeDock(tr("Cycle Counter"), m_cycleCounterWidget,
-                                   QStringLiteral("dockCycleCounter"), Qt::BottomDockWidgetArea);
+                                  DebugDockId::CycleCounter, Qt::BottomDockWidgetArea);
     m_timerMonitorDock = makeDock(tr("Timer Monitor"), m_timerMonitorWidget,
-                                   QStringLiteral("dockTimerMonitor"), Qt::BottomDockWidgetArea);
+                                  DebugDockId::TimerMonitor, Qt::BottomDockWidgetArea);
     m_lcdStateDock = makeDock(tr("LCD State"), m_lcdStateWidget,
-                               QStringLiteral("dockLCDState"), Qt::BottomDockWidgetArea);
+                              DebugDockId::LCDState, Qt::BottomDockWidgetArea);
     m_mmuViewerDock = makeDock(tr("MMU Viewer"), m_mmuViewerWidget,
-                                QStringLiteral("dockMMUViewer"), Qt::BottomDockWidgetArea);
+                               DebugDockId::MMUViewer, Qt::BottomDockWidgetArea);
 
     /* Set Material icons on toggle actions */
     refreshIcons();
@@ -249,10 +298,7 @@ void DebugDockManager::addHexViewDock()
     dw->hideTitlebar(true);
     dw->setObjectName(objName);
     dw->setWidget(widget);
-    dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-    dw->setFeatures(QDockWidget::DockWidgetClosable |
-                    QDockWidget::DockWidgetMovable |
-                    QDockWidget::DockWidgetFloatable);
+    applyStandardDockFeatures(dw);
     m_host->addDockWidget(Qt::BottomDockWidgetArea, dw);
 
     if (m_hexDock)
@@ -300,9 +346,14 @@ void DebugDockManager::refreshIcons()
 
 void DebugDockManager::refreshAll()
 {
-    /* Refresh high-priority widgets immediately (disassembly, registers) */
-    if (m_disasmWidget) m_disasmWidget->refresh();
-    if (m_registerWidget) m_registerWidget->refresh();
+    auto refreshNow = [](auto *widget) {
+        if (widget)
+            widget->refresh();
+    };
+
+    /* Refresh high-priority widgets immediately (disassembly, registers). */
+    refreshNow(m_disasmWidget);
+    refreshNow(m_registerWidget);
 
     /* Stagger remaining widgets across separate event-loop iterations
      * so no single callback blocks the UI for too long.  Each widget
@@ -311,26 +362,36 @@ void DebugDockManager::refreshAll()
         QTimer::singleShot(ms, this, fn);
     };
 
-    /* Lightweight widgets first (tables with few rows, no MMIO reads) */
+    /* Lightweight widgets first (tables with few rows, no MMIO reads). */
     defer(0, [this]() {
-        if (m_breakpointWidget) m_breakpointWidget->refresh();
-        if (m_watchpointWidget) m_watchpointWidget->refresh();
+        if (m_breakpointWidget)
+            m_breakpointWidget->refresh();
+        if (m_watchpointWidget)
+            m_watchpointWidget->refresh();
     });
 
     defer(0, [this]() {
-        if (m_hexWidget) m_hexWidget->refresh();
+        if (m_hexWidget)
+            m_hexWidget->refresh();
         for (HexViewWidget *hw : m_extraHexWidgets)
-            if (hw) hw->refresh();
+            if (hw)
+                hw->refresh();
     });
 
-    /* Heavier widgets each get their own iteration */
-    defer(0, [this]() { if (m_stackWidget) m_stackWidget->refresh(); });
-    defer(0, [this]() { if (m_portMonitorWidget) m_portMonitorWidget->refresh(); });
-    defer(0, [this]() { if (m_timerMonitorWidget) m_timerMonitorWidget->refresh(); });
-    defer(0, [this]() { if (m_lcdStateWidget) m_lcdStateWidget->refresh(); });
-    defer(0, [this]() { if (m_mmuViewerWidget) m_mmuViewerWidget->refresh(); });
-    defer(0, [this]() { if (m_memVisWidget) m_memVisWidget->refresh(); });
-    defer(0, [this]() { if (m_cycleCounterWidget) m_cycleCounterWidget->refresh(); });
+    /* Heavier widgets each get their own iteration. */
+    const auto deferRefresh = [&](auto *widget) {
+        defer(0, [widget]() {
+            if (widget)
+                widget->refresh();
+        });
+    };
+    deferRefresh(m_stackWidget);
+    deferRefresh(m_portMonitorWidget);
+    deferRefresh(m_timerMonitorWidget);
+    deferRefresh(m_lcdStateWidget);
+    deferRefresh(m_mmuViewerWidget);
+    deferRefresh(m_memVisWidget);
+    deferRefresh(m_cycleCounterWidget);
 }
 
 void DebugDockManager::retranslate()
