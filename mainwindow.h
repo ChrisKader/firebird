@@ -32,6 +32,8 @@ class QResizeEvent;
 class QToolButton;
 class QTableWidget;
 class QDockWidget;
+class QMenu;
+class QIcon;
 class QQuickWidgetLessBroken : public QQuickWidget
 {
     Q_OBJECT
@@ -161,6 +163,13 @@ private:
     void setDebuggerActive(bool active);
     void applyWidgetTheme();
     void applyStandardDockFeatures(QDockWidget *dw) const;
+    DockWidget *createMainDock(const QString &title,
+                               QWidget *widget,
+                               const QString &objectName,
+                               Qt::DockWidgetArea area,
+                               QMenu *docksMenu = nullptr,
+                               const QIcon &icon = QIcon(),
+                               bool hideTitlebar = true);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

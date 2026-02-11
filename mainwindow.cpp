@@ -104,6 +104,33 @@ void MainWindow::applyStandardDockFeatures(QDockWidget *dw) const
                     QDockWidget::DockWidgetFloatable);
 }
 
+DockWidget *MainWindow::createMainDock(const QString &title,
+                                       QWidget *widget,
+                                       const QString &objectName,
+                                       Qt::DockWidgetArea area,
+                                       QMenu *docksMenu,
+                                       const QIcon &icon,
+                                       bool hideTitlebar)
+{
+    auto *dw = new DockWidget(title, content_window);
+    if (hideTitlebar)
+        dw->hideTitlebar(true);
+    if (!objectName.isEmpty())
+        dw->setObjectName(objectName);
+    if (!icon.isNull())
+        dw->setWindowIcon(icon);
+    dw->setWidget(widget);
+    applyStandardDockFeatures(dw);
+    content_window->addDockWidget(area, dw);
+    if (docksMenu) {
+        QAction *action = dw->toggleViewAction();
+        if (!icon.isNull())
+            action->setIcon(icon);
+        docksMenu->addAction(action);
+    }
+    return dw;
+}
+
 void MainWindow::resizeEvent(QResizeEvent *event)
 {
     if (event)
@@ -291,12 +318,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     // Extract LCDWidget from ui->frame into its own dock
     {
-        m_dock_lcd = new DockWidget(tr("Screen"), content_window);
-        m_dock_lcd->setObjectName(QString::fromLatin1(kDockObjectLCD));
-        m_dock_lcd->hideTitlebar(true);
-        applyStandardDockFeatures(m_dock_lcd);
-        m_dock_lcd->setWidget(ui->lcdView);
-        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_lcd);
+        m_dock_lcd = createMainDock(tr("Screen"),
+                                    ui->lcdView,
+                                    QString::fromLatin1(kDockObjectLCD),
+                                    Qt::RightDockWidgetArea);
         connect(ui->lcdView, &LCDWidget::scaleChanged, this, [this](int percent) {
             m_dock_lcd->setWindowTitle(tr("Screen") + QStringLiteral(" (%1%)").arg(percent));
         });
@@ -342,12 +367,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
             });
         }
 
-        m_dock_controls = new DockWidget(tr("Controls"), content_window);
-        m_dock_controls->setObjectName(QString::fromLatin1(kDockObjectControls));
-        m_dock_controls->hideTitlebar(true);
-        applyStandardDockFeatures(m_dock_controls);
-        m_dock_controls->setWidget(controlsWidget);
-        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_controls);
+        m_dock_controls = createMainDock(tr("Controls"),
+                                         controlsWidget,
+                                         QString::fromLatin1(kDockObjectControls),
+                                         Qt::RightDockWidgetArea);
     }
 
     // Hide the now-empty frame (cannot delete -- owned by Ui::MainWindow)
@@ -1435,20 +1458,13 @@ void MainWindow::convertTabsToDocks()
         const QIcon tab_icon = ui->tabWidget->tabIcon(0);
         ui->tabWidget->removeTab(0);
 
-        DockWidget *dw = new DockWidget(tab_title, content_window);
-        dw->hideTitlebar(true); // Create with hidden titlebar to not resize the window on startup
-        dw->setWindowIcon(tab_icon);
-        // objectName must be a stable, untranslated identifier for saveState/restoreState
-        dw->setObjectName(tab->objectName());
-        applyStandardDockFeatures(dw);
-
-        // Fill "Docks" menu
-        QAction *action = dw->toggleViewAction();
-        action->setIcon(dw->windowIcon());
-        docks_menu->addAction(action);
-
-        dw->setWidget(tab);
-
+        DockWidget *dw = createMainDock(tab_title,
+                                        tab,
+                                        tab->objectName(), /* stable saveState identity */
+                                        Qt::RightDockWidgetArea,
+                                        docks_menu,
+                                        tab_icon,
+                                        true);
         dock_pairs.append({tab, dw});
     }
 
@@ -1471,26 +1487,21 @@ void MainWindow::convertTabsToDocks()
     m_dock_files = dock_files;
     m_dock_keypad = dock_keypad;
 
-    auto createStandardDock = [this, docks_menu](const QString &title,
-                                                 const char *objectName,
-                                                 QWidget *widget) -> DockWidget * {
-        auto *dw = new DockWidget(title, content_window);
-        dw->hideTitlebar(true);
-        dw->setObjectName(QString::fromLatin1(objectName));
-        dw->setWidget(widget);
-        applyStandardDockFeatures(dw);
-        content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
-        docks_menu->addAction(dw->toggleViewAction());
-        return dw;
-    };
-
     /* Create NAND Browser dock */
     m_nandBrowser = new NandBrowserWidget(content_window);
-    m_dock_nand = createStandardDock(tr("NAND Browser"), kDockObjectNandBrowser, m_nandBrowser);
+    m_dock_nand = createMainDock(tr("NAND Browser"),
+                                 m_nandBrowser,
+                                 QString::fromLatin1(kDockObjectNandBrowser),
+                                 Qt::RightDockWidgetArea,
+                                 docks_menu);
 
     /* Create Hardware Configuration dock */
     m_hwConfig = new HwConfigWidget(content_window);
-    m_dock_hwconfig = createStandardDock(tr("Hardware Config"), kDockObjectHwConfig, m_hwConfig);
+    m_dock_hwconfig = createMainDock(tr("Hardware Config"),
+                                     m_hwConfig,
+                                     QString::fromLatin1(kDockObjectHwConfig),
+                                     Qt::RightDockWidgetArea,
+                                     docks_menu);
 
     /* Add LCD and Controls dock toggle actions to the Docks menu */
     if (m_dock_lcd) {
