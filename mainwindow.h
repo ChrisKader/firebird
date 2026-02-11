@@ -7,6 +7,7 @@
 #include <QQuickWidget>
 #include <QStringList>
 #include <functional>
+#include <memory>
 
 #include "app/emuthread.h"
 #include "dialogs/fbaboutdialog.h"
@@ -228,7 +229,7 @@ private:
     std::function<void()> updatePlayPauseButtonFn;
 
     // Debug subsystem (owns all 12 debug dock widgets)
-    DebugDockManager *m_debugDocks = nullptr;
+    std::unique_ptr<DebugDockManager> m_debugDocks;
 
     // Serial line buffer for forwarding to Console dock
     QString m_serialLineBuf;

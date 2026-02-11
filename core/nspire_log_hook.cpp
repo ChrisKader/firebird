@@ -524,14 +524,38 @@ static bool should_suppress_nlog_line(const std::string &label, const std::strin
     return false;
 }
 
+static std::string strip_mask_field(std::string line)
+{
+    size_t pos = line.find("mask=");
+    if (pos == std::string::npos)
+        return line;
+
+    size_t hex_begin = pos + 5;
+    size_t hex_end = hex_begin;
+    while (hex_end < line.size() && std::isxdigit(static_cast<unsigned char>(line[hex_end])))
+        hex_end++;
+    if (hex_end == hex_begin)
+        return line;
+
+    size_t erase_begin = pos;
+    if (erase_begin > 0 && line[erase_begin - 1] == ' ')
+        erase_begin--;
+    while (hex_end < line.size() && std::isspace(static_cast<unsigned char>(line[hex_end])))
+        hex_end++;
+
+    line.erase(erase_begin, hex_end - erase_begin);
+    return line;
+}
+
 static void emit_tagged_line(const std::string &file, const std::string &line)
 {
-    if (line.empty())
+    const std::string cleaned = strip_mask_field(line);
+    if (cleaned.empty())
         return;
     const std::string label = sanitize_file_label(file);
-    if (should_suppress_nlog_line(label, line))
+    if (should_suppress_nlog_line(label, cleaned))
         return;
-    std::string clipped = line;
+    std::string clipped = cleaned;
     if (clipped.size() > 1024) {
         clipped.resize(1024);
         clipped += "...";

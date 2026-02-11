@@ -31,6 +31,59 @@ struct bp_meta {
 
 static struct bp_meta bp_meta_table[BP_META_MAX];
 
+/* -- Debug CPU snapshot --------------------------------------- */
+
+struct debug_cpu_snapshot {
+    arm_state arm;
+    uint32_t cpsr;
+    uint32_t spsr;
+    bool has_spsr;
+    bool valid;
+};
+
+static struct debug_cpu_snapshot g_debug_cpu_snapshot = {};
+
+static void debug_capture_cpu_snapshot_locked(void)
+{
+    memcpy(&g_debug_cpu_snapshot.arm, &arm, sizeof(g_debug_cpu_snapshot.arm));
+    g_debug_cpu_snapshot.cpsr = get_cpsr();
+    const uint32_t mode = g_debug_cpu_snapshot.cpsr & 0x1F;
+    g_debug_cpu_snapshot.has_spsr = (mode != MODE_USR && mode != MODE_SYS);
+    g_debug_cpu_snapshot.spsr = g_debug_cpu_snapshot.has_spsr ? get_spsr() : 0;
+    g_debug_cpu_snapshot.valid = true;
+}
+
+static const arm_state *debug_cpu_state(void)
+{
+    if (!g_debug_cpu_snapshot.valid && in_debugger)
+        debug_capture_cpu_snapshot_locked();
+    return g_debug_cpu_snapshot.valid ? &g_debug_cpu_snapshot.arm : &arm;
+}
+
+static uint32_t debug_current_cpsr(void)
+{
+    if (!g_debug_cpu_snapshot.valid && in_debugger)
+        debug_capture_cpu_snapshot_locked();
+    return g_debug_cpu_snapshot.valid ? g_debug_cpu_snapshot.cpsr : get_cpsr();
+}
+
+static bool debug_current_spsr(uint32_t *out)
+{
+    if (!out)
+        return false;
+    if (!g_debug_cpu_snapshot.valid && in_debugger)
+        debug_capture_cpu_snapshot_locked();
+    if (g_debug_cpu_snapshot.valid) {
+        *out = g_debug_cpu_snapshot.spsr;
+        return g_debug_cpu_snapshot.has_spsr;
+    }
+
+    const uint32_t mode = get_cpsr() & 0x1F;
+    const bool has_spsr = (mode != MODE_USR && mode != MODE_SYS);
+    *out = has_spsr ? get_spsr() : 0;
+    return has_spsr;
+}
+
 static struct bp_meta *bp_meta_find(uint32_t addr)
 {
     for (int i = 0; i < BP_META_MAX; i++) {
@@ -75,14 +128,11 @@ static void bp_meta_free(uint32_t addr)
 void debug_get_registers(uint32_t regs_out[16], uint32_t *cpsr_out,
                          uint32_t *spsr_out, bool *has_spsr_out)
 {
+    const arm_state *state = debug_cpu_state();
     for (int i = 0; i < 16; i++)
-        regs_out[i] = arm.reg[i];
-    *cpsr_out = get_cpsr();
-
-    uint32_t mode = *cpsr_out & 0x1F;
-    bool has_spsr = (mode != MODE_USR && mode != MODE_SYS);
-    *has_spsr_out = has_spsr;
-    *spsr_out = has_spsr ? get_spsr() : 0;
+        regs_out[i] = state->reg[i];
+    *cpsr_out = debug_current_cpsr();
+    *has_spsr_out = debug_current_spsr(spsr_out);
 }
 
 bool debug_set_register(int reg_num, uint32_t value)
@@ -90,34 +140,39 @@ bool debug_set_register(int reg_num, uint32_t value)
     if (reg_num < 0 || reg_num > 15)
         return false;
     arm.reg[reg_num] = value;
+    if (g_debug_cpu_snapshot.valid)
+        g_debug_cpu_snapshot.arm.reg[reg_num] = value;
     return true;
 }
 
 bool debug_set_cpsr(uint32_t value)
 {
     set_cpsr_full(value);
+    if (g_debug_cpu_snapshot.valid)
+        debug_capture_cpu_snapshot_locked();
     return true;
 }
 
 bool debug_is_thumb_mode(void)
 {
-    return (get_cpsr() >> 5) & 1;
+    return (debug_current_cpsr() >> 5) & 1;
 }
 
 void debug_get_banked_registers(uint32_t mode, uint32_t regs_out[16],
                                 uint32_t *spsr_out)
 {
-    uint32_t cur_mode = get_cpsr() & 0x1F;
+    const arm_state *state = debug_cpu_state();
+    uint32_t cur_mode = debug_current_cpsr() & 0x1F;
     *spsr_out = 0;
 
     /* Start with current registers for everything */
     for (int i = 0; i < 16; i++)
-        regs_out[i] = arm.reg[i];
+        regs_out[i] = state->reg[i];
 
     if (mode == cur_mode || mode == MODE_SYS) {
         /* Current mode or SYS (shares USR regs) -- just return current */
-        if (cur_mode != MODE_USR && cur_mode != MODE_SYS)
-            *spsr_out = get_spsr();
+        if (!debug_current_spsr(spsr_out))
+            *spsr_out = 0;
         return;
     }
 
@@ -127,39 +182,39 @@ void debug_get_banked_registers(uint32_t mode, uint32_t regs_out[16],
 
     switch (mode) {
     case MODE_USR:
-        regs_out[13] = arm.r13_usr[0];
-        regs_out[14] = arm.r13_usr[1];
+        regs_out[13] = state->r13_usr[0];
+        regs_out[14] = state->r13_usr[1];
         if (cur_mode == MODE_FIQ) {
             for (int i = 0; i < 5; i++)
-                regs_out[8 + i] = arm.r8_usr[i];
+                regs_out[8 + i] = state->r8_usr[i];
         }
         break;
     case MODE_FIQ:
         for (int i = 0; i < 5; i++)
-            regs_out[8 + i] = arm.r8_fiq[i];
-        regs_out[13] = arm.r13_fiq[0];
-        regs_out[14] = arm.r13_fiq[1];
-        *spsr_out = arm.spsr_fiq;
+            regs_out[8 + i] = state->r8_fiq[i];
+        regs_out[13] = state->r13_fiq[0];
+        regs_out[14] = state->r13_fiq[1];
+        *spsr_out = state->spsr_fiq;
         break;
     case MODE_IRQ:
-        regs_out[13] = arm.r13_irq[0];
-        regs_out[14] = arm.r13_irq[1];
-        *spsr_out = arm.spsr_irq;
+        regs_out[13] = state->r13_irq[0];
+        regs_out[14] = state->r13_irq[1];
+        *spsr_out = state->spsr_irq;
         break;
     case MODE_SVC:
-        regs_out[13] = arm.r13_svc[0];
-        regs_out[14] = arm.r13_svc[1];
-        *spsr_out = arm.spsr_svc;
+        regs_out[13] = state->r13_svc[0];
+        regs_out[14] = state->r13_svc[1];
+        *spsr_out = state->spsr_svc;
         break;
     case MODE_ABT:
-        regs_out[13] = arm.r13_abt[0];
-        regs_out[14] = arm.r13_abt[1];
-        *spsr_out = arm.spsr_abt;
+        regs_out[13] = state->r13_abt[0];
+        regs_out[14] = state->r13_abt[1];
+        *spsr_out = state->spsr_abt;
         break;
     case MODE_UND:
-        regs_out[13] = arm.r13_und[0];
-        regs_out[14] = arm.r13_und[1];
-        *spsr_out = arm.spsr_und;
+        regs_out[13] = state->r13_und[0];
+        regs_out[14] = state->r13_und[1];
+        *spsr_out = state->spsr_und;
         break;
     default:
         break;
@@ -168,12 +223,13 @@ void debug_get_banked_registers(uint32_t mode, uint32_t regs_out[16],
 
 void debug_get_cp15(uint32_t out[6])
 {
-    out[0] = arm.control;
-    out[1] = arm.translation_table_base;
-    out[2] = arm.domain_access_control;
-    out[3] = arm.data_fault_status;
-    out[4] = arm.instruction_fault_status;
-    out[5] = arm.fault_address;
+    const arm_state *state = debug_cpu_state();
+    out[0] = state->control;
+    out[1] = state->translation_table_base;
+    out[2] = state->domain_access_control;
+    out[3] = state->data_fault_status;
+    out[4] = state->instruction_fault_status;
+    out[5] = state->fault_address;
 }
 
 /* -- Disassembly --------------------------------------------- */
@@ -182,7 +238,7 @@ int debug_disassemble(uint32_t start_addr, struct debug_disasm_line *out,
                       int count)
 {
     uint32_t addr = start_addr;
-    bool is_thumb = (get_cpsr() >> 5) & 1;
+    bool is_thumb = (debug_current_cpsr() >> 5) & 1;
     int filled = 0;
 
     for (int i = 0; i < count; i++) {
@@ -703,6 +759,27 @@ bool debug_peek_reg(uint32_t paddr, uint32_t *out)
     return false; /* address not recognized */
 }
 
+/* -- Debug CPU Snapshot -------------------------------------- */
+
+void debug_capture_cpu_snapshot(void)
+{
+    if (!in_debugger) {
+        g_debug_cpu_snapshot.valid = false;
+        return;
+    }
+    debug_capture_cpu_snapshot_locked();
+}
+
+void debug_invalidate_cpu_snapshot(void)
+{
+    g_debug_cpu_snapshot.valid = false;
+}
+
+bool debug_has_cpu_snapshot(void)
+{
+    return g_debug_cpu_snapshot.valid;
+}
+
 /* -- Snapshot Persistence ------------------------------------ */
 
 /* On-disk format:
@@ -732,6 +809,7 @@ struct bp_save_entry {
 void debug_clear_metadata(void)
 {
     memset(bp_meta_table, 0, sizeof(bp_meta_table));
+    debug_invalidate_cpu_snapshot();
 }
 
 bool debug_suspend(emu_snapshot *snapshot)
@@ -776,6 +854,7 @@ bool debug_resume(const emu_snapshot *snapshot)
 {
     /* Clear existing metadata */
     memset(bp_meta_table, 0, sizeof(bp_meta_table));
+    debug_invalidate_cpu_snapshot();
 
     uint32_t count = 0;
     if (!snapshot_read(snapshot, &count, sizeof(count)))

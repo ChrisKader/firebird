@@ -136,6 +136,15 @@ uint32_t debug_search_memory(uint32_t start, uint32_t length,
  * Returns true if the address was recognized, false otherwise. */
 bool debug_peek_reg(uint32_t paddr, uint32_t *out);
 
+/* -- Debug CPU Snapshot -------------------------------------- */
+
+/* Capture/clear the paused CPU snapshot used by debugger UI reads.
+ * Snapshot reads eliminate cross-widget drift while paused by ensuring
+ * all register/CP15 reads come from one captured state. */
+void debug_capture_cpu_snapshot(void);
+void debug_invalidate_cpu_snapshot(void);
+bool debug_has_cpu_snapshot(void);
+
 /* -- Snapshot Persistence ------------------------------------ */
 
 typedef struct emu_snapshot emu_snapshot;

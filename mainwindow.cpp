@@ -51,6 +51,7 @@
 #include <utility>
 
 #include "core/debug.h"
+#include "core/debug_api.h"
 #include "core/emu.h"
 #include "core/flash.h"
 #include "core/gif.h"
@@ -1272,6 +1273,7 @@ void MainWindow::debugInputRequested(bool b)
 
     if (b)
     {
+        debug_capture_cpu_snapshot();
         if (m_debugDocks) m_debugDocks->raise();
         if (m_debugDocks) {
             m_debugDocks->markDirty();
@@ -1279,6 +1281,8 @@ void MainWindow::debugInputRequested(bool b)
         }
         if (m_debugDocks && m_debugDocks->console())
             m_debugDocks->console()->focusInput();
+    } else {
+        debug_invalidate_cpu_snapshot();
     }
 }
 
@@ -1290,6 +1294,7 @@ void MainWindow::debuggerEntered(bool entered)
     setDebuggerActive(entered);
     if (entered)
     {
+        debug_capture_cpu_snapshot();
         if (m_debugDocks) m_debugDocks->raise();
         if (m_debugDocks) {
             m_debugDocks->markDirty();
@@ -1300,6 +1305,7 @@ void MainWindow::debuggerEntered(bool entered)
     }
     else
     {
+        debug_invalidate_cpu_snapshot();
         if (m_debugDocks) m_debugDocks->hideAutoShown();
     }
 }
@@ -1595,9 +1601,9 @@ void MainWindow::convertTabsToDocks()
 
     /* STEP 5: Create debugger docks and finalize initial dock visibility. */
     /* Create the CEmu-style debugger docks via DebugDockManager */
-    m_debugDocks = new DebugDockManager(content_window, material_icon_font, this);
+    m_debugDocks = std::make_unique<DebugDockManager>(content_window, material_icon_font, this);
     m_debugDocks->createDocks(docks_menu);
-    connect(m_debugDocks, &DebugDockManager::debugCommand,
+    connect(m_debugDocks.get(), &DebugDockManager::debugCommand,
             this, &MainWindow::debuggerCommand);
 
     setUIEditMode(editmode_toggle->isChecked());
@@ -1925,6 +1931,7 @@ void MainWindow::isBusy(bool busy)
 
 void MainWindow::started(bool success)
 {
+    debug_invalidate_cpu_snapshot();
     updateUIActionState(success);
 
     if (success) {
@@ -1937,6 +1944,7 @@ void MainWindow::started(bool success)
 
 void MainWindow::resumed(bool success)
 {
+    debug_invalidate_cpu_snapshot();
     updateUIActionState(success);
 
     if (success) {
@@ -1965,6 +1973,7 @@ void MainWindow::suspended(bool success)
 
 void MainWindow::stopped()
 {
+    debug_invalidate_cpu_snapshot();
     updateUIActionState(false);
     showStatusMsg(tr("Emulation stopped"));
 }

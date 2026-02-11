@@ -22,8 +22,8 @@ This document describes the current threading model used by Firebird's desktop U
 
 ## Known limitations
 
-- Debug widgets still read global emulator state directly (for example via globals in `core/emu.h`).
-- There is no single atomic "debug snapshot" object yet.
+- The debugger snapshot currently covers CPU/CP15 register state only; memory reads still come from live emulation memory while paused.
+- Some non-debugger subsystems still read/write globals directly (for example in `core/emu.h`).
 - `volatile` globals are still used in several places; this is not equivalent to full synchronization.
 
 ## Practical rules for contributors
@@ -35,6 +35,6 @@ This document describes the current threading model used by Firebird's desktop U
 
 ## Planned direction
 
-- Introduce a CPU/debug snapshot object captured at pause points.
-- Move debug widgets to read the snapshot rather than raw global state.
+- Extend snapshot coverage beyond CPU registers (memory windows, IO snapshots where useful).
+- Continue migrating debugger reads to stable snapshot-backed APIs.
 - Replace `volatile` shared state with atomics/explicit synchronization where appropriate.
