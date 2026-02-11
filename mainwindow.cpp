@@ -51,6 +51,7 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QDesktopServices>
+#include <QDateTime>
 
 #include <array>
 #include <utility>
@@ -260,6 +261,20 @@ static QString layoutProfilePath(const QString &profileName)
     return layoutProfilesDirPath() + QLatin1Char('/') + profileName + QStringLiteral(".json");
 }
 
+static QString backupCorruptLayoutProfile(const QString &filePath)
+{
+    QFileInfo info(filePath);
+    if (!info.exists())
+        return QString();
+
+    const QString stamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMddHHmmss"));
+    const QString backupPath = filePath + QStringLiteral(".corrupt.") + stamp + QStringLiteral(".json");
+    QFile::remove(backupPath);
+    if (!QFile::copy(filePath, backupPath))
+        return QString();
+    return backupPath;
+}
+
 static bool ensureLayoutProfilesDir(QString *errorOut = nullptr)
 {
     const QString dirPath = layoutProfilesDirPath();
@@ -337,8 +352,11 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
     const QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &jsonParseError);
     file.close();
     if (jsonParseError.error != QJsonParseError::NoError || !doc.isObject()) {
+        const QString backupPath = backupCorruptLayoutProfile(filePath);
         if (errorOut)
-            *errorOut = QStringLiteral("invalid JSON in %1").arg(filePath);
+            *errorOut = backupPath.isEmpty()
+                    ? QStringLiteral("invalid JSON in %1").arg(filePath)
+                    : QStringLiteral("invalid JSON in %1 (backup: %2)").arg(filePath, backupPath);
         return false;
     }
 
@@ -350,8 +368,11 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
     int profileVersion = fallbackVersion;
     QString stateParseError;
     if (!extractWindowStateFromLayoutObject(root, &state, &profileVersion, &stateParseError)) {
+        const QString backupPath = backupCorruptLayoutProfile(filePath);
         if (errorOut)
-            *errorOut = QStringLiteral("%1 in %2").arg(stateParseError, filePath);
+            *errorOut = backupPath.isEmpty()
+                    ? QStringLiteral("%1 in %2").arg(stateParseError, filePath)
+                    : QStringLiteral("%1 in %2 (backup: %3)").arg(stateParseError, filePath, backupPath);
         return false;
     }
 
