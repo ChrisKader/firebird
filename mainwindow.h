@@ -229,7 +229,7 @@ private:
     bool focus_pause_enabled = false;
     bool focus_auto_paused = false;
 
-    // Sidebar docks
+    // Utility docks converted from legacy tabs
     DockWidget *m_dock_files = nullptr;
     DockWidget *m_dock_keypad = nullptr;
     DockWidget *m_dock_nand = nullptr;
