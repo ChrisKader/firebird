@@ -1,28 +1,30 @@
-# State Slots
+# State Slot System
 
-Firebird supports numbered quick-save slots via the **State** menu.
+This document describes Firebird's quick save/load slots exposed under `State -> Save to Slot` and `State -> Load from Slot`.
 
-## Slot files
+## Slot IDs
 
-- Slot format: `slot_<N>.fbsnapshot`
-- Typical slot numbers: `1..9`
+- Supported slots: `1` through `9`.
+- Save shortcuts: `Ctrl+1` .. `Ctrl+9`.
+- Load shortcuts: `Ctrl+Shift+1` .. `Ctrl+Shift+9`.
 
-## Storage location
+## Storage Path Resolution
 
-Slot location depends on the active kit configuration:
+Slot files are resolved by `stateSlotPath(int slot)` in `mainwindow.cpp`.
 
-- If the active kit has a snapshot path configured, slot files are created in that snapshot's directory.
-- If no kit snapshot path exists, slot files are created in `QStandardPaths::AppDataLocation`.
+Resolution order:
 
-This allows quick-save/load to work both for configured kits and ad-hoc sessions.
+1. If the active kit has a snapshot path configured, slots are stored in that snapshot directory.
+2. Otherwise, slots fall back to `QStandardPaths::AppDataLocation`.
 
-## Behavior
+Final filename format:
 
-- Save to slot: writes the current emulator state into `slot_<N>.fbsnapshot`.
-- Load from slot: resumes from `slot_<N>.fbsnapshot` if present.
-- Empty slot: if the slot file does not exist, the UI reports that the slot is empty.
+- `slot_1.fbsnapshot`
+- ...
+- `slot_9.fbsnapshot`
 
-## Related code
+## Behavior Notes
 
-- Path computation: `mainwindow.cpp` (`stateSlotPath`)
-- Slot save/load actions: `MainWindow::saveStateSlot`, `MainWindow::loadStateSlot`
+- Slot saves/loads use the same suspend/resume snapshot mechanisms as manual snapshot actions.
+- Slots are intentionally per-kit when a kit snapshot path exists.
+- If no kit snapshot path exists, slots remain available via the app data fallback location.
