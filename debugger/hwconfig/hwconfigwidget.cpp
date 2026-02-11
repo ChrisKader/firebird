@@ -174,17 +174,19 @@ void HwConfigWidget::refresh()
 
 void HwConfigWidget::syncOverridesFromGlobals()
 {
-    const int16_t savedBatteryRaw = adc_battery_level_override;
-    int savedBatteryMv = (battery_mv_override >= 0)
-        ? battery_mv_override : battery_mv_from_legacy_raw(savedBatteryRaw);
+    const int16_t savedBatteryRaw = hw_override_get_adc_battery_level();
+    const int savedBatteryMvOverride = hw_override_get_battery_mv();
+    int savedBatteryMv = (savedBatteryMvOverride >= 0)
+        ? savedBatteryMvOverride : battery_mv_from_legacy_raw(savedBatteryRaw);
     if (savedBatteryMv < 0)
         savedBatteryMv = 4000;
 
-    charger_state_t savedCharging = (charger_state_override >= CHARGER_DISCONNECTED
-        && charger_state_override <= CHARGER_CHARGING)
-        ? charger_state_override : charging_state_from_legacy(adc_charging_override);
-    const int16_t savedContrast = lcd_contrast_override;
-    const int16_t savedKeypad   = adc_keypad_type_override;
+    const charger_state_t chargerOverride = hw_override_get_charger_state();
+    charger_state_t savedCharging = (chargerOverride >= CHARGER_DISCONNECTED
+        && chargerOverride <= CHARGER_CHARGING)
+        ? chargerOverride : charging_state_from_legacy(hw_override_get_adc_charging());
+    const int16_t savedContrast = hw_override_get_lcd_contrast();
+    const int16_t savedKeypad   = hw_override_get_adc_keypad_type();
 
     m_batterySlider->blockSignals(true);
     m_batterySlider->setValue(savedBatteryMv);
@@ -198,7 +200,7 @@ void HwConfigWidget::syncOverridesFromGlobals()
     m_chargerStateCombo->setCurrentIndex(stateIndex);
     m_chargerStateCombo->blockSignals(false);
 
-    bool batteryOn = (battery_mv_override >= 0 || adc_battery_level_override >= 0);
+    bool batteryOn = (savedBatteryMvOverride >= 0 || savedBatteryRaw >= 0);
     m_batteryOverride->blockSignals(true);
     m_batteryOverride->setChecked(batteryOn);
     m_batteryOverride->blockSignals(false);
@@ -237,33 +239,34 @@ void HwConfigWidget::applyBatteryOverride()
         int stateData = m_chargerStateCombo->currentData().toInt();
         if (stateData < CHARGER_DISCONNECTED || stateData > CHARGER_CHARGING)
             stateData = CHARGER_DISCONNECTED;
-        battery_mv_override = mv;
-        adc_battery_level_override = (int16_t)legacy_raw_from_battery_mv(mv);
-        charger_state_override = (charger_state_t)stateData;
-        adc_charging_override = (charger_state_override == CHARGER_CHARGING) ? 1 : 0;
+        const charger_state_t chargerState = (charger_state_t)stateData;
+        hw_override_set_battery_mv(mv);
+        hw_override_set_adc_battery_level((int16_t)legacy_raw_from_battery_mv(mv));
+        hw_override_set_charger_state(chargerState);
+        hw_override_set_adc_charging((chargerState == CHARGER_CHARGING) ? 1 : 0);
     } else {
-        battery_mv_override = -1;
-        adc_battery_level_override = -1;
-        adc_charging_override = -1;
-        charger_state_override = CHARGER_AUTO;
+        hw_override_set_battery_mv(-1);
+        hw_override_set_adc_battery_level(-1);
+        hw_override_set_adc_charging(-1);
+        hw_override_set_charger_state(CHARGER_AUTO);
     }
 }
 
 void HwConfigWidget::applyContrastOverride()
 {
     if (m_contrastOverride->isChecked()) {
-        lcd_contrast_override = (int16_t)m_contrastSlider->value();
+        hw_override_set_lcd_contrast((int16_t)m_contrastSlider->value());
         /* Apply immediately to the hdq1w register */
         hdq1w.lcd_contrast = (uint8_t)m_contrastSlider->value();
     } else {
-        lcd_contrast_override = -1;
+        hw_override_set_lcd_contrast(-1);
     }
 }
 
 void HwConfigWidget::applyKeypadType()
 {
     int val = m_keypadTypeCombo->currentData().toInt();
-    adc_keypad_type_override = (int16_t)val;
+    hw_override_set_adc_keypad_type((int16_t)val);
 }
 
 void HwConfigWidget::showEvent(QShowEvent *event)

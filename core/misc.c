@@ -1167,7 +1167,7 @@ void hdq1w_write(uint32_t addr, uint32_t value) {
             /* On CX2, contrast is driven by the backlight PWM controller
              * at 90130000, not the HDQ1W register.  Ignore OS writes here
              * so they don't overwrite the PWM-derived value. */
-            if (!emulate_cx2 && lcd_contrast_override < 0)
+            if (!emulate_cx2 && hw_override_get_lcd_contrast() < 0)
                 hdq1w.lcd_contrast = value;
             return;
     }
@@ -1326,7 +1326,7 @@ enum {
 bool cx2_battery_override_active(void)
 {
     /* CX II battery model is driven by the millivolt override path. */
-    return battery_mv_override >= 0;
+    return hw_override_get_battery_mv() >= 0;
 }
 
 static int clamp_int(int value, int min, int max)
@@ -1340,8 +1340,9 @@ static int clamp_int(int value, int min, int max)
 
 static int cx2_effective_battery_mv(void)
 {
-    if (battery_mv_override >= 0)
-        return clamp_int(battery_mv_override, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX);
+    const int battery_mv = hw_override_get_battery_mv();
+    if (battery_mv >= 0)
+        return clamp_int(battery_mv, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX);
 
     /* Default to a full battery, matching classic ADC default behavior. */
     return CX2_BATTERY_MV_MAX;
@@ -1402,13 +1403,15 @@ static uint32_t cx2_adc_bg_reload(void)
 
 charger_state_t cx2_effective_charger_state(void)
 {
-    if (charger_state_override >= CHARGER_DISCONNECTED
-            && charger_state_override <= CHARGER_CHARGING)
-        return charger_state_override;
-    if (usb_cable_connected_override >= 0)
-        return usb_cable_connected_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+    const charger_state_t charger_override = hw_override_get_charger_state();
+    if (charger_override >= CHARGER_DISCONNECTED
+            && charger_override <= CHARGER_CHARGING)
+        return charger_override;
+    const int8_t usb_override = hw_override_get_usb_cable_connected();
+    if (usb_override >= 0)
+        return usb_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
     if (cx2_battery_override_active())
-        return (adc_charging_override > 0) ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+        return (hw_override_get_adc_charging() > 0) ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
     return usblink_connected ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
 }
 
@@ -1548,12 +1551,14 @@ static uint16_t adc_read_channel(int n) {
         // A value from 0 to 20 indicates normal TI-Nspire keypad.
         // A value from 21 to 42 indicates TI-84+ keypad.
         // A value around 73 indicates a TI-Nspire with touchpad
-        return (adc_keypad_type_override >= 0)
-            ? (uint16_t)adc_keypad_type_override : 73;
+        const int16_t keypad_override = hw_override_get_adc_keypad_type();
+        return (keypad_override >= 0)
+            ? (uint16_t)keypad_override : 73;
     } else {
         // Channels 1-2: battery voltage
-        return (adc_battery_level_override >= 0)
-            ? (uint16_t)adc_battery_level_override : 930;
+        const int16_t battery_override = hw_override_get_adc_battery_level();
+        return (battery_override >= 0)
+            ? (uint16_t)battery_override : 930;
     }
 }
 void adc_reset() {

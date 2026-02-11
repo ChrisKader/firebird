@@ -55,8 +55,8 @@ extern bool turbo_mode;
 
 /* Hardware configuration overrides (GUI-settable).
  * -1 = use defaults; >= 0 = override value. */
-/* Live-tuned from UI thread while read by emulation thread. Keep volatile so
- * runtime overrides are re-read and not optimized into stale values. */
+/* Live-tuned from UI thread while read by emulation thread.
+ * Use the hw_override_* accessors below for atomic load/store semantics. */
 extern volatile int16_t adc_battery_level_override;  /* 0-930 ADC raw value */
 extern volatile int8_t  adc_charging_override;       /* 0 = not charging, 1 = charging */
 extern volatile int16_t lcd_contrast_override;       /* 0-147 */
@@ -73,6 +73,76 @@ typedef enum charger_state {
 extern volatile int battery_mv_override;             /* millivolts, -1 = default */
 extern volatile charger_state_t charger_state_override;
 extern volatile int8_t usb_cable_connected_override; /* -1 = follow link state, 0/1 = force */
+
+static inline int16_t hw_override_get_adc_battery_level(void)
+{
+    return __atomic_load_n(&adc_battery_level_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_adc_battery_level(int16_t value)
+{
+    __atomic_store_n(&adc_battery_level_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int8_t hw_override_get_adc_charging(void)
+{
+    return __atomic_load_n(&adc_charging_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_adc_charging(int8_t value)
+{
+    __atomic_store_n(&adc_charging_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int16_t hw_override_get_lcd_contrast(void)
+{
+    return __atomic_load_n(&lcd_contrast_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_lcd_contrast(int16_t value)
+{
+    __atomic_store_n(&lcd_contrast_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int16_t hw_override_get_adc_keypad_type(void)
+{
+    return __atomic_load_n(&adc_keypad_type_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_adc_keypad_type(int16_t value)
+{
+    __atomic_store_n(&adc_keypad_type_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int hw_override_get_battery_mv(void)
+{
+    return __atomic_load_n(&battery_mv_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_battery_mv(int value)
+{
+    __atomic_store_n(&battery_mv_override, value, __ATOMIC_RELAXED);
+}
+
+static inline charger_state_t hw_override_get_charger_state(void)
+{
+    return __atomic_load_n(&charger_state_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_charger_state(charger_state_t value)
+{
+    __atomic_store_n(&charger_state_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int8_t hw_override_get_usb_cable_connected(void)
+{
+    return __atomic_load_n(&usb_cable_connected_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_usb_cable_connected(int8_t value)
+{
+    __atomic_store_n(&usb_cable_connected_override, value, __ATOMIC_RELAXED);
+}
 
 enum { LOG_CPU, LOG_IO, LOG_FLASH, LOG_INTS, LOG_ICOUNT, LOG_USB, LOG_GDB, MAX_LOG };
 #define LOG_TYPE_TBL "CIFQ#UG"

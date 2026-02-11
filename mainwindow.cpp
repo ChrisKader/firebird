@@ -897,18 +897,18 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 
     // Restore HW config overrides
     const HwOverrides hw = readHwOverridesFromSettings(settings);
-    adc_battery_level_override = static_cast<int16_t>(hw.batteryRaw);
-    adc_charging_override = static_cast<int8_t>(hw.charging);
-    lcd_contrast_override = static_cast<int16_t>(hw.brightness);
-    adc_keypad_type_override = static_cast<int16_t>(hw.keypadType);
-    battery_mv_override = hw.batteryMv;
+    hw_override_set_adc_battery_level(static_cast<int16_t>(hw.batteryRaw));
+    hw_override_set_adc_charging(static_cast<int8_t>(hw.charging));
+    hw_override_set_lcd_contrast(static_cast<int16_t>(hw.brightness));
+    hw_override_set_adc_keypad_type(static_cast<int16_t>(hw.keypadType));
+    hw_override_set_battery_mv(hw.batteryMv);
     int savedChargerState = hw.chargerState;
     if (savedChargerState >= CHARGER_DISCONNECTED && savedChargerState <= CHARGER_CHARGING)
-        charger_state_override = (charger_state_t)savedChargerState;
-    else if (adc_charging_override >= 0)
-        charger_state_override = adc_charging_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+        hw_override_set_charger_state((charger_state_t)savedChargerState);
+    else if (hw_override_get_adc_charging() >= 0)
+        hw_override_set_charger_state(hw_override_get_adc_charging() ? CHARGER_CHARGING : CHARGER_DISCONNECTED);
     else
-        charger_state_override = CHARGER_AUTO;
+        hw_override_set_charger_state(CHARGER_AUTO);
     if (m_hwConfig)
         m_hwConfig->syncOverridesFromGlobals();
 
@@ -1153,12 +1153,12 @@ void MainWindow::savePersistentUiState()
 
     // Save HW config overrides
     const HwOverrides hw = {
-        static_cast<int>(adc_battery_level_override),
-        static_cast<int>(adc_charging_override),
-        static_cast<int>(lcd_contrast_override),
-        static_cast<int>(adc_keypad_type_override),
-        battery_mv_override,
-        static_cast<int>(charger_state_override),
+        static_cast<int>(hw_override_get_adc_battery_level()),
+        static_cast<int>(hw_override_get_adc_charging()),
+        static_cast<int>(hw_override_get_lcd_contrast()),
+        static_cast<int>(hw_override_get_adc_keypad_type()),
+        hw_override_get_battery_mv(),
+        static_cast<int>(hw_override_get_charger_state()),
     };
     writeHwOverridesToSettings(settings, hw);
 
@@ -1775,11 +1775,11 @@ void MainWindow::launchIdaInstantDebugging()
 void MainWindow::connectUSB()
 {
     if (usblink_connected) {
-        usb_cable_connected_override = 0;
+        hw_override_set_usb_cable_connected(0);
         usblink_queue_reset();
         usblink_reset();
     } else {
-        usb_cable_connected_override = 1;
+        hw_override_set_usb_cable_connected(1);
         usblink_connect();
     }
 

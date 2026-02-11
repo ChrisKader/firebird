@@ -369,8 +369,9 @@ void cx2_backlight_reset()
 	/* Default to brightest setting on cold boot. */
 	cx2_backlight.pwm_period = 255;
 	cx2_backlight.pwm_value = 0;
-	if (lcd_contrast_override >= 0)
-		hdq1w.lcd_contrast = (uint8_t)cx2_clamp_int(lcd_contrast_override, 0, LCD_CONTRAST_MAX);
+	const int16_t lcd_override = hw_override_get_lcd_contrast();
+	if (lcd_override >= 0)
+		hdq1w.lcd_contrast = (uint8_t)cx2_clamp_int(lcd_override, 0, LCD_CONTRAST_MAX);
 	else
 		hdq1w.lcd_contrast = LCD_CONTRAST_MAX;
 }
@@ -399,7 +400,7 @@ void cx2_backlight_write(uint32_t addr, uint32_t value)
 	// Mirror the PWM duty cycle to hdq1w.lcd_contrast (unless GUI override is active).
 	// Per Hackspire: period=255, value 0 (brightest) to 225 (darkest).
 	// Map to [0, LCD_CONTRAST_MAX] range for rendering.
-	if(lcd_contrast_override < 0) {
+	if(hw_override_get_lcd_contrast() < 0) {
 		if(cx2_backlight.pwm_period == 0)
 			hdq1w.lcd_contrast = 0;
 		else
