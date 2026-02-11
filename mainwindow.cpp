@@ -2229,6 +2229,19 @@ void MainWindow::convertTabsToDocks()
         }
     });
 
+    connect(layouts_menu, &QMenu::aboutToShow, this,
+            [loadDefaultLayoutAction, loadDebugLayoutAction,
+             loadWidescreenLayoutAction, loadCustomLayoutAction]() {
+        loadDefaultLayoutAction->setEnabled(
+            QFile::exists(layoutProfilePath(QStringLiteral("default"))));
+        loadDebugLayoutAction->setEnabled(
+            QFile::exists(layoutProfilePath(QStringLiteral("debugging"))));
+        loadWidescreenLayoutAction->setEnabled(
+            QFile::exists(layoutProfilePath(QStringLiteral("widescreen"))));
+        loadCustomLayoutAction->setEnabled(
+            QFile::exists(layoutProfilePath(QStringLiteral("custom"))));
+    });
+
     QMenu *focusMenu = docks_menu->addMenu(tr("Dock Focus Policy"));
     QActionGroup *focusGroup = new QActionGroup(focusMenu);
     focusGroup->setExclusive(true);
