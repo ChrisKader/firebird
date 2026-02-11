@@ -3,46 +3,7 @@
 
 #include <QHBoxLayout>
 
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-
-DockWidget::DockWidget(const QString &uniqueName, QWidget *parent, Qt::WindowFlags flags)
-    : KDDockWidgets::QtWidgets::DockWidget(uniqueName, {}, {}, flags)
-{
-    Q_UNUSED(parent);
-    setObjectName(uniqueName);
-    setTitle(uniqueName);
-    setWindowTitle(uniqueName);
-
-    connect(this, &KDDockWidgets::QtWidgets::DockWidget::isFloatingChanged,
-            this, [this](bool floating) {
-                emit topLevelChanged(floating);
-                emit dockLocationChanged(Qt::NoDockWidgetArea);
-            });
-    connect(this, &KDDockWidgets::QtWidgets::DockWidget::isOpenChanged,
-            this, [this](bool visible) {
-                emit visibilityChanged(visible);
-                emit dockLocationChanged(Qt::NoDockWidgetArea);
-            });
-}
-
-void DockWidget::setWidget(QWidget *widget)
-{
-    KDDockWidgets::QtWidgets::DockWidget::setWidget(widget);
-}
-
-void DockWidget::hideTitlebar(bool)
-{
-}
-
-void DockWidget::refreshTitlebar()
-{
-}
-
-void DockWidget::applyThinBarStyle()
-{
-}
-
-#else
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
 
 DockWidget::DockWidget(const QString &title, QWidget *parent, Qt::WindowFlags flags)
     : QDockWidget(title, parent, flags)

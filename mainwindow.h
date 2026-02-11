@@ -13,10 +13,10 @@
 #include "app/emuthread.h"
 #include "dialogs/fbaboutdialog.h"
 #include "ui/lcdwidget.h"
+#include "ui/dockwidget.h"
 #include "app/qmlbridge.h"
 
 class DebugDockManager;
-class DockWidget;
 class NandBrowserWidget;
 class HwConfigWidget;
 

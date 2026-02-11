@@ -9,9 +9,10 @@
 #include <QPointer>
 #include <cstdint>
 
+#include "ui/dockwidget.h"
+
 class QMainWindow;
 class QMenu;
-class DockWidget;
 class DisassemblyWidget;
 class RegisterWidget;
 class HexViewWidget;
