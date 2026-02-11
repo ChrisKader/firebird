@@ -10,6 +10,14 @@ qt_standard_project_setup()
 
 option(FIREBIRD_ENABLE_KDDOCKWIDGETS "Enable experimental KDDockWidgets migration path" OFF)
 
+add_executable(firebird-layout-convert
+    tools/layout_convert.cpp
+)
+target_link_libraries(firebird-layout-convert PRIVATE
+    Qt::Core
+    Qt::Widgets
+)
+
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Core emulator
     core/arm_interpreter.cpp

@@ -29,3 +29,23 @@ stable path.
 1. Verify `FIREBIRD_ENABLE_KDDOCKWIDGETS=ON` on desktop platforms.
 2. Add a small prototype docking area (LCD/Keypad/Console).
 3. Start layout migration tooling (`QMainWindow` state -> JSON).
+
+## Converter Utility
+
+The repo now includes `firebird-layout-convert` (built from `tools/layout_convert.cpp`).
+
+Example:
+
+```bash
+./build/firebird-layout-convert \
+  --settings "$HOME/.config/firebird-emu/nspire_emu_thread.ini" \
+  --output /tmp/firebird-layout.json \
+  --pretty
+```
+
+What it does:
+
+- Reads legacy `windowState` from settings.
+- Creates placeholder docks for known Firebird dock object names.
+- Calls `restoreState()` with version fallback.
+- Emits migration JSON with dock area/visibility/floating/geometry info.
