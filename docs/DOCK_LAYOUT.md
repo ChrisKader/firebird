@@ -27,7 +27,8 @@ Changing this order can break persisted layouts because `restoreState` requires 
   2. legacy `windowState` in QSettings
   3. legacy `windowLayoutJson` bridge in QSettings
   4. reset to default layout
-- If startup used legacy settings data, Firebird migrates it into the selected profile JSON.
+- If startup used legacy settings data, Firebird migrates it into the selected profile JSON,
+  writes `layouts.bak.json` in the layout profile directory, and shows a one-time migration notice.
 
 ## Layout Profiles
 

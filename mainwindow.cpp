@@ -130,6 +130,7 @@ static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
 static constexpr const char *kSettingDockFocusPolicy = "dockFocusPolicy";
 static constexpr const char *kLayoutSchemaQMainWindowV1 = "firebird.qmainwindow.layout.v1";
 static constexpr int kMaxLayoutHistoryEntries = 10;
+static constexpr const char *kSettingLayoutMigrationNoticeShown = "layoutMigrationNoticeShown";
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -1154,12 +1155,49 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         const QJsonObject debugDockState = m_debugDocks ? m_debugDocks->serializeDockStates()
                                                         : QJsonObject();
         QString migrateError;
+        bool migrated = false;
         if (!saveLayoutProfile(content_window, autoProfile, WindowStateVersion, debugDockState, &migrateError)) {
             qDebug("legacy layout migration to profile '%s' failed: %s",
                    autoProfile.toUtf8().constData(),
                    migrateError.toUtf8().constData());
         } else {
+            migrated = true;
             qDebug("migrated legacy layout to profile '%s'", autoProfile.toUtf8().constData());
+        }
+
+        QString backupPath;
+        QString backupJson = settings->value(QString::fromLatin1(kSettingWindowLayoutJson)).toString();
+        if (backupJson.isEmpty()) {
+            const QByteArray currentState = content_window->saveState(WindowStateVersion);
+            const QJsonObject backupObj = exportLegacyDockLayoutJson(content_window, currentState, WindowStateVersion);
+            backupJson = QString::fromUtf8(QJsonDocument(backupObj).toJson(QJsonDocument::Indented));
+        }
+        if (!backupJson.isEmpty()) {
+            QString dirError;
+            if (ensureLayoutProfilesDir(&dirError)) {
+                backupPath = layoutProfilesDirPath() + QStringLiteral("/layouts.bak.json");
+                QFile backupFile(backupPath);
+                if (backupFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+                    backupFile.write(backupJson.toUtf8());
+                    backupFile.close();
+                } else {
+                    qDebug("could not write legacy layout backup: %s",
+                           backupPath.toUtf8().constData());
+                    backupPath.clear();
+                }
+            }
+        }
+
+        if (migrated && !settings->value(QString::fromLatin1(kSettingLayoutMigrationNoticeShown), false).toBool()) {
+            settings->setValue(QString::fromLatin1(kSettingLayoutMigrationNoticeShown), true);
+            const QString noticePath = backupPath;
+            QTimer::singleShot(0, this, [this, noticePath]() {
+                const QString msg = noticePath.isEmpty()
+                        ? tr("Layout format updated. Your layout now uses JSON profiles.")
+                        : tr("Layout format updated. Legacy layout backup saved to:\n%1")
+                              .arg(noticePath);
+                QMessageBox::information(this, tr("Layout Migration"), msg);
+            });
         }
     }
 
