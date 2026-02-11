@@ -173,14 +173,16 @@ private:
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
     void applyWidgetTheme();
-    void applyStandardDockFeatures(DockWidget *dw) const;
+    void applyStandardDockFeatures(DockWidget *dw, bool closable = true) const;
     DockWidget *createMainDock(const QString &title,
                                QWidget *widget,
                                const QString &objectName,
                                Qt::DockWidgetArea area,
                                QMenu *docksMenu = nullptr,
                                const QIcon &icon = QIcon(),
-                               bool hideTitlebar = true);
+                               bool hideTitlebar = true,
+                               bool closable = true,
+                               bool startVisible = true);
 
 protected:
     void resizeEvent(QResizeEvent *event) override;

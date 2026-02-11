@@ -74,14 +74,16 @@ const char *dockObjectName(DebugDockId id)
     return "dockUnknown";
 }
 
-void applyStandardDockFeatures(DockWidget *dw)
+void applyStandardDockFeatures(DockWidget *dw, bool closable = true)
 {
     if (!dw)
         return;
     dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-    dw->setFeatures(QDockWidget::DockWidgetClosable |
-                    QDockWidget::DockWidgetMovable |
-                    QDockWidget::DockWidgetFloatable);
+    QDockWidget::DockWidgetFeatures features = QDockWidget::DockWidgetMovable |
+                                               QDockWidget::DockWidgetFloatable;
+    if (closable)
+        features |= QDockWidget::DockWidgetClosable;
+    dw->setFeatures(features);
 }
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
@@ -105,17 +107,27 @@ KDDockWidgets::Location toKDDLocation(Qt::DockWidgetArea area)
 void addDockWidgetCompat(QMainWindow *window,
                          DockWidget *dock,
                          Qt::DockWidgetArea area,
-                         DockWidget *relativeTo = nullptr)
+                         DockWidget *relativeTo = nullptr,
+                         bool startHidden = false)
 {
     if (!window || !dock)
         return;
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     if (auto *kdd = asKDDMainWindow(window)) {
-        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo);
+        KDDockWidgets::InitialOption initial;
+        if (dock->widget()) {
+            const QSize hinted = dock->widget()->sizeHint();
+            if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
+                initial.preferredSize = hinted;
+        }
+        if (startHidden)
+            initial.visibility = KDDockWidgets::InitialVisibilityOption::StartHidden;
+        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo, initial);
         return;
     }
 #else
     Q_UNUSED(relativeTo);
+    Q_UNUSED(startHidden);
     window->addDockWidget(area, dock);
 #endif
 }
@@ -152,11 +164,18 @@ void splitDockWidgetCompat(QMainWindow *window, DockWidget *first, DockWidget *s
         return;
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     Q_UNUSED(window);
+    KDDockWidgets::InitialOption initial;
+    if (second->widget()) {
+        const QSize hinted = second->widget()->sizeHint();
+        if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
+            initial.preferredSize = hinted;
+    }
     first->addDockWidgetToContainingWindow(
         second,
         orientation == Qt::Horizontal ? KDDockWidgets::Location_OnRight
                                       : KDDockWidgets::Location_OnBottom,
-        first);
+        first,
+        initial);
 #else
     window->splitDockWidget(first, second, orientation);
 #endif
@@ -236,13 +255,17 @@ void DebugDockManager::showDock(DockWidget *dock, bool explicitUserAction)
 void DebugDockManager::createDocks(QMenu *docksMenu)
 {
     auto makeDock = [&](const QString &title, QWidget *widget, DebugDockId id,
-                        Qt::DockWidgetArea area) -> DockWidget * {
+                        Qt::DockWidgetArea area, bool coreDock) -> DockWidget * {
         const QString uniqueName = QString::fromLatin1(dockObjectName(id));
         auto *dw = new KDockWidget(uniqueName, title, m_host);
         dw->applyThinTitlebar(true);
         dw->setWidget(widget);
-        applyStandardDockFeatures(dw);
-        addDockWidgetCompat(m_host, dw, area);
+        applyStandardDockFeatures(dw, !coreDock);
+        addDockWidgetCompat(m_host, dw, area, nullptr, !coreDock);
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
+        if (!coreDock)
+            dw->hide();
+#endif
 
         QAction *action = dw->toggleViewAction();
         docksMenu->addAction(action);
@@ -272,39 +295,39 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     docksMenu->addSeparator();
 
     m_disasmDock = makeDock(tr("Disassembly"), m_disasmWidget,
-                            DebugDockId::Disasm, Qt::RightDockWidgetArea);
+                            DebugDockId::Disasm, Qt::RightDockWidgetArea, true);
     m_registerDock = makeDock(tr("Registers"), m_registerWidget,
-                              DebugDockId::Registers, Qt::RightDockWidgetArea);
+                              DebugDockId::Registers, Qt::RightDockWidgetArea, true);
     m_stackDock = makeDock(tr("Stack"), m_stackWidget,
-                           DebugDockId::Stack, Qt::RightDockWidgetArea);
+                           DebugDockId::Stack, Qt::RightDockWidgetArea, false);
 
     /* Tab Registers and Stack together */
     tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
     m_registerDock->raise();
 
     m_hexDock = makeDock(tr("Memory"), m_hexWidget,
-                         DebugDockId::Memory, Qt::BottomDockWidgetArea);
+                         DebugDockId::Memory, Qt::BottomDockWidgetArea, true);
     m_breakpointDock = makeDock(tr("Breakpoints"), m_breakpointWidget,
-                                DebugDockId::Breakpoints, Qt::BottomDockWidgetArea);
+                                DebugDockId::Breakpoints, Qt::BottomDockWidgetArea, false);
     m_watchpointDock = makeDock(tr("Watchpoints"), m_watchpointWidget,
-                                DebugDockId::Watchpoints, Qt::BottomDockWidgetArea);
+                                DebugDockId::Watchpoints, Qt::BottomDockWidgetArea, false);
     m_portMonitorDock = makeDock(tr("Port Monitor"), m_portMonitorWidget,
-                                 DebugDockId::PortMonitor, Qt::BottomDockWidgetArea);
+                                 DebugDockId::PortMonitor, Qt::BottomDockWidgetArea, false);
     m_keyHistoryDock = makeDock(tr("Key History"), m_keyHistoryWidget,
-                                DebugDockId::KeyHistory, Qt::BottomDockWidgetArea);
+                                DebugDockId::KeyHistory, Qt::BottomDockWidgetArea, false);
 
     m_consoleDock = makeDock(tr("Console"), m_consoleWidget,
-                             DebugDockId::Console, Qt::BottomDockWidgetArea);
+                             DebugDockId::Console, Qt::BottomDockWidgetArea, true);
     m_memVisDock = makeDock(tr("Memory Visualizer"), m_memVisWidget,
-                            DebugDockId::MemVis, Qt::BottomDockWidgetArea);
+                            DebugDockId::MemVis, Qt::BottomDockWidgetArea, false);
     m_cycleCounterDock = makeDock(tr("Cycle Counter"), m_cycleCounterWidget,
-                                  DebugDockId::CycleCounter, Qt::BottomDockWidgetArea);
+                                  DebugDockId::CycleCounter, Qt::BottomDockWidgetArea, false);
     m_timerMonitorDock = makeDock(tr("Timer Monitor"), m_timerMonitorWidget,
-                                  DebugDockId::TimerMonitor, Qt::BottomDockWidgetArea);
+                                  DebugDockId::TimerMonitor, Qt::BottomDockWidgetArea, false);
     m_lcdStateDock = makeDock(tr("LCD State"), m_lcdStateWidget,
-                              DebugDockId::LCDState, Qt::BottomDockWidgetArea);
+                              DebugDockId::LCDState, Qt::BottomDockWidgetArea, false);
     m_mmuViewerDock = makeDock(tr("MMU Viewer"), m_mmuViewerWidget,
-                               DebugDockId::MMUViewer, Qt::BottomDockWidgetArea);
+                               DebugDockId::MMUViewer, Qt::BottomDockWidgetArea, false);
 
     /* Set Material icons on toggle actions */
     refreshIcons();
@@ -657,9 +680,7 @@ void DebugDockManager::raise()
 
     autoShow(m_disasmDock);
     autoShow(m_registerDock);
-    autoShow(m_stackDock);
     autoShow(m_hexDock);
-    autoShow(m_breakpointDock);
     autoShow(m_consoleDock);
 
     showDock(m_disasmDock, false);
@@ -684,7 +705,7 @@ void DebugDockManager::setEditMode(bool enabled)
 
 void DebugDockManager::resetLayout()
 {
-    /* Show all debug docks and re-arrange them to a sensible default. */
+    /* Re-arrange debug docks with a core-visible default set. */
     DockWidget *debugDocks[] = {
         m_disasmDock, m_registerDock, m_stackDock,
         m_hexDock, m_breakpointDock, m_watchpointDock, m_portMonitorDock,
@@ -769,4 +790,26 @@ void DebugDockManager::resetLayout()
     else if (debugToolsRoot) { vTargets << debugToolsRoot; vSizes << 200; }
     if (!vTargets.isEmpty())
         resizeDocksCompat(m_host, vTargets, vSizes, Qt::Vertical);
+
+    auto hideByDefault = [](DockWidget *dock) {
+        if (dock)
+            dock->setVisible(false);
+    };
+    hideByDefault(m_stackDock);
+    hideByDefault(m_breakpointDock);
+    hideByDefault(m_watchpointDock);
+    hideByDefault(m_portMonitorDock);
+    hideByDefault(m_keyHistoryDock);
+    hideByDefault(m_memVisDock);
+    hideByDefault(m_cycleCounterDock);
+    hideByDefault(m_timerMonitorDock);
+    hideByDefault(m_lcdStateDock);
+    hideByDefault(m_mmuViewerDock);
+    for (DockWidget *extra : m_extraHexDocks)
+        hideByDefault(extra);
+
+    if (m_disasmDock) m_disasmDock->setVisible(true);
+    if (m_registerDock) m_registerDock->setVisible(true);
+    if (m_hexDock) m_hexDock->setVisible(true);
+    if (m_consoleDock) m_consoleDock->setVisible(true);
 }

@@ -206,17 +206,27 @@ static KDDockWidgets::Location toKDDLocation(Qt::DockWidgetArea area)
 static void addDockWidgetCompat(QMainWindow *window,
                                 DockWidget *dock,
                                 Qt::DockWidgetArea area,
-                                DockWidget *relativeTo = nullptr)
+                                DockWidget *relativeTo = nullptr,
+                                bool startHidden = false)
 {
     if (!window || !dock)
         return;
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     if (auto *kdd = asKDDMainWindow(window)) {
-        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo);
+        KDDockWidgets::InitialOption initial;
+        if (dock->widget()) {
+            const QSize hinted = dock->widget()->sizeHint();
+            if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
+                initial.preferredSize = hinted;
+        }
+        if (startHidden)
+            initial.visibility = KDDockWidgets::InitialVisibilityOption::StartHidden;
+        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo, initial);
         return;
     }
 #else
     Q_UNUSED(relativeTo);
+    Q_UNUSED(startHidden);
     window->addDockWidget(area, dock);
 #endif
 }
@@ -549,16 +559,16 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
 
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
 
-void MainWindow::applyStandardDockFeatures(DockWidget *dw) const
+void MainWindow::applyStandardDockFeatures(DockWidget *dw, bool closable) const
 {
     if (!dw)
         return;
-#ifndef FIREBIRD_USE_KDDOCKWIDGETS
     dw->setAllowedAreas(Qt::AllDockWidgetAreas);
-    dw->setFeatures(QDockWidget::DockWidgetClosable |
-                    QDockWidget::DockWidgetMovable |
-                    QDockWidget::DockWidgetFloatable);
-#endif
+    QDockWidget::DockWidgetFeatures features = QDockWidget::DockWidgetMovable |
+                                               QDockWidget::DockWidgetFloatable;
+    if (closable)
+        features |= QDockWidget::DockWidgetClosable;
+    dw->setFeatures(features);
 }
 
 DockWidget *MainWindow::createMainDock(const QString &title,
@@ -567,7 +577,9 @@ DockWidget *MainWindow::createMainDock(const QString &title,
                                        Qt::DockWidgetArea area,
                                        QMenu *docksMenu,
                                        const QIcon &icon,
-                                       bool hideTitlebar)
+                                       bool hideTitlebar,
+                                       bool closable,
+                                       bool startVisible)
 {
     const QString uniqueName = objectName.isEmpty() ? title : objectName;
     auto *dw = new KDockWidget(uniqueName, title, content_window);
@@ -576,8 +588,12 @@ DockWidget *MainWindow::createMainDock(const QString &title,
     if (!icon.isNull())
         dw->setWindowIcon(icon);
     dw->setWidget(widget);
-    applyStandardDockFeatures(dw);
-    addDockWidgetCompat(content_window, dw, area);
+    applyStandardDockFeatures(dw, closable);
+    addDockWidgetCompat(content_window, dw, area, nullptr, !startVisible);
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
+    if (!startVisible)
+        dw->hide();
+#endif
     if (docksMenu) {
         QAction *action = dw->toggleViewAction();
         if (!icon.isNull())
@@ -770,9 +786,12 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     // This lets the custom header bar sit above everything else (similar to VS Code),
     // while docks live around the central emulator surface without overlapping the header.
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    const auto contentWindowOptions = KDDockWidgets::MainWindowOptions(
+        KDDockWidgets::MainWindowOption_HasCentralWidget |
+        KDDockWidgets::MainWindowOption_CentralWidgetGetsAllExtraSpace);
     content_window = new KDDockWidgets::QtWidgets::MainWindow(
         QStringLiteral("contentWindow"),
-        KDDockWidgets::MainWindowOption_HasCentralWidget,
+        contentWindowOptions,
         this);
 #else
     content_window = new QMainWindow(this);
@@ -785,11 +804,16 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
                                    QMainWindow::GroupedDragging);
 #endif
 
-    // Use an invisible placeholder as central widget so docks fill all the space.
-    // setFixedSize(0, 10) keeps a minimal vertical extent so all four dock areas
-    // remain usable; setMaximumSize(0,0) can cause Qt to collapse adjacent docks.
+    // Use an invisible placeholder as central widget so docking keeps a stable center area.
+    // On KDD we keep a small minimum so newly placed docks are not forced to consume
+    // all available space around a collapsed center.
     auto *placeholder = new QWidget(content_window);
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    placeholder->setMinimumSize(220, 160);
+    placeholder->setSizePolicy(QSizePolicy::MinimumExpanding, QSizePolicy::MinimumExpanding);
+#else
     placeholder->setFixedSize(0, 10);
+#endif
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     if (auto *kdd = asKDDMainWindow(content_window))
         kdd->setPersistentCentralWidget(placeholder);
@@ -803,7 +827,12 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
         m_dock_lcd = createMainDock(tr("Screen"),
                                     ui->lcdView,
                                     QString::fromLatin1(mainDockObjectName(MainDockId::LCD)),
-                                    Qt::RightDockWidgetArea);
+                                    Qt::RightDockWidgetArea,
+                                    nullptr,
+                                    QIcon(),
+                                    true,
+                                    false,
+                                    true);
         connect(ui->lcdView, &LCDWidget::scaleChanged, this, [this](int percent) {
             m_dock_lcd->setWindowTitle(tr("Screen") + QStringLiteral(" (%1%)").arg(percent));
         });
@@ -852,7 +881,12 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
         m_dock_controls = createMainDock(tr("Controls"),
                                          controlsWidget,
                                          QString::fromLatin1(mainDockObjectName(MainDockId::Controls)),
-                                         Qt::RightDockWidgetArea);
+                                         Qt::RightDockWidgetArea,
+                                         nullptr,
+                                         QIcon(),
+                                         true,
+                                         false,
+                                         true);
     }
 
     // Hide the now-empty frame (cannot delete -- owned by Ui::MainWindow)
@@ -2300,7 +2334,9 @@ void MainWindow::convertTabsToDocks()
                                         Qt::RightDockWidgetArea,
                                         docks_menu,
                                         tab_icon,
-                                        true);
+                                        true,
+                                        tab != ui->tab,
+                                        tab == ui->tab);
         dock_pairs.append({tab, dw});
     }
 
@@ -2315,8 +2351,6 @@ void MainWindow::convertTabsToDocks()
 
         if (tab == ui->tabFiles)         dock_files = dw;
         else if (tab == ui->tab)         dock_keypad = dw;
-
-        addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea);
     }
 
     /* Keep pointers for layout reset/re-link behavior. */
@@ -2330,7 +2364,11 @@ void MainWindow::convertTabsToDocks()
                                  m_nandBrowser,
                                  QString::fromLatin1(mainDockObjectName(MainDockId::NandBrowser)),
                                  Qt::RightDockWidgetArea,
-                                 docks_menu);
+                                 docks_menu,
+                                 QIcon(),
+                                 true,
+                                 true,
+                                 false);
 
     /* Create Hardware Configuration dock */
     m_hwConfig = new HwConfigWidget(content_window);
@@ -2338,7 +2376,11 @@ void MainWindow::convertTabsToDocks()
                                      m_hwConfig,
                                      QString::fromLatin1(mainDockObjectName(MainDockId::HwConfig)),
                                      Qt::RightDockWidgetArea,
-                                     docks_menu);
+                                     docks_menu,
+                                     QIcon(),
+                                     true,
+                                     true,
+                                     false);
 
     /* External LCD as an optional floating dock (instead of a separate window). */
     m_dock_ext_lcd = createMainDock(tr("Screen (External)"),
@@ -2347,6 +2389,8 @@ void MainWindow::convertTabsToDocks()
                                     Qt::RightDockWidgetArea,
                                     docks_menu,
                                     QIcon(),
+                                    false,
+                                    true,
                                     false);
     m_dock_ext_lcd->setFloating(true);
     m_dock_ext_lcd->hide();
@@ -2720,16 +2764,20 @@ void MainWindow::resetDockLayout()
         m_dock_controls->setVisible(true);
     }
 
-    /* Reset file/keypad/NAND/HW config docks as regular docks. */
-    for (DockWidget *dw : {m_dock_files,
-                           m_dock_keypad,
-                           m_dock_nand,
-                           m_dock_hwconfig}) {
-        if (dw) {
-            dw->setFloating(false);
-            addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea);
-            dw->setVisible(true);
-        }
+    /* Keep the keypad dock visible by default. */
+    if (m_dock_keypad) {
+        m_dock_keypad->setFloating(false);
+        addDockWidgetCompat(content_window, m_dock_keypad, Qt::RightDockWidgetArea);
+        m_dock_keypad->setVisible(true);
+    }
+
+    /* Utility docks stay optional by default. */
+    for (DockWidget *dw : {m_dock_files, m_dock_nand, m_dock_hwconfig}) {
+        if (!dw)
+            continue;
+        dw->setFloating(false);
+        addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea, nullptr, true);
+        dw->setVisible(false);
     }
 
     if (m_debugDocks) m_debugDocks->resetLayout();

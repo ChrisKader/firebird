@@ -11,6 +11,8 @@
 #include <kddockwidgets/DockWidget.h>
 #include <kddockwidgets/LayoutSaver.h>
 
+#include "ui/kdockwidget.h"
+
 namespace {
 
 QString uniqueName(const QString &prefix)
@@ -153,6 +155,34 @@ private slots:
         QCoreApplication::processEvents();
 
         QVERIFY(fixture.dockB->isOpen());
+    }
+
+    void wrapperCompatibility()
+    {
+        KDockWidget dock(uniqueName(QStringLiteral("compatDock")), QStringLiteral("Compat"));
+        dock.setWidget(new QWidget());
+
+        dock.setFeatures(QDockWidget::DockWidgetMovable |
+                         QDockWidget::DockWidgetFloatable);
+        QVERIFY((dock.options() & KDDockWidgets::DockWidgetOption_NotClosable) != 0);
+
+        dock.setFeatures(QDockWidget::DockWidgetClosable |
+                         QDockWidget::DockWidgetMovable |
+                         QDockWidget::DockWidgetFloatable);
+        QVERIFY((dock.options() & KDDockWidgets::DockWidgetOption_NotClosable) == 0);
+
+        dock.setFeatures(QDockWidget::DockWidgetClosable |
+                         QDockWidget::DockWidgetMovable);
+        QVERIFY(dock.floatAction() != nullptr);
+        QVERIFY(!dock.floatAction()->isEnabled());
+
+        dock.setFeatures(QDockWidget::DockWidgetClosable |
+                         QDockWidget::DockWidgetMovable |
+                         QDockWidget::DockWidgetFloatable);
+        QVERIFY(dock.floatAction()->isEnabled());
+
+        dock.setAllowedAreas(Qt::NoDockWidgetArea);
+        dock.setAllowedAreas(Qt::AllDockWidgetAreas);
     }
 };
 

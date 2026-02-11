@@ -227,6 +227,10 @@ if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
     if(BUILD_TESTING)
         add_executable(firebird-kdd-layout-tests
             tests/kdd_layout_test.cpp
+            ui/kdockwidget.cpp
+        )
+        target_compile_definitions(firebird-kdd-layout-tests PRIVATE
+            FIREBIRD_USE_KDDOCKWIDGETS=1
         )
         target_link_libraries(firebird-kdd-layout-tests PRIVATE
             Qt::Core

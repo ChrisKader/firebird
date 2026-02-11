@@ -37,6 +37,14 @@ signals:
     void topLevelChanged(bool floating);
     void visibilityChanged(bool visible);
     void dockLocationChanged(Qt::DockWidgetArea area);
+
+private:
+    void syncCompatibilityOptions();
+
+    Qt::DockWidgetAreas m_allowedAreas = Qt::AllDockWidgetAreas;
+    QDockWidget::DockWidgetFeatures m_features = QDockWidget::DockWidgetClosable |
+                                                 QDockWidget::DockWidgetMovable |
+                                                 QDockWidget::DockWidgetFloatable;
 };
 #else
 class KDockWidget : public DockWidget
