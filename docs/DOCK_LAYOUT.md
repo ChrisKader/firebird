@@ -52,6 +52,10 @@ Changing this order can break persisted layouts because `restoreState` requires 
   - Memory: Memory, Memory Visualizer, MMU Viewer, extra memory views
   - System: Port Monitor, Timer Monitor, LCD State, Cycle Counter
   - Debug tools: Console, Breakpoints, Watchpoints, Key History
+- Layout undo/redo is available under `Edit`:
+  - `Undo Layout` (`Ctrl+Alt+Z`)
+  - `Redo Layout` (`Ctrl+Alt+Shift+Z`)
+  - History is capped at 10 snapshots.
 
 ## Related code
 

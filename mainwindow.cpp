@@ -127,6 +127,7 @@ static constexpr const char *kSettingLayoutProfile = "layoutProfile";
 static constexpr const char *kSettingDebugDockStateJson = "debugDockStateJson";
 static constexpr const char *kSettingDockFocusPolicy = "dockFocusPolicy";
 static constexpr const char *kLayoutSchemaQMainWindowV1 = "firebird.qmainwindow.layout.v1";
+static constexpr int kMaxLayoutHistoryEntries = 10;
 
 struct HwOverrides {
     int batteryRaw = -1;
@@ -1160,6 +1161,10 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
         }
     }
 
+    m_layoutUndoHistory.clear();
+    m_layoutRedoHistory.clear();
+    captureLayoutHistorySnapshot();
+
     m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
 
     // Restore HW config overrides
@@ -1450,6 +1455,90 @@ void MainWindow::savePersistentUiState()
     writeHwOverridesToSettings(settings, hw);
 
     settings->sync();
+}
+
+void MainWindow::scheduleLayoutHistoryCapture()
+{
+    if (m_layoutHistoryApplying || !m_layoutHistoryTimer)
+        return;
+    m_layoutHistoryTimer->start();
+}
+
+void MainWindow::captureLayoutHistorySnapshot()
+{
+    if (m_layoutHistoryApplying || !content_window)
+        return;
+
+    const QByteArray state = content_window->saveState(WindowStateVersion);
+    if (state.isEmpty())
+        return;
+    if (!m_layoutUndoHistory.isEmpty() && m_layoutUndoHistory.last() == state) {
+        updateLayoutHistoryActions();
+        return;
+    }
+
+    m_layoutUndoHistory.append(state);
+    while (m_layoutUndoHistory.size() > kMaxLayoutHistoryEntries)
+        m_layoutUndoHistory.removeFirst();
+    m_layoutRedoHistory.clear();
+    updateLayoutHistoryActions();
+}
+
+void MainWindow::updateLayoutHistoryActions()
+{
+    if (m_undoLayoutAction)
+        m_undoLayoutAction->setEnabled(m_layoutUndoHistory.size() > 1);
+    if (m_redoLayoutAction)
+        m_redoLayoutAction->setEnabled(!m_layoutRedoHistory.isEmpty());
+}
+
+void MainWindow::undoLayoutChange()
+{
+    if (!content_window || m_layoutUndoHistory.size() < 2)
+        return;
+
+    const QByteArray current = m_layoutUndoHistory.takeLast();
+    const QByteArray target = m_layoutUndoHistory.last();
+
+    m_layoutHistoryApplying = true;
+    bool restored = false;
+    for (int version = WindowStateVersion; version >= 1 && !restored; --version)
+        restored = content_window->restoreState(target, version);
+    m_layoutHistoryApplying = false;
+
+    if (restored) {
+        m_layoutRedoHistory.append(current);
+        if (m_debugDocks)
+            m_debugDocks->refreshIcons();
+    } else {
+        m_layoutUndoHistory.append(current);
+    }
+    updateLayoutHistoryActions();
+}
+
+void MainWindow::redoLayoutChange()
+{
+    if (!content_window || m_layoutRedoHistory.isEmpty())
+        return;
+
+    const QByteArray target = m_layoutRedoHistory.takeLast();
+
+    m_layoutHistoryApplying = true;
+    bool restored = false;
+    for (int version = WindowStateVersion; version >= 1 && !restored; --version)
+        restored = content_window->restoreState(target, version);
+    m_layoutHistoryApplying = false;
+
+    if (restored) {
+        m_layoutUndoHistory.append(target);
+        while (m_layoutUndoHistory.size() > kMaxLayoutHistoryEntries)
+            m_layoutUndoHistory.removeFirst();
+        if (m_debugDocks)
+            m_debugDocks->refreshIcons();
+    } else {
+        m_layoutRedoHistory.append(target);
+    }
+    updateLayoutHistoryActions();
 }
 
 void MainWindow::switchTranslator(const QLocale &locale)
@@ -1801,6 +1890,18 @@ void MainWindow::convertTabsToDocks()
     QMenu *docks_menu = new QMenu(tr("Docks"), this);
     ui->menubar->insertMenu(ui->menuAbout->menuAction(), docks_menu);
 
+    QMenu *edit_menu = new QMenu(tr("&Edit"), this);
+    ui->menubar->insertMenu(ui->menuTools->menuAction(), edit_menu);
+
+    m_undoLayoutAction = edit_menu->addAction(tr("Undo Layout"));
+    m_undoLayoutAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Z")));
+    connect(m_undoLayoutAction, &QAction::triggered, this, &MainWindow::undoLayoutChange);
+
+    m_redoLayoutAction = edit_menu->addAction(tr("Redo Layout"));
+    m_redoLayoutAction->setShortcut(QKeySequence(QStringLiteral("Ctrl+Alt+Shift+Z")));
+    connect(m_redoLayoutAction, &QAction::triggered, this, &MainWindow::redoLayoutChange);
+    updateLayoutHistoryActions();
+
     QAction *editmode_toggle = new QAction(tr("Enable UI edit mode"), this);
     editmode_toggle->setCheckable(true);
     editmode_toggle->setChecked(settings->value(QStringLiteral("uiEditModeEnabled"), true).toBool());
@@ -2028,6 +2129,22 @@ void MainWindow::convertTabsToDocks()
     }
 
     setUIEditMode(editmode_toggle->isChecked());
+
+    if (!m_layoutHistoryTimer) {
+        m_layoutHistoryTimer = new QTimer(this);
+        m_layoutHistoryTimer->setSingleShot(true);
+        m_layoutHistoryTimer->setInterval(150);
+        connect(m_layoutHistoryTimer, &QTimer::timeout, this, &MainWindow::captureLayoutHistorySnapshot);
+    }
+    const auto dockChildren = content_window->findChildren<DockWidget *>();
+    for (DockWidget *dock : dockChildren) {
+        connect(dock, &QDockWidget::dockLocationChanged, this,
+                [this](Qt::DockWidgetArea) { scheduleLayoutHistoryCapture(); });
+        connect(dock, &QDockWidget::topLevelChanged, this,
+                [this](bool) { scheduleLayoutHistoryCapture(); });
+        connect(dock, &QDockWidget::visibilityChanged, this,
+                [this](bool) { scheduleLayoutHistoryCapture(); });
+    }
 
     ui->tabWidget->setHidden(true);
 }
@@ -2335,6 +2452,7 @@ void MainWindow::resetDockLayout()
     }
 
     if (m_debugDocks) m_debugDocks->resetLayout();
+    scheduleLayoutHistoryCapture();
 }
 
 void MainWindow::showAbout()

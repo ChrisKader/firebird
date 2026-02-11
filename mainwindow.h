@@ -35,6 +35,8 @@ class QTableWidget;
 class QDockWidget;
 class QMenu;
 class QIcon;
+class QAction;
+class QTimer;
 class QQuickWidgetLessBroken : public QQuickWidget
 {
     Q_OBJECT
@@ -152,6 +154,11 @@ private:
     void refillKitMenus();
     void updateWindowTitle();
     void savePersistentUiState();
+    void scheduleLayoutHistoryCapture();
+    void captureLayoutHistorySnapshot();
+    void updateLayoutHistoryActions();
+    void undoLayoutChange();
+    void redoLayoutChange();
 
     // This changes the current GUI language to the one given in parameter, if available.
     // The change is persistent (saved in settings) if it was successful.
@@ -255,6 +262,14 @@ private:
 
     // LCD/Keypad link state
     bool m_lcdKeypadLinked = false;
+
+    // Layout undo/redo history
+    QAction *m_undoLayoutAction = nullptr;
+    QAction *m_redoLayoutAction = nullptr;
+    QTimer *m_layoutHistoryTimer = nullptr;
+    QList<QByteArray> m_layoutUndoHistory;
+    QList<QByteArray> m_layoutRedoHistory;
+    bool m_layoutHistoryApplying = false;
 
 };
 
