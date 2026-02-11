@@ -8,6 +8,8 @@ find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick QuickWidgets Widgets)
 
 qt_standard_project_setup()
 
+option(FIREBIRD_ENABLE_KDDOCKWIDGETS "Enable experimental KDDockWidgets migration path" OFF)
+
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Core emulator
     core/arm_interpreter.cpp
@@ -165,6 +167,21 @@ target_compile_options(firebird-emu PRIVATE
 target_compile_definitions(firebird-emu PRIVATE
     QT_NO_CAST_FROM_ASCII
 )
+
+if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
+    find_package(KDDockWidgets 2.4 REQUIRED)
+    target_compile_definitions(firebird-emu PRIVATE FIREBIRD_USE_KDDOCKWIDGETS=1)
+
+    if(TARGET KDDockWidgets::KDDockWidgets)
+        target_link_libraries(firebird-emu PRIVATE KDDockWidgets::KDDockWidgets)
+    elseif(TARGET KDDockWidgets::kddockwidgets)
+        target_link_libraries(firebird-emu PRIVATE KDDockWidgets::kddockwidgets)
+    elseif(TARGET KDAB::kddockwidgets)
+        target_link_libraries(firebird-emu PRIVATE KDAB::kddockwidgets)
+    else()
+        message(FATAL_ERROR "KDDockWidgets package found, but no known CMake target was exported.")
+    endif()
+endif()
 
 # Resources:
 set(resources_resource_files
