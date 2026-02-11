@@ -86,6 +86,12 @@ private:
     QStack<uint32_t> m_navHistory;
     QStack<uint32_t> m_navForward;
 
+    /* Cache the last disassembled window to avoid redundant full re-disassembly
+     * when only breakpoint/watchpoint markers change on the same base address. */
+    QVector<debug_disasm_line> m_cachedWindow;
+    uint32_t m_cachedBaseAddr = 0;
+    bool m_cachedWindowValid = false;
+
     static constexpr int MARGIN_WIDTH = 24;
     static constexpr int NUM_LINES = 128;
 };

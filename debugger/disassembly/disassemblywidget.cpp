@@ -16,6 +16,8 @@
 #include <QFile>
 #include <QTextStream>
 
+#include <cstring>
+
 #include "core/debug_api.h"
 #include "ui/widgettheme.h"
 
@@ -259,6 +261,10 @@ int DisassemblyWidget::visibleLineCount() const
 
 void DisassemblyWidget::refresh()
 {
+    /* CPU execution may have changed code and PC; invalidate cached disassembly
+     * window so the next update re-queries core state. */
+    m_cachedWindowValid = false;
+
     uint32_t regs[16];
     uint32_t cpsr, spsr;
     bool has_spsr;
@@ -291,8 +297,25 @@ void DisassemblyWidget::goToAddress(uint32_t addr)
 
 void DisassemblyWidget::updateLines()
 {
-    struct debug_disasm_line raw_lines[NUM_LINES];
-    int count = debug_disassemble(m_baseAddr, raw_lines, NUM_LINES);
+    int count = 0;
+    const debug_disasm_line *raw_lines = nullptr;
+
+    if (m_cachedWindowValid && m_cachedBaseAddr == m_baseAddr) {
+        count = m_cachedWindow.size();
+        raw_lines = m_cachedWindow.constData();
+    } else {
+        struct debug_disasm_line window[NUM_LINES];
+        count = debug_disassemble(m_baseAddr, window, NUM_LINES);
+        if (count < 0)
+            count = 0;
+
+        m_cachedWindow.resize(count);
+        if (count > 0)
+            std::memcpy(m_cachedWindow.data(), window, sizeof(debug_disasm_line) * static_cast<size_t>(count));
+        m_cachedBaseAddr = m_baseAddr;
+        m_cachedWindowValid = true;
+        raw_lines = m_cachedWindow.constData();
+    }
 
     struct debug_breakpoint bps[256];
     int bp_count = debug_list_breakpoints(bps, 256);
