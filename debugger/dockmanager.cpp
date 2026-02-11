@@ -87,6 +87,31 @@ DebugDockManager::DebugDockManager(QMainWindow *host, const QFont &iconFont,
 {
 }
 
+DisassemblyWidget *DebugDockManager::disassembly() const
+{
+    return m_disasmWidget.data();
+}
+
+HexViewWidget *DebugDockManager::hexView() const
+{
+    return m_hexWidget.data();
+}
+
+ConsoleWidget *DebugDockManager::console() const
+{
+    return m_consoleWidget.data();
+}
+
+DockWidget *DebugDockManager::consoleDock() const
+{
+    return m_consoleDock.data();
+}
+
+WatchpointWidget *DebugDockManager::watchpoints() const
+{
+    return m_watchpointWidget.data();
+}
+
 void DebugDockManager::setDockFocusPolicy(DockFocusPolicy policy)
 {
     m_dockFocusPolicy = policy;
@@ -441,8 +466,8 @@ void DebugDockManager::refreshAll()
     };
 
     /* Refresh high-priority widgets immediately (disassembly, registers). */
-    refreshNow(m_disasmWidget, shouldRefresh(DIRTY_DISASM) && dockVisible(m_disasmDock));
-    refreshNow(m_registerWidget, shouldRefresh(DIRTY_REGS) && dockVisible(m_registerDock));
+    refreshNow(m_disasmWidget.data(), shouldRefresh(DIRTY_DISASM) && dockVisible(m_disasmDock));
+    refreshNow(m_registerWidget.data(), shouldRefresh(DIRTY_REGS) && dockVisible(m_registerDock));
 
     /* Stagger remaining widgets across separate event-loop iterations
      * so no single callback blocks the UI for too long.  Each widget
@@ -487,13 +512,13 @@ void DebugDockManager::refreshAll()
             return;
         deferRefresh(widget);
     };
-    deferRefreshIfVisible(m_stackWidget, m_stackDock, DIRTY_STACK);
-    deferRefreshIfVisible(m_portMonitorWidget, m_portMonitorDock, DIRTY_IO);
-    deferRefreshIfVisible(m_timerMonitorWidget, m_timerMonitorDock, DIRTY_IO);
-    deferRefreshIfVisible(m_lcdStateWidget, m_lcdStateDock, DIRTY_IO);
-    deferRefreshIfVisible(m_mmuViewerWidget, m_mmuViewerDock, DIRTY_IO);
-    deferRefreshIfVisible(m_memVisWidget, m_memVisDock, DIRTY_STATS);
-    deferRefreshIfVisible(m_cycleCounterWidget, m_cycleCounterDock, DIRTY_STATS);
+    deferRefreshIfVisible(m_stackWidget.data(), m_stackDock, DIRTY_STACK);
+    deferRefreshIfVisible(m_portMonitorWidget.data(), m_portMonitorDock, DIRTY_IO);
+    deferRefreshIfVisible(m_timerMonitorWidget.data(), m_timerMonitorDock, DIRTY_IO);
+    deferRefreshIfVisible(m_lcdStateWidget.data(), m_lcdStateDock, DIRTY_IO);
+    deferRefreshIfVisible(m_mmuViewerWidget.data(), m_mmuViewerDock, DIRTY_IO);
+    deferRefreshIfVisible(m_memVisWidget.data(), m_memVisDock, DIRTY_STATS);
+    deferRefreshIfVisible(m_cycleCounterWidget.data(), m_cycleCounterDock, DIRTY_STATS);
 
     m_dirtyFlags = 0;
 }

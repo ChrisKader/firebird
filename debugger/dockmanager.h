@@ -6,6 +6,7 @@
 #include <QSet>
 #include <QList>
 #include <QJsonObject>
+#include <QPointer>
 #include <cstdint>
 
 class QMainWindow;
@@ -56,11 +57,11 @@ public:
     void setDockFocusPolicy(DockFocusPolicy policy);
     DockFocusPolicy dockFocusPolicy() const { return m_dockFocusPolicy; }
 
-    DisassemblyWidget *disassembly() const { return m_disasmWidget; }
-    HexViewWidget *hexView() const { return m_hexWidget; }
-    ConsoleWidget *console() const { return m_consoleWidget; }
-    DockWidget *consoleDock() const { return m_consoleDock; }
-    WatchpointWidget *watchpoints() const { return m_watchpointWidget; }
+    DisassemblyWidget *disassembly() const;
+    HexViewWidget *hexView() const;
+    ConsoleWidget *console() const;
+    DockWidget *consoleDock() const;
+    WatchpointWidget *watchpoints() const;
 
 signals:
     void debugCommand(QString cmd);
@@ -77,43 +78,43 @@ private:
         DIRTY_ALL     = 0xFFFFFFFFu,
     };
 
-    QMainWindow *m_host;
+    QPointer<QMainWindow> m_host;
     QFont m_iconFont;
 
-    DisassemblyWidget *m_disasmWidget = nullptr;
-    RegisterWidget *m_registerWidget = nullptr;
-    HexViewWidget *m_hexWidget = nullptr;
-    BreakpointWidget *m_breakpointWidget = nullptr;
-    WatchpointWidget *m_watchpointWidget = nullptr;
-    PortMonitorWidget *m_portMonitorWidget = nullptr;
-    StackWidget *m_stackWidget = nullptr;
-    KeyHistoryWidget *m_keyHistoryWidget = nullptr;
-    ConsoleWidget *m_consoleWidget = nullptr;
-    MemoryVisualizerWidget *m_memVisWidget = nullptr;
-    CycleCounterWidget *m_cycleCounterWidget = nullptr;
-    TimerMonitorWidget *m_timerMonitorWidget = nullptr;
-    LCDStateWidget *m_lcdStateWidget = nullptr;
-    MMUViewerWidget *m_mmuViewerWidget = nullptr;
+    QPointer<DisassemblyWidget> m_disasmWidget;
+    QPointer<RegisterWidget> m_registerWidget;
+    QPointer<HexViewWidget> m_hexWidget;
+    QPointer<BreakpointWidget> m_breakpointWidget;
+    QPointer<WatchpointWidget> m_watchpointWidget;
+    QPointer<PortMonitorWidget> m_portMonitorWidget;
+    QPointer<StackWidget> m_stackWidget;
+    QPointer<KeyHistoryWidget> m_keyHistoryWidget;
+    QPointer<ConsoleWidget> m_consoleWidget;
+    QPointer<MemoryVisualizerWidget> m_memVisWidget;
+    QPointer<CycleCounterWidget> m_cycleCounterWidget;
+    QPointer<TimerMonitorWidget> m_timerMonitorWidget;
+    QPointer<LCDStateWidget> m_lcdStateWidget;
+    QPointer<MMUViewerWidget> m_mmuViewerWidget;
 
-    DockWidget *m_disasmDock = nullptr;
-    DockWidget *m_registerDock = nullptr;
-    DockWidget *m_hexDock = nullptr;
-    DockWidget *m_breakpointDock = nullptr;
-    DockWidget *m_watchpointDock = nullptr;
-    DockWidget *m_portMonitorDock = nullptr;
-    DockWidget *m_stackDock = nullptr;
-    DockWidget *m_keyHistoryDock = nullptr;
-    DockWidget *m_consoleDock = nullptr;
-    DockWidget *m_memVisDock = nullptr;
-    DockWidget *m_cycleCounterDock = nullptr;
-    DockWidget *m_timerMonitorDock = nullptr;
-    DockWidget *m_lcdStateDock = nullptr;
-    DockWidget *m_mmuViewerDock = nullptr;
+    QPointer<DockWidget> m_disasmDock;
+    QPointer<DockWidget> m_registerDock;
+    QPointer<DockWidget> m_hexDock;
+    QPointer<DockWidget> m_breakpointDock;
+    QPointer<DockWidget> m_watchpointDock;
+    QPointer<DockWidget> m_portMonitorDock;
+    QPointer<DockWidget> m_stackDock;
+    QPointer<DockWidget> m_keyHistoryDock;
+    QPointer<DockWidget> m_consoleDock;
+    QPointer<DockWidget> m_memVisDock;
+    QPointer<DockWidget> m_cycleCounterDock;
+    QPointer<DockWidget> m_timerMonitorDock;
+    QPointer<DockWidget> m_lcdStateDock;
+    QPointer<DockWidget> m_mmuViewerDock;
 
     QSet<DockWidget *> m_autoShownDocks;
-    QList<HexViewWidget *> m_extraHexWidgets;
-    QList<DockWidget *> m_extraHexDocks;
-    QMenu *m_docksMenu = nullptr;
+    QList<QPointer<HexViewWidget>> m_extraHexWidgets;
+    QList<QPointer<DockWidget>> m_extraHexDocks;
+    QPointer<QMenu> m_docksMenu;
     int m_hexViewCount = 1;
     uint32_t m_dirtyFlags = DIRTY_ALL;
     DockFocusPolicy m_dockFocusPolicy = DockFocusPolicy::Always;
