@@ -56,6 +56,11 @@
 #include <array>
 #include <utility>
 
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    #include <kddockwidgets/MainWindow.h>
+    #include <kddockwidgets/KDDockWidgets.h>
+#endif
+
 #include "core/debug.h"
 #include "core/debug_api.h"
 #include "core/emu.h"
@@ -164,6 +169,7 @@ static void writeHwOverridesToSettings(QSettings *settings, const HwOverrides &o
         settings->setValue(QString::fromLatin1(entry.first), entry.second);
 }
 
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
 static QString dockAreaToString(Qt::DockWidgetArea area)
 {
     switch (area) {
@@ -175,6 +181,43 @@ static QString dockAreaToString(Qt::DockWidgetArea area)
     }
     return QStringLiteral("none");
 }
+#endif
+
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+static KDDockWidgets::QtWidgets::MainWindow *asKDDMainWindow(QMainWindow *window)
+{
+    return dynamic_cast<KDDockWidgets::QtWidgets::MainWindow *>(window);
+}
+
+static KDDockWidgets::Location toKDDLocation(Qt::DockWidgetArea area)
+{
+    switch (area) {
+    case Qt::LeftDockWidgetArea: return KDDockWidgets::Location_OnLeft;
+    case Qt::TopDockWidgetArea: return KDDockWidgets::Location_OnTop;
+    case Qt::RightDockWidgetArea: return KDDockWidgets::Location_OnRight;
+    case Qt::BottomDockWidgetArea: return KDDockWidgets::Location_OnBottom;
+    default: return KDDockWidgets::Location_OnRight;
+    }
+}
+#endif
+
+static void addDockWidgetCompat(QMainWindow *window,
+                                DockWidget *dock,
+                                Qt::DockWidgetArea area,
+                                DockWidget *relativeTo = nullptr)
+{
+    if (!window || !dock)
+        return;
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    if (auto *kdd = asKDDMainWindow(window)) {
+        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo);
+        return;
+    }
+#else
+    Q_UNUSED(relativeTo);
+    window->addDockWidget(area, dock);
+#endif
+}
 
 static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteArray &state, int version)
 {
@@ -185,8 +228,8 @@ static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteAr
 
     QJsonArray docks;
     if (window) {
-        const auto dockChildren = window->findChildren<QDockWidget *>();
-        for (QDockWidget *dw : dockChildren) {
+        const auto dockChildren = window->findChildren<DockWidget *>();
+        for (DockWidget *dw : dockChildren) {
             if (!dw)
                 continue;
             QJsonObject dock;
@@ -194,7 +237,11 @@ static QJsonObject exportLegacyDockLayoutJson(QMainWindow *window, const QByteAr
             dock.insert(QStringLiteral("title"), dw->windowTitle());
             dock.insert(QStringLiteral("visible"), dw->isVisible());
             dock.insert(QStringLiteral("floating"), dw->isFloating());
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+            dock.insert(QStringLiteral("area"), QStringLiteral("none"));
+#else
             dock.insert(QStringLiteral("area"), dockAreaToString(window->dockWidgetArea(dw)));
+#endif
             dock.insert(QStringLiteral("geometryBase64"),
                         QString::fromLatin1(dw->saveGeometry().toBase64()));
             docks.append(dock);
@@ -377,7 +424,7 @@ static bool restoreLayoutProfile(QMainWindow *window, const QString &profileName
 
 /* WidgetTheme, applyPaletteColors, setWidgetBackground now in widgettheme.h/cpp */
 
-void MainWindow::applyStandardDockFeatures(QDockWidget *dw) const
+void MainWindow::applyStandardDockFeatures(DockWidget *dw) const
 {
     if (!dw)
         return;
@@ -395,16 +442,15 @@ DockWidget *MainWindow::createMainDock(const QString &title,
                                        const QIcon &icon,
                                        bool hideTitlebar)
 {
-    auto *dw = new KDockWidget(title, content_window);
+    const QString uniqueName = objectName.isEmpty() ? title : objectName;
+    auto *dw = new KDockWidget(uniqueName, title, content_window);
     if (hideTitlebar)
         dw->applyThinTitlebar(true);
-    if (!objectName.isEmpty())
-        dw->setObjectName(objectName);
     if (!icon.isNull())
         dw->setWindowIcon(icon);
     dw->setWidget(widget);
     applyStandardDockFeatures(dw);
-    content_window->addDockWidget(area, dw);
+    addDockWidgetCompat(content_window, dw, area);
     if (docksMenu) {
         QAction *action = dw->toggleViewAction();
         if (!icon.isNull())
@@ -593,22 +639,36 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     connect(&emuThread(), &EmuThread::paused, this, [this](bool)
             { if (updatePlayPauseButtonFn) updatePlayPauseButtonFn(); });
 
-    // Create an inner QMainWindow that will host all docks and the LCD frame.
+    // Create an inner main window that will host all docks and the LCD frame.
     // This lets the custom header bar sit above everything else (similar to VS Code),
     // while docks live around the central emulator surface without overlapping the header.
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    content_window = new KDDockWidgets::QtWidgets::MainWindow(
+        QStringLiteral("contentWindow"),
+        KDDockWidgets::MainWindowOption_HasCentralWidget,
+        this);
+#else
     content_window = new QMainWindow(this);
+#endif
     content_window->setObjectName(QStringLiteral("contentWindow"));
+#ifndef FIREBIRD_USE_KDDOCKWIDGETS
     content_window->setDockOptions(QMainWindow::AllowTabbedDocks |
                                    QMainWindow::AllowNestedDocks |
                                    QMainWindow::AnimatedDocks |
                                    QMainWindow::GroupedDragging);
+#endif
 
     // Use an invisible placeholder as central widget so docks fill all the space.
     // setFixedSize(0, 10) keeps a minimal vertical extent so all four dock areas
     // remain usable; setMaximumSize(0,0) can cause Qt to collapse adjacent docks.
     auto *placeholder = new QWidget(content_window);
     placeholder->setFixedSize(0, 10);
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    if (auto *kdd = asKDDMainWindow(content_window))
+        kdd->setPersistentCentralWidget(placeholder);
+#else
     content_window->setCentralWidget(placeholder);
+#endif
     ui->mainLayout->addWidget(content_window);
 
     // Extract LCDWidget from ui->frame into its own dock
@@ -2128,7 +2188,7 @@ void MainWindow::convertTabsToDocks()
         if (tab == ui->tabFiles)         dock_files = dw;
         else if (tab == ui->tab)         dock_keypad = dw;
 
-        content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
+        addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea);
     }
 
     /* Keep pointers for layout reset/re-link behavior. */
@@ -2162,7 +2222,7 @@ void MainWindow::convertTabsToDocks()
                                     false);
     m_dock_ext_lcd->setFloating(true);
     m_dock_ext_lcd->hide();
-    connect(m_dock_ext_lcd, &QDockWidget::visibilityChanged, this, [this](bool visible) {
+    connect(m_dock_ext_lcd, &DockWidget::visibilityChanged, this, [this](bool visible) {
         if (ui && ui->actionLCD_Window)
             ui->actionLCD_Window->setChecked(visible);
     });
@@ -2181,7 +2241,7 @@ void MainWindow::convertTabsToDocks()
         /* QQuickWidget's Shape.CurveRenderer loses GPU state when the
          * widget is reparented during dock/undock.  Reload the QML
          * source to recreate all Shape items with fresh resources. */
-        connect(m_dock_keypad, &QDockWidget::topLevelChanged, this, [this]() {
+        connect(m_dock_keypad, &DockWidget::topLevelChanged, this, [this]() {
             QTimer::singleShot(0, this, [this]() {
                 auto src = ui->keypadWidget->source();
                 ui->keypadWidget->setSource(QUrl());
@@ -2223,11 +2283,11 @@ void MainWindow::convertTabsToDocks()
     }
     const auto dockChildren = content_window->findChildren<DockWidget *>();
     for (DockWidget *dock : dockChildren) {
-        connect(dock, &QDockWidget::dockLocationChanged, this,
+        connect(dock, &DockWidget::dockLocationChanged, this,
                 [this](Qt::DockWidgetArea) { scheduleLayoutHistoryCapture(); });
-        connect(dock, &QDockWidget::topLevelChanged, this,
+        connect(dock, &DockWidget::topLevelChanged, this,
                 [this](bool) { scheduleLayoutHistoryCapture(); });
-        connect(dock, &QDockWidget::visibilityChanged, this,
+        connect(dock, &DockWidget::visibilityChanged, this,
                 [this](bool) { scheduleLayoutHistoryCapture(); });
     }
 
@@ -2523,23 +2583,23 @@ void MainWindow::resetDockLayout()
     /* Reset LCD and Controls docks to RightDockWidgetArea (main area) */
     if (m_dock_lcd) {
         m_dock_lcd->setFloating(false);
-        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_lcd);
+        addDockWidgetCompat(content_window, m_dock_lcd, Qt::RightDockWidgetArea);
         m_dock_lcd->setVisible(true);
     }
     if (m_dock_controls) {
         m_dock_controls->setFloating(false);
-        content_window->addDockWidget(Qt::RightDockWidgetArea, m_dock_controls);
+        addDockWidgetCompat(content_window, m_dock_controls, Qt::RightDockWidgetArea);
         m_dock_controls->setVisible(true);
     }
 
     /* Reset file/keypad/NAND/HW config docks as regular docks. */
-    for (QDockWidget *dw : {static_cast<QDockWidget*>(m_dock_files),
-                            static_cast<QDockWidget*>(m_dock_keypad),
-                            static_cast<QDockWidget*>(m_dock_nand),
-                            static_cast<QDockWidget*>(m_dock_hwconfig)}) {
+    for (DockWidget *dw : {m_dock_files,
+                           m_dock_keypad,
+                           m_dock_nand,
+                           m_dock_hwconfig}) {
         if (dw) {
             dw->setFloating(false);
-            content_window->addDockWidget(Qt::RightDockWidgetArea, dw);
+            addDockWidgetCompat(content_window, dw, Qt::RightDockWidgetArea);
             dw->setVisible(true);
         }
     }

@@ -33,7 +33,6 @@ class MainWindow;
 class QResizeEvent;
 class QToolButton;
 class QTableWidget;
-class QDockWidget;
 class QMenu;
 class QIcon;
 class QAction;
@@ -174,7 +173,7 @@ private:
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
     void applyWidgetTheme();
-    void applyStandardDockFeatures(QDockWidget *dw) const;
+    void applyStandardDockFeatures(DockWidget *dw) const;
     DockWidget *createMainDock(const QString &title,
                                QWidget *widget,
                                const QString &objectName,

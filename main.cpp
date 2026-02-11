@@ -14,6 +14,10 @@
 #include "app/qmlbridge.h"
 #include "app/kitmodel.h"
 
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    #include <kddockwidgets/KDDockWidgets.h>
+#endif
+
 #if !defined(NO_TRANSLATION) && defined(IS_IOS_BUILD)
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -110,6 +114,10 @@ int main(int argc, char **argv)
     qRegisterMetaType<KitModel>();
 
     migrateSettings();
+
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    KDDockWidgets::initFrontend(KDDockWidgets::FrontendType::QtWidgets);
+#endif
 
     EmuThread emuThread;
     QMLBridge qmlBridge(&emuThread);

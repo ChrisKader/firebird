@@ -202,7 +202,13 @@ target_compile_definitions(firebird-emu PRIVATE
 )
 
 if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
-    find_package(KDDockWidgets 2.4 EXACT REQUIRED)
+    set(_kddockwidgets_version 2.4.0)
+    find_package(KDDockWidgets ${_kddockwidgets_version} EXACT CONFIG QUIET)
+    if(NOT TARGET KDDockWidgets::KDDockWidgets
+       AND NOT TARGET KDDockWidgets::kddockwidgets
+       AND NOT TARGET KDAB::kddockwidgets)
+        find_package(KDDockWidgets-qt6 ${_kddockwidgets_version} EXACT CONFIG REQUIRED)
+    endif()
     target_compile_definitions(firebird-emu PRIVATE FIREBIRD_USE_KDDOCKWIDGETS=1)
 
     if(TARGET KDDockWidgets::KDDockWidgets)

@@ -5,7 +5,9 @@
 *.bc
 *.qmlc
 build/
+build-kdd/
 android/.gradle
 .DS_Store
 .python-version
 data/
+.deps/

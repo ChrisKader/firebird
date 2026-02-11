@@ -2,9 +2,16 @@
 
 #include <QAction>
 
-KDockWidget::KDockWidget(const QString &title, QWidget *parent)
-    : DockWidget(title, parent)
+KDockWidget::KDockWidget(const QString &uniqueName,
+                         const QString &title,
+                         QWidget *parent)
+    : DockWidget(uniqueName, parent)
 {
+    setObjectName(uniqueName);
+    setWindowTitle(title);
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    setTitle(title);
+#endif
 }
 
 void KDockWidget::applyThinTitlebar(bool enabled)
