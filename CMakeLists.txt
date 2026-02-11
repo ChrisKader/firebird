@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(firebird-emu VERSION 1.0 LANGUAGES C CXX ASM)
 
+include(CTest)
+
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOUIC ON)
 
@@ -17,6 +19,27 @@ target_link_libraries(firebird-layout-convert PRIVATE
     Qt::Core
     Qt::Widgets
 )
+
+if(BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Test)
+
+    add_executable(firebird-layout-convert-tests
+        tests/layout_convert_test.cpp
+    )
+    target_link_libraries(firebird-layout-convert-tests PRIVATE
+        Qt::Core
+        Qt::Widgets
+        Qt::Test
+    )
+    add_dependencies(firebird-layout-convert-tests firebird-layout-convert)
+
+    add_test(NAME firebird-layout-convert-tests
+        COMMAND firebird-layout-convert-tests
+    )
+    set_tests_properties(firebird-layout-convert-tests PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;FIREBIRD_LAYOUT_CONVERTER=$<TARGET_FILE:firebird-layout-convert>"
+    )
+endif()
 
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Core emulator

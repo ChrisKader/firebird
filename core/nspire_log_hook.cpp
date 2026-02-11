@@ -526,25 +526,38 @@ static bool should_suppress_nlog_line(const std::string &label, const std::strin
 
 static std::string strip_mask_field(std::string line)
 {
-    size_t pos = line.find("mask=");
-    if (pos == std::string::npos)
-        return line;
+    size_t search_pos = 0;
+    while (search_pos < line.size()) {
+        size_t pos = line.find("mask=", search_pos);
+        if (pos == std::string::npos)
+            break;
 
-    size_t hex_begin = pos + 5;
-    size_t hex_end = hex_begin;
-    while (hex_end < line.size() && std::isxdigit(static_cast<unsigned char>(line[hex_end])))
-        hex_end++;
-    if (hex_end == hex_begin)
-        return line;
+        size_t hex_begin = pos + 5;
+        size_t hex_end = hex_begin;
+        while (hex_end < line.size() && std::isxdigit(static_cast<unsigned char>(line[hex_end])))
+            hex_end++;
+        if (hex_end == hex_begin) {
+            search_pos = hex_begin;
+            continue;
+        }
 
-    size_t erase_begin = pos;
-    if (erase_begin > 0 && line[erase_begin - 1] == ' ')
-        erase_begin--;
-    while (hex_end < line.size() && std::isspace(static_cast<unsigned char>(line[hex_end])))
-        hex_end++;
+        size_t erase_begin = pos;
+        if (erase_begin > 0 && line[erase_begin - 1] == ' ')
+            erase_begin--;
+        while (hex_end < line.size() && std::isspace(static_cast<unsigned char>(line[hex_end])))
+            hex_end++;
 
-    line.erase(erase_begin, hex_end - erase_begin);
-    return line;
+        line.erase(erase_begin, hex_end - erase_begin);
+        search_pos = erase_begin;
+    }
+
+    size_t start = 0;
+    while (start < line.size() && std::isspace(static_cast<unsigned char>(line[start])) != 0)
+        start++;
+    size_t end = line.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(line[end - 1])) != 0)
+        end--;
+    return line.substr(start, end - start);
 }
 
 static void emit_tagged_line(const std::string &file, const std::string &line)
