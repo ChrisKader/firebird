@@ -183,10 +183,29 @@ void gpio_write(uint32_t addr, uint32_t value) {
 
 /* 90010000, 900C0000, 900D0000 */
 timer_state timer_classic;
-#define ADDR_TO_TP(addr) (&timer_classic.pairs[((addr) >> 16) % 5])
+
+static int timer_bank_from_addr(uint32_t addr)
+{
+    switch ((addr >> 16) & 0xFFFF) {
+        case 0x9001: return 0; // Fast timer
+        case 0x900C: return 1; // Slow timer 0
+        case 0x900D: return 2; // Slow timer 1
+        default: return -1;
+    }
+}
+
+static struct timerpair *timer_pair_from_addr(uint32_t addr)
+{
+    int which = timer_bank_from_addr(addr);
+    if (which < 0)
+        return NULL;
+    return &timer_classic.pairs[which];
+}
 
 uint32_t timer_read(uint32_t addr) {
-    struct timerpair *tp = ADDR_TO_TP(addr);
+    struct timerpair *tp = timer_pair_from_addr(addr);
+    if (!tp)
+        return bad_read_word(addr);
     cycle_count_delta = 0; // Avoid slowdown by fast-forwarding through polling loops
     switch (addr & 0x003F) {
         case 0x00: return tp->timers[0].value;
@@ -201,7 +220,11 @@ uint32_t timer_read(uint32_t addr) {
     return bad_read_word(addr);
 }
 void timer_write(uint32_t addr, uint32_t value) {
-    struct timerpair *tp = ADDR_TO_TP(addr);
+    struct timerpair *tp = timer_pair_from_addr(addr);
+    if (!tp) {
+        bad_write_word(addr, value);
+        return;
+    }
     switch (addr & 0x003F) {
         case 0x00: tp->timers[0].start_value = tp->timers[0].value = value; return;
         case 0x04: tp->timers[0].divider = value; return;
@@ -319,7 +342,7 @@ static void watchdog_event(int index) {
 
     if (watchdog.control >> 1 & watchdog.interrupt) {
         warn("Resetting due to watchdog timeout");
-        cpu_events |= EVENT_RESET;
+        emu_request_reset_hard();
     } else {
         watchdog.interrupt = 1;
         int_set(INT_WATCHDOG, 1);
@@ -497,7 +520,7 @@ void misc_write(uint32_t addr, uint32_t value) {
     struct timerpair *tp = &timer_classic.pairs[(addr - 0x10) >> 3 & 3];
     switch (addr & 0x0FFF) {
         case 0x04: return;
-        case 0x08: cpu_events |= EVENT_RESET; return;
+        case 0x08: emu_request_reset_soft(); return;
         case 0x10: case 0x18: case 0x20:
             if (emulate_cx) break;
             tp->int_status &= ~value;
@@ -733,7 +756,9 @@ static uint32_t timer_cx_current_value(int which, int timer_idx) {
 
 uint32_t timer_cx_read(uint32_t addr) {
     cycle_count_delta += 1000; // avoid slowdown with polling loops
-    int which = (addr >> 16) % 5;
+    int which = timer_bank_from_addr(addr);
+    if (which < 0)
+        return bad_read_word(addr);
     int timer_idx = (addr >> 5) & 1;
     struct cx_timer *t = &timer_cx.timer[which][timer_idx];
     switch (addr & 0xFFFF) {
@@ -954,7 +979,11 @@ static void timer_cx_schedule_fast(void) {
 }
 
 void timer_cx_write(uint32_t addr, uint32_t value) {
-    int which = (addr >> 16) % 5;
+    int which = timer_bank_from_addr(addr);
+    if (which < 0) {
+        bad_write_word(addr, value);
+        return;
+    }
     struct cx_timer *t = &timer_cx.timer[which][addr >> 5 & 1];
     switch (addr & 0xFFFF) {
         case 0x0000: case 0x0020:
@@ -1142,6 +1171,11 @@ void timer_cx_reset() {
     timer_cx_schedule_slow();
 }
 
+void timer_cx_wake(void) {
+    timer_cx_schedule_fast();
+    timer_cx_schedule_slow();
+}
+
 /* 900F0000 */
 hdq1w_state hdq1w;
 
@@ -1325,8 +1359,9 @@ enum {
 
 bool cx2_battery_override_active(void)
 {
-    /* CX II battery model is driven by the millivolt override path. */
-    return hw_override_get_battery_mv() >= 0;
+    /* Primary path is millivolt override; keep legacy raw override as fallback. */
+    return hw_override_get_battery_mv() >= 0
+        || hw_override_get_adc_battery_level() >= 0;
 }
 
 static int clamp_int(int value, int min, int max)
@@ -1343,6 +1378,14 @@ static int cx2_effective_battery_mv(void)
     const int battery_mv = hw_override_get_battery_mv();
     if (battery_mv >= 0)
         return clamp_int(battery_mv, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX);
+
+    /* Compatibility fallback: accept legacy raw override if mV override is unset. */
+    const int raw = hw_override_get_adc_battery_level();
+    if (raw >= 0) {
+        int clamped_raw = clamp_int(raw, 0, 930);
+        return CX2_BATTERY_MV_MIN
+            + (clamped_raw * (CX2_BATTERY_MV_MAX - CX2_BATTERY_MV_MIN) + 465) / 930;
+    }
 
     /* Default to a full battery, matching classic ADC default behavior. */
     return CX2_BATTERY_MV_MAX;
@@ -1412,7 +1455,9 @@ charger_state_t cx2_effective_charger_state(void)
         return usb_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
     if (cx2_battery_override_active())
         return (hw_override_get_adc_charging() > 0) ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
-    return usblink_connected ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
+    /* Do not infer charging from link/session state. Treat auto as disconnected
+     * unless an explicit charger/USB override is provided. */
+    return CHARGER_DISCONNECTED;
 }
 
 static uint32_t cx2_adc_vbus_code(void)
@@ -1435,6 +1480,9 @@ static uint32_t cx2_adc_vbus_code(void)
 
 static void cx2_adc_refresh_samples(void)
 {
+    if (cpu_events & EVENT_SLEEP)
+        return;
+
     uint32_t batt = adc_cx2_effective_battery_code();
     uint32_t vref = cx2_adc_vref_code();
     uint32_t vref_aux = cx2_adc_vref_aux_code();
@@ -1468,6 +1516,49 @@ static void cx2_adc_refresh_samples(void)
     adc_cx2.reg[0x1Cu >> 2] = batt;
 }
 
+static bool cx2_adc_channel_offset(uint32_t offset, uint32_t *chan, uint32_t *regoff)
+{
+    if (offset < 0x100u || offset >= 0x1E0u)
+        return false;
+    uint32_t rel = offset - 0x100u;
+    uint32_t c = rel / 0x20u;
+    if (c >= 7u)
+        return false;
+    if (chan)
+        *chan = c;
+    if (regoff)
+        *regoff = rel % 0x20u;
+    return true;
+}
+
+static void cx2_adc_mark_channel_done(uint32_t chan)
+{
+    uint32_t base = (0x100u + chan * 0x20u) >> 2;
+    adc_cx2.reg[base + (0x08u >> 2)] |= 1u;
+    adc_cx2.reg[base + (0x0Cu >> 2)] |= 1u;
+}
+
+static bool cx2_adc_start_requested(uint32_t cmd);
+
+static bool cx2_adc_channel_started(uint32_t chan)
+{
+    uint32_t base = (0x100u + chan * 0x20u) >> 2;
+    return cx2_adc_start_requested(adc_cx2.reg[base + (0x00u >> 2)])
+        || cx2_adc_start_requested(adc_cx2.reg[base + (0x04u >> 2)]);
+}
+
+static bool cx2_adc_mark_started_channels_done(void)
+{
+    bool any = false;
+    for (uint32_t chan = 0; chan < 7u; chan++) {
+        if (!cx2_adc_channel_started(chan))
+            continue;
+        cx2_adc_mark_channel_done(chan);
+        any = true;
+    }
+    return any;
+}
+
 static bool cx2_adc_irq_should_assert(void)
 {
     uint32_t chan;
@@ -1489,16 +1580,20 @@ static void cx2_adc_update_irq(void)
     /* CX II bootloader ADC paths use logical IRQ 13 mapping in several places.
      * Mirror the source onto raw IRQ 13 as well so either mask path can fire. */
     int_set(13, on);
-    if (on)
-        aladdin_pmu_set_adc_pending(true);
+    aladdin_pmu_set_adc_pending(on);
 }
 
 void adc_cx2_background_step(void)
 {
+    if (cpu_events & EVENT_SLEEP)
+        return;
+
     /* 0x118 bit0 enables periodic conversions in observed boot flows. */
     if ((adc_cx2.reg[0x118u >> 2] & 1u) == 0)
         return;
     if (cx2_adc_irq_should_assert()) {
+        /* Keep sample bank live even while completion status stays latched. */
+        cx2_adc_refresh_samples();
         /* If status is latched, keep IRQ/pending in sync with that latch. */
         cx2_adc_update_irq();
         return;
@@ -1511,8 +1606,8 @@ void adc_cx2_background_step(void)
 
     adc_cx2.bg_counter = cx2_adc_bg_reload();
     cx2_adc_refresh_samples();
-    adc_cx2.reg[0x108u >> 2] |= 1u;
-    adc_cx2.reg[0x10Cu >> 2] |= 1u;
+    if (!cx2_adc_mark_started_channels_done())
+        cx2_adc_mark_channel_done(0);
     cx2_adc_update_irq();
 }
 
@@ -1535,15 +1630,25 @@ static bool cx2_adc_start_requested(uint32_t cmd)
 static void cx2_adc_latch_completion(void)
 {
     cx2_adc_refresh_samples();
-    adc_cx2.reg[0x108u >> 2] |= 1u;
-    adc_cx2.reg[0x10Cu >> 2] |= 1u;
+    if (!cx2_adc_mark_started_channels_done())
+        cx2_adc_mark_channel_done(0);
     adc_cx2.bg_counter = cx2_adc_bg_reload();
     cx2_adc_update_irq();
 }
 
 static uint16_t adc_read_channel(int n) {
-    if (pmu.disable2 & 0x10)
+    if (pmu.disable2 & 0x10) {
+        if (n == 3) {
+            const int16_t keypad_override = hw_override_get_adc_keypad_type();
+            if (keypad_override >= 0)
+                return (uint16_t)keypad_override;
+        } else {
+            const int16_t battery_override = hw_override_get_adc_battery_level();
+            if (battery_override >= 0)
+                return (uint16_t)battery_override;
+        }
         return 0x3FF;
+    }
 
     // Scale for channels 1-2:   155 units = 1 volt
     // Scale for other channels: 310 units = 1 volt
@@ -1641,7 +1746,7 @@ uint32_t adc_cx2_read_word(uint32_t addr)
 {
     uint32_t offset = addr & 0xFFF;
     uint32_t index = offset >> 2;
-    if (offset <= 0x1Cu && cx2_battery_override_active())
+    if (offset <= 0x1Cu)
         cx2_adc_refresh_samples();
     uint32_t reg = adc_cx2.reg[index];
     if (offset <= 0x1Cu && offset != 0x18u)
@@ -1653,13 +1758,14 @@ void adc_cx2_write_word(uint32_t addr, uint32_t value)
 {
     uint32_t offset = addr & 0xFFF;
     uint32_t index = offset >> 2;
+    uint32_t regoff = 0;
+    bool is_channel_reg = cx2_adc_channel_offset(offset, NULL, &regoff);
 
     if (offset <= 0x1Cu && offset != 0x18u)
         value &= CX2_ADC_CODE_MAX;
 
-    /* Status regs 0x108/0x10C: write-1-to-clear.  Must read pre-write value
-     * before storing so latched bits are not silently dropped. */
-    if (offset == 0x108 || offset == 0x10C) {
+    /* Channel status regs (+0x08/+0x0C): write-1-to-clear. */
+    if (is_channel_reg && (regoff == 0x08u || regoff == 0x0Cu)) {
         uint32_t old = adc_cx2.reg[index];
         uint32_t newv = old & ~(value & 3u);
         adc_cx2.reg[index] = newv;
@@ -1676,14 +1782,9 @@ void adc_cx2_write_word(uint32_t addr, uint32_t value)
         adc_cx2.slot18_programmed_valid = true;
     }
 
-    if (offset == 0x104 && cx2_adc_start_requested(value)) {
-        /* Pre-trigger phase polls 0x108/0x10C immediately after 0x104. */
-        cx2_adc_latch_completion();
-        return;
-    }
-
-    if (offset == 0x100 && cx2_adc_start_requested(value)) {
-        /* 0x100 launch drives the recurring conversion/status handshake. */
+    if (is_channel_reg && (regoff == 0x00u || regoff == 0x04u)
+            && cx2_adc_start_requested(value)) {
+        /* Channel launch drives conversion/status handshake. */
         cx2_adc_latch_completion();
         return;
     }

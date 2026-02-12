@@ -1092,7 +1092,7 @@ void translate_fix_pc() {
     arm.reg[15] -= (uint8_t*) insnp - (uint8_t*) translation_table[index].start_ptr;
 
     unsigned int translation_insts = translation_table[index].end_ptr - translation_table[index].start_ptr;
-    for(unsigned int i = 0; ret_eip > translation_table[index].jump_table[i] && i < translation_insts; ++i)
+    for(unsigned int i = 0; i < translation_insts && ret_eip > translation_table[index].jump_table[i]; ++i)
         arm.reg[15] += 4;
 
     cycle_count_delta -= ((uintptr_t)translation_table[index].end_ptr - (uintptr_t)insnp) >> 2;

@@ -10,13 +10,15 @@ interrupt_state intr;
 static void get_current_int(int is_fiq, int *current) {
     uint32_t masked_status = intr.status & intr.mask[is_fiq];
     int pri_limit = intr.priority_limit[is_fiq];
+    int best = -1;
     int i;
     for (i = 0; i < 32; i++) {
         if (masked_status & (1u << i) && intr.priority[i] < pri_limit) {
-            *current = i;
+            best = i;
             pri_limit = intr.priority[i];
         }
     }
+    *current = best;
 }
 
 static void update() {
@@ -33,16 +35,18 @@ static void update() {
         get_current_int(is_fiq, &i);
         if (i >= 0) {
             arm.interrupts |= 0x80 >> is_fiq;
-            cpu_int_check();
+        } else {
+            arm.interrupts &= ~(0x80 >> is_fiq);
         }
     }
+    cpu_int_check();
 }
 
 uint32_t int_read_word(uint32_t addr) {
     int group = addr >> 8 & 3;
     if (group < 2) {
         int is_fiq = group;
-        int current = 0;
+        int current = -1;
         switch (addr & 0xFF) {
             case 0x00:
                 return intr.status & intr.mask[is_fiq];
@@ -56,8 +60,10 @@ uint32_t int_read_word(uint32_t addr) {
                 return current;
             case 0x24:
                 get_current_int(is_fiq, &current);
-                intr.prev_pri_limit[is_fiq] = intr.priority_limit[is_fiq];
-                intr.priority_limit[is_fiq] = intr.priority[current];
+                if (current >= 0) {
+                    intr.prev_pri_limit[is_fiq] = intr.priority_limit[is_fiq];
+                    intr.priority_limit[is_fiq] = intr.priority[current];
+                }
                 return current;
             case 0x28:
                 current = -1;

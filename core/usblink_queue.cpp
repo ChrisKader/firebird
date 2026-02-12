@@ -1,6 +1,7 @@
 #include <cassert>
 #include <atomic>
 #include <queue>
+#include <mutex>
 #include <chrono>
 #include <thread>
 
@@ -28,30 +29,64 @@ struct usblink_queue_action {
 
 static std::atomic_bool busy;
 static std::queue<usblink_queue_action> usblink_queue;
+static std::mutex usblink_queue_mut;
 
 static void dirlist_callback(struct usblink_file *f, bool is_error, void *user_data)
 {
-    assert(!usblink_queue.empty());
-    assert(usblink_queue.front().user_data == user_data);
-    assert(usblink_queue.front().action == usblink_queue_action::DIRLIST);
-
-    if(usblink_queue.front().dirlist_callback != nullptr)
-        usblink_queue.front().dirlist_callback(f, is_error, user_data);
-
-    if(!f)
+    usblink_dirlist_cb callback = nullptr;
     {
-        usblink_queue.pop();
-        busy = false;
+        std::lock_guard<std::mutex> lg(usblink_queue_mut);
+        if(usblink_queue.empty()) {
+            busy.store(false);
+            return;
+        }
+
+        const auto &front = usblink_queue.front();
+        if(front.user_data != user_data || front.action != usblink_queue_action::DIRLIST) {
+            busy.store(false);
+            return;
+        }
+
+        callback = front.dirlist_callback;
+        if(!f) {
+            usblink_queue.pop();
+            busy.store(false);
+        }
     }
+
+    if(callback != nullptr)
+        callback(f, is_error, user_data);
 }
 
 static void progress_callback(int progress, void *user_data)
 {
-    assert(!usblink_queue.empty());
-    assert(usblink_queue.front().user_data == user_data);
-    if(usblink_queue.front().progress_callback != nullptr)
+    usblink_progress_cb callback = nullptr;
+    int action = usblink_queue_action::PUT_FILE;
     {
-        auto action = usblink_queue.front().action;
+        std::lock_guard<std::mutex> lg(usblink_queue_mut);
+        if(usblink_queue.empty()) {
+            busy.store(false);
+            return;
+        }
+
+        const auto &front = usblink_queue.front();
+        if(front.user_data != user_data) {
+            busy.store(false);
+            return;
+        }
+
+        callback = front.progress_callback;
+        action = front.action;
+
+        if(progress < 0 || progress == 100)
+        {
+            usblink_queue.pop();
+            busy.store(false);
+        }
+    }
+
+    if(callback != nullptr)
+    {
         if(action == usblink_queue_action::PUT_FILE
                 || action == usblink_queue_action::SEND_OS
                 || action == usblink_queue_action::MOVE
@@ -59,39 +94,38 @@ static void progress_callback(int progress, void *user_data)
                 || action == usblink_queue_action::DEL_DIR
                 || action == usblink_queue_action::DEL_FILE
                 || action == usblink_queue_action::GET_FILE)
-            usblink_queue.front().progress_callback(progress, user_data);
+            callback(progress, user_data);
         else
             assert(false);
-    }
-
-    if(progress < 0 || progress == 100)
-    {
-        usblink_queue.pop();
-        busy = false;
     }
 }
 
 void usblink_queue_do()
 {
-    bool b = false;
-    if(!usblink_connected || usblink_queue.empty() || !busy.compare_exchange_strong(b, true))
-        return;
+    usblink_queue_action action;
+    {
+        std::lock_guard<std::mutex> lg(usblink_queue_mut);
+        if(!usblink_connected || usblink_queue.empty() || busy.load())
+            return;
 
-    usblink_queue_action action = usblink_queue.front();
+        busy.store(true);
+        action = usblink_queue.front();
+    }
+
     switch(action.action)
     {
     case usblink_queue_action::PUT_FILE:
         if(!usblink_put_file(action.local.c_str(), action.remote.c_str(), progress_callback, action.user_data))
         {
             progress_callback(-1, action.user_data);
-            busy = false;
+            busy.store(false);
         }
         break;
     case usblink_queue_action::SEND_OS:
         if(!usblink_send_os(action.local.c_str(), progress_callback, action.user_data))
         {
             progress_callback(-1, action.user_data);
-            busy = false;
+            busy.store(false);
         }
         break;
     case usblink_queue_action::DIRLIST:
@@ -113,33 +147,45 @@ void usblink_queue_do()
         if(!usblink_get_file(action.remote.c_str(), action.local.c_str(), progress_callback, action.user_data))
         {
             progress_callback(-1, action.user_data);
-            busy = false;
+            busy.store(false);
         }
     }
 }
 
 void usblink_queue_reset()
 {
-    while(!usblink_queue.empty())
+    while(true)
     {
+        usblink_queue_action action;
+        {
+            std::lock_guard<std::mutex> lg(usblink_queue_mut);
+            if(usblink_queue.empty())
+                break;
+
+            action = usblink_queue.front();
+            usblink_queue.pop();
+        }
+
         // Treat as error
-        usblink_queue_action action = usblink_queue.front();
         if(action.dirlist_callback)
             action.dirlist_callback(nullptr, true, action.user_data);
         else if(action.progress_callback)
             action.progress_callback(-1, action.user_data);
-
-        usblink_queue.pop();
     }
-
-    busy = false;
+    {
+        std::lock_guard<std::mutex> lg(usblink_queue_mut);
+        busy.store(false);
+    }
 
     usblink_reset();
 }
 
 void usblink_queue_add(usblink_queue_action &action)
 {
-    usblink_queue.push(action);
+    {
+        std::lock_guard<std::mutex> lg(usblink_queue_mut);
+        usblink_queue.push(action);
+    }
 
     if(!usblink_connected)
         usblink_connect();
@@ -227,5 +273,6 @@ void usblink_queue_move(std::string old_path, std::string new_path, usblink_prog
 
 unsigned int usblink_queue_size()
 {
+    std::lock_guard<std::mutex> lg(usblink_queue_mut);
     return usblink_queue.size();
 }

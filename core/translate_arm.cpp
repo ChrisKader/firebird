@@ -9,6 +9,7 @@
  */
 
 #include <cassert>
+#include <cstddef>
 #include <cstdint>
 #include <cstdio>
 
@@ -47,6 +48,7 @@ extern void **translation_sp __asm__("translation_sp");
 struct translation translation_table[MAX_TRANSLATIONS];
 uint32_t *jump_table[MAX_TRANSLATIONS*2],
          **jump_table_current = jump_table;
+static constexpr size_t JUMP_TABLE_CAPACITY = sizeof(jump_table) / sizeof(jump_table[0]);
 
 uint32_t *translate_buffer = nullptr,
          *translate_current = nullptr,
@@ -512,6 +514,12 @@ void translate(uint32_t pc_start, uint32_t *insn_ptr_start)
     if(translate_current + 0x100 > translate_end)
     {
         gui_debug_printf("Out of translation space!");
+        flush_translations();
+        return;
+    }
+    if((size_t)(jump_table_current - jump_table) + 0x100 > JUMP_TABLE_CAPACITY)
+    {
+        gui_debug_printf("Out of jump table space!");
         flush_translations();
         return;
     }
@@ -1195,7 +1203,7 @@ void translate_fix_pc()
     unsigned int jump_index = insnp - translation_table[index].start_ptr;
     unsigned int translation_insts = translation_table[index].end_ptr - translation_table[index].start_ptr;
 
-    for(unsigned int i = jump_index; ret_pc > translation_table[index].jump_table[i] && i < translation_insts; ++i)
+    for(unsigned int i = jump_index; i < translation_insts && ret_pc > translation_table[index].jump_table[i]; ++i)
         arm.reg[15] += 4;
 
     cycle_count_delta -= translation_table[index].end_ptr - insnp;

@@ -104,6 +104,18 @@ static uint32_t packet_fulldatasize(const struct packet *p) {
         return (p->data_size == 0xFF) ? (BSWAP32(p->bigdatasize) + 4) : p->data_size;
 }
 
+static bool packet_append_cstr(uint8_t **data, size_t *remaining, const char *text)
+{
+    if (!text)
+        text = "";
+    int written = snprintf((char *)*data, *remaining, "%s", text);
+    if (written < 0 || (size_t)written >= *remaining)
+        return false;
+    *data += written + 1;
+    *remaining -= (size_t)written + 1;
+    return true;
+}
+
 uint16_t usblink_data_checksum(struct packet *packet) {
     uint16_t check = 0;
     int i, size = packet_fulldatasize(packet);
@@ -319,21 +331,25 @@ void get_file_next(struct packet *in)
         break;
 
     case 0x05: // Receive data packet
-        put_file_size += size - 1;
-
-        if(put_file_size > put_file_size_orig)
-            size -= put_file_size_orig - put_file_size;
+    {
+        uint32_t payload = size > 0 ? size - 1 : 0;
+        uint32_t remaining_payload = put_file_size_orig > put_file_size
+                                     ? (put_file_size_orig - put_file_size)
+                                     : 0;
+        if (payload > remaining_payload)
+            payload = remaining_payload;
+        put_file_size += payload;
 
         if(current_file_callback)
         {
             static int old_progress = 101;
             // Not 100 as the completion is signaled seperately and mustn't happen more than once
-            int progress = (put_file_size * 99) / put_file_size_orig;
+            int progress = put_file_size_orig ? (put_file_size * 99) / put_file_size_orig : 99;
             if(old_progress != progress)
                 current_file_callback(old_progress = progress, current_user_data);
         }
 
-        fwrite(data + 1, 1, size - 1, put_file);
+        fwrite(data + 1, 1, payload, put_file);
 
         if(in->data_size < 254 || put_file_size == put_file_size_orig)
         {
@@ -355,6 +371,8 @@ void get_file_next(struct packet *in)
             if(current_file_callback)
                 current_file_callback(put_file_size == put_file_size_orig ? 100 : -1, current_user_data);
         }
+        break;
+    }
     }
 }
 
@@ -376,11 +394,16 @@ void usblink_dirlist(const char *dir, usblink_dirlist_cb callback, void *user_da
     out->ack = 0;
     out->seqno = next_seqno();
     uint8_t *data = out->data;
+    size_t remaining = sizeof(out->data);
     memset(data, 0, sizeof(out->data));
     *data++ = File_Dirlist_Init;
-    //TODO
-    assert(strlen(dir) < sizeof(out->data) - 2);
-    data += sprintf((char*) data, "%s", dir) + 1; //0-byte
+    --remaining;
+    if (!packet_append_cstr(&data, &remaining, dir)) {
+        if (current_dirlist_callback)
+            current_dirlist_callback(NULL, true, current_user_data);
+        current_dirlist_callback = NULL;
+        return;
+    }
     out->data_size = data - out->data;
     if(out->data_size < 10)
         out->data_size = 10;
@@ -569,9 +592,15 @@ bool usblink_put_file(const char *local, const char *remote, usblink_progress_cb
     out->ack = 0;
     out->seqno = next_seqno();
     uint8_t *data = out->data;
+    size_t remaining = sizeof(out->data);
     *data++ = File_Put;
     *data++ = 1;
-    data += sprintf((char *)data, "%s", remote) + 1;
+    remaining -= 2;
+    if (!packet_append_cstr(&data, &remaining, remote)) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return 0;
+    }
     *(uint32_t *)data = BSWAP32(put_file_size); data += 4;
     out->data_size = data - out->data;
     usblink_send_packet();
@@ -591,15 +620,26 @@ void usblink_new_dir(const char *path, usblink_progress_cb callback, void *user_
     out->ack = 0;
     out->seqno = next_seqno();
     uint8_t *data = out->data;
+    size_t remaining = sizeof(out->data);
     *data++ = File_New_Folder;
     *data++ = 3;
-
-    unsigned int size = sprintf((char *)data, "%s", path) + 1;
-    data += size;
-    while(size < 9)
+    remaining -= 2;
+    if (!packet_append_cstr(&data, &remaining, path)) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
+    }
+    unsigned int size = (unsigned int)strlen(path ? path : "") + 1;
+    while(size < 9 && remaining > 0)
     {
         *data++ = 0;
+        --remaining;
         ++size;
+    }
+    if (size < 9) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
     }
 
     out->data_size = data - out->data;
@@ -650,22 +690,44 @@ void usblink_move(const char *old_path, const char *new_path, usblink_progress_c
     out->ack = 0;
     out->seqno = next_seqno();
     uint8_t *data = out->data;
+    size_t remaining = sizeof(out->data);
     *data++ = File_Rename;
     *data++ = 1;
-    unsigned int size = sprintf((char *)data, "%s", old_path) + 1;
-    data += size;
-    while(size < 9)
+    remaining -= 2;
+    if (!packet_append_cstr(&data, &remaining, old_path)) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
+    }
+    unsigned int size = (unsigned int)strlen(old_path ? old_path : "") + 1;
+    while(size < 9 && remaining > 0)
     {
         *data++ = 0;
+        --remaining;
         ++size;
     }
+    if (size < 9) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
+    }
 
-    size = sprintf((char *)data, "%s", new_path) + 1;
-    data += size;
-    while(size < 10)
+    if (!packet_append_cstr(&data, &remaining, new_path)) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
+    }
+    size = (unsigned int)strlen(new_path ? new_path : "") + 1;
+    while(size < 10 && remaining > 0)
     {
         *data++ = 0;
+        --remaining;
         ++size;
+    }
+    if (size < 10) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
     }
 
     out->data_size = data - out->data;
@@ -692,15 +754,26 @@ bool usblink_get_file(const char *path, const char *dest, usblink_progress_cb ca
     out->ack = 0;
     out->seqno = next_seqno();
     uint8_t *data = out->data;
+    size_t remaining = sizeof(out->data);
     *data++ = File_Get;
     *data++ = 1;
-
-    unsigned int size = sprintf((char *)data, "%s", path) + 1;
-    data += size;
-    while(size < 9)
+    remaining -= 2;
+    if (!packet_append_cstr(&data, &remaining, path)) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return false;
+    }
+    unsigned int size = (unsigned int)strlen(path ? path : "") + 1;
+    while(size < 9 && remaining > 0)
     {
         *data++ = 0;
+        --remaining;
         ++size;
+    }
+    if (size < 9) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return false;
     }
 
     out->data_size = data - out->data;
@@ -722,6 +795,7 @@ void usblink_delete(const char *path, bool is_dir, usblink_progress_cb callback,
     out->ack = 0;
     out->seqno = next_seqno();
     uint8_t *data = out->data;
+    size_t remaining = sizeof(out->data);
     if(is_dir)
     {
         *data++ = File_Del_Folder;
@@ -732,13 +806,23 @@ void usblink_delete(const char *path, bool is_dir, usblink_progress_cb callback,
         *data++ = File_Del;
         *data++ = 1;
     }
-
-    unsigned int size = sprintf((char *)data, "%s", path) + 1;
-    data += size;
-    while(size < 9)
+    remaining -= 2;
+    if (!packet_append_cstr(&data, &remaining, path)) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
+    }
+    unsigned int size = (unsigned int)strlen(path ? path : "") + 1;
+    while(size < 9 && remaining > 0)
     {
         *data++ = 0;
+        --remaining;
         ++size;
+    }
+    if (size < 9) {
+        if (current_file_callback)
+            current_file_callback(-1, current_user_data);
+        return;
     }
 
     out->data_size = data - out->data;
@@ -756,7 +840,8 @@ extern void usb_receive_packet(int endpoint, void *packet, uint32_t size);
 void usblink_reset() {
     if (put_file_state) {
         put_file_state = 0;
-        fclose(put_file);
+        if (put_file)
+            fclose(put_file);
         put_file = NULL;
     }
     usblink_connected = false;

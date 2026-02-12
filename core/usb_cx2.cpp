@@ -70,7 +70,7 @@ static bool usb_cx2_real_packet_to_calc(uint8_t ep, const uint8_t *packet, size_
     usb_cx2.fifo[fifo].size += size;
     usb_cx2.gisr[1] |= 1 << (fifo * 2); // FIFO OUT IRQ
     auto packet_size = usb_cx2.epout[(ep - 1) & 7] & 0x7ff;
-    if(size % packet_size) // Last pkt is short?
+    if(packet_size == 0 || (size % packet_size)) // Last pkt is short?
         usb_cx2.gisr[1] |= 1 << ((fifo * 2) + 1); // FIFO SPK IRQ
     else // ZLP needed
         error("Sending zero-length packets not implemented");
@@ -171,7 +171,19 @@ void usb_cx2_fdma_update(int fdma)
 
     bool fromMemory = usb_cx2.fdma[fdma].ctrl & 0b10;
     size_t length = (usb_cx2.fdma[fdma].ctrl >> 8) & 0x1ffff;
-    uint8_t *ptr = (uint8_t*) phys_mem_ptr(usb_cx2.fdma[fdma].addr, length);
+    if (length == 0) {
+        usb_cx2.dmasr |= 1 << fdma; // DMA done
+        usb_cx2_int_check();
+        return;
+    }
+    uint8_t *ptr = nullptr;
+    ptr = (uint8_t*) phys_mem_ptr(usb_cx2.fdma[fdma].addr, length);
+    if (!ptr) {
+        warn("USB FDMA: bad mapping fdma=%d addr=%08x len=%zu", fdma, usb_cx2.fdma[fdma].addr, length);
+        usb_cx2.dmasr |= 1u << (fdma + 16); // DMA error
+        usb_cx2_int_check();
+        return;
+    }
 
     uint8_t ep = 0;
     int fifo = fdma - 1;
@@ -190,13 +202,20 @@ void usb_cx2_fdma_update(int fdma)
     }
     else
     {
-        if(fdma == 0)
-            error("Reading from ep0 not expected\n");
+        if(fdma == 0) {
+            warn("USB FDMA: reading from EP0 FIFO is unsupported");
+            usb_cx2.dmasr |= 1u << (fdma + 16); // DMA error
+            usb_cx2_int_check();
+            return;
+        }
 
-        if(length > usb_cx2.fifo[fifo].size)
+        if(length > usb_cx2.fifo[fifo].size) {
             warn("Trying to read more bytes than available on fdma%d\n", fdma);
+            length = usb_cx2.fifo[fifo].size;
+        }
 
-        memcpy(ptr, usb_cx2.fifo[fifo].data, length);
+        if (length != 0)
+            memcpy(ptr, usb_cx2.fifo[fifo].data, length);
 
         // Move the remaining data to the start
         usb_cx2.fifo[fifo].size -= length;
@@ -432,7 +451,8 @@ void usb_cx2_write_word(uint32_t addr, uint32_t value)
     case 0x124: // IDLE counter
         return;
     case 0x130: // GIMR_ALL
-        usb_cx2.gimr_all = value & 0b111;
+        usb_cx2.gimr_all = value & 0b1111;
+        usb_cx2_int_check();
         return;
     case 0x134: case 0x138:
     case 0x13c:

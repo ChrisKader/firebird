@@ -162,6 +162,10 @@ static bool flush_out_buffer(void) {
                 return false;
             }
         }
+        if (n == 0) {
+            log_socket_error("GDB socket closed while sending");
+            return false;
+        }
         p += n;
     }
     sockbufptr = sockbuf;
@@ -302,11 +306,24 @@ bool gdbstub_init(unsigned int port) {
     r = bind(listen_socket_fd, (struct sockaddr *)&sockaddr, sizeof(sockaddr));
     if (r == -1) {
         log_socket_error("Failed to bind GDB stub socket. Check that Firebird is not already running");
+    #ifdef __MINGW32__
+        closesocket(listen_socket_fd);
+    #else
+        close(listen_socket_fd);
+    #endif
+        listen_socket_fd = -1;
         return false;
     }
     r = listen(listen_socket_fd, 0);
     if (r == -1) {
         log_socket_error("Failed to listen on GDB stub socket");
+    #ifdef __MINGW32__
+        closesocket(listen_socket_fd);
+    #else
+        close(listen_socket_fd);
+    #endif
+        listen_socket_fd = -1;
+        return false;
     }
 
     return true;
@@ -950,6 +967,8 @@ retry:
         /* now, read until a # or end of buffer is found */
         while (1) {
             ch = get_debug_char();
+            if (ch == (char)-1)
+                return NULL;
             if (ch == (char)-2) {
                 continue;
             }
@@ -970,8 +989,12 @@ retry:
         if (ch == '#') {
             buffer[count] = 0;
             ch = get_debug_char();
+            if (ch == (char)-1)
+                return NULL;
             xmitcsum = hex(ch) << 4;
             ch = get_debug_char();
+            if (ch == (char)-1)
+                return NULL;
             xmitcsum += hex(ch);
 
             if (checksum != xmitcsum) {

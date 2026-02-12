@@ -21,7 +21,7 @@ void lcd_draw_frame(uint8_t *buffer) {
         return;
     }
     int row;
-    for (row = 0; row < 230; ++row) {
+    for (row = 0; row < 240; ++row) {
         uint32_t pal_shift = (lcd.control & (1 << 8)) ? 11 : 1;
         int words = (320 / 32) * bpp;
         uint8_t *out = buffer + (row * 160);
@@ -320,6 +320,7 @@ static void lcd_event(int index) {
     lcd.framebuffer = lcd.upbase;
     lcd.int_status |= 0xC;
     int_set(INT_LCD, lcd.int_status & lcd.int_mask);
+    gui_lcd_frame_ready();
 
     gif_new_frame();
 }

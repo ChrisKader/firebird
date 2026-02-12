@@ -3,6 +3,7 @@
 #include <cassert>
 #include "keymap.h"
 #include "core/keypad.h"
+#include "core/emu.h"
 #include "app/qmlbridge.h"
 #include <QHash>
 
@@ -100,6 +101,56 @@ void setKeypad(unsigned int keymap_id, bool state)
 }
 
 static QHash<int, int> pressed_keys;
+static Qt::Key active_touchpad_key = Qt::Key_unknown;
+
+static void setTouchpadFromArrow(Qt::Key key, bool active)
+{
+    if (!active) {
+        touchpad_set_state(0.0f, 0.0f, false, false);
+        return;
+    }
+
+    switch (key) {
+    case Qt::Key_Down:
+        touchpad_set_state(0.5f, 1.0f, true, true);
+        break;
+    case Qt::Key_Up:
+        touchpad_set_state(0.5f, 0.0f, true, true);
+        break;
+    case Qt::Key_Left:
+        touchpad_set_state(0.0f, 0.5f, true, true);
+        break;
+    case Qt::Key_Right:
+        touchpad_set_state(1.0f, 0.5f, true, true);
+        break;
+    default:
+        break;
+    }
+}
+
+static void releaseTrackedKeys()
+{
+    for (auto calc_key : pressed_keys)
+        setKeypad(calc_key, false);
+    pressed_keys.clear();
+}
+
+static void releaseTouchpadKeysOnFocusOut()
+{
+    if (active_touchpad_key == Qt::Key_unknown)
+        return;
+
+    setTouchpadFromArrow(active_touchpad_key, false);
+    active_touchpad_key = Qt::Key_unknown;
+
+    emit qt_keypad_bridge.keyStateChanged(QStringLiteral("up"), false);
+    emit qt_keypad_bridge.keyStateChanged(QStringLiteral("down"), false);
+    emit qt_keypad_bridge.keyStateChanged(QStringLiteral("left"), false);
+    emit qt_keypad_bridge.keyStateChanged(QStringLiteral("right"), false);
+
+    if (QMLBridge *bridge = qmlBridgeInstance())
+        bridge->touchpadStateChanged();
+}
 
 void keyToKeypad(QKeyEvent *event)
 {
@@ -283,6 +334,9 @@ void keyToKeypad(QKeyEvent *event)
 
 void QtKeypadBridge::keyPressEvent(QKeyEvent *event)
 {
+    if (cpu_events & EVENT_SLEEP)
+        releaseTrackedKeys();
+
     // Ignore autorepeat, calc os must handle it on its own
     if(event->isAutoRepeat())
         return;
@@ -292,23 +346,23 @@ void QtKeypadBridge::keyPressEvent(QKeyEvent *event)
     switch(key)
     {
     case Qt::Key_Down:
-        keypad.touchpad_x = TOUCHPAD_X_MAX / 2;
-        keypad.touchpad_y = 0;
+        setTouchpadFromArrow(key, true);
+        active_touchpad_key = key;
         emit qt_keypad_bridge.keyStateChanged(QStringLiteral("down"), true);
         break;
     case Qt::Key_Up:
-        keypad.touchpad_x = TOUCHPAD_X_MAX / 2;
-        keypad.touchpad_y = TOUCHPAD_Y_MAX;
+        setTouchpadFromArrow(key, true);
+        active_touchpad_key = key;
         emit qt_keypad_bridge.keyStateChanged(QStringLiteral("up"), true);
         break;
     case Qt::Key_Left:
-        keypad.touchpad_y = TOUCHPAD_Y_MAX / 2;
-        keypad.touchpad_x = 0;
+        setTouchpadFromArrow(key, true);
+        active_touchpad_key = key;
         emit qt_keypad_bridge.keyStateChanged(QStringLiteral("left"), true);
         break;
     case Qt::Key_Right:
-        keypad.touchpad_y = TOUCHPAD_Y_MAX / 2;
-        keypad.touchpad_x = TOUCHPAD_X_MAX;
+        setTouchpadFromArrow(key, true);
+        active_touchpad_key = key;
         emit qt_keypad_bridge.keyStateChanged(QStringLiteral("right"), true);
         break;
     default:
@@ -317,12 +371,8 @@ void QtKeypadBridge::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    keypad.touchpad_contact = keypad.touchpad_down = true;
     if (QMLBridge *bridge = qmlBridgeInstance())
         bridge->touchpadStateChanged();
-    keypad.kpc.gpio_int_active |= 0x800;
-
-    keypad_int_check();
 }
 
 void QtKeypadBridge::keyReleaseEvent(QKeyEvent *event)
@@ -336,34 +386,34 @@ void QtKeypadBridge::keyReleaseEvent(QKeyEvent *event)
     switch(key)
     {
     case Qt::Key_Down:
-        if(keypad.touchpad_x == TOUCHPAD_X_MAX / 2
-            && keypad.touchpad_y == 0)
+        if(active_touchpad_key == key)
         {
-            keypad.touchpad_contact = keypad.touchpad_down = false;
+            setTouchpadFromArrow(key, false);
+            active_touchpad_key = Qt::Key_unknown;
             emit qt_keypad_bridge.keyStateChanged(QStringLiteral("down"), false);
         }
         break;
     case Qt::Key_Up:
-        if(keypad.touchpad_x == TOUCHPAD_X_MAX / 2
-            && keypad.touchpad_y == TOUCHPAD_Y_MAX)
+        if(active_touchpad_key == key)
         {
-            keypad.touchpad_contact = keypad.touchpad_down = false;
+            setTouchpadFromArrow(key, false);
+            active_touchpad_key = Qt::Key_unknown;
             emit qt_keypad_bridge.keyStateChanged(QStringLiteral("up"), false);
         }
         break;
     case Qt::Key_Left:
-        if(keypad.touchpad_y == TOUCHPAD_Y_MAX / 2
-            && keypad.touchpad_x == 0)
+        if(active_touchpad_key == key)
         {
-            keypad.touchpad_contact = keypad.touchpad_down = false;
+            setTouchpadFromArrow(key, false);
+            active_touchpad_key = Qt::Key_unknown;
             emit qt_keypad_bridge.keyStateChanged(QStringLiteral("left"), false);
         }
         break;
     case Qt::Key_Right:
-        if(keypad.touchpad_y == TOUCHPAD_Y_MAX / 2
-            && keypad.touchpad_x == TOUCHPAD_X_MAX)
+        if(active_touchpad_key == key)
         {
-            keypad.touchpad_contact = keypad.touchpad_down = false;
+            setTouchpadFromArrow(key, false);
+            active_touchpad_key = Qt::Key_unknown;
             emit qt_keypad_bridge.keyStateChanged(QStringLiteral("right"), false);
         }
         break;
@@ -375,8 +425,6 @@ void QtKeypadBridge::keyReleaseEvent(QKeyEvent *event)
 
     if (QMLBridge *bridge = qmlBridgeInstance())
         bridge->touchpadStateChanged();
-    keypad.kpc.gpio_int_active |= 0x800;
-    keypad_int_check();
 }
 
 bool QtKeypadBridge::eventFilter(QObject *obj, QEvent *event)
@@ -390,10 +438,8 @@ bool QtKeypadBridge::eventFilter(QObject *obj, QEvent *event)
     else if(event->type() == QEvent::FocusOut)
     {
         // Release all keys on focus change
-        for(auto calc_key : pressed_keys)
-            setKeypad(calc_key, false);
-
-        pressed_keys.clear();
+        releaseTrackedKeys();
+        releaseTouchpadKeysOnFocusOut();
         return false;
     }
     else

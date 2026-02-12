@@ -43,18 +43,62 @@ static uint32_t aladdin_pmu_ctrl_08 = 0x2000;
 enum {
 	PMU_IRQ_MASK_INDEX = 0x50 >> 2,   // PMU+0x850
 	PMU_IRQ_PEND_INDEX = 0x54 >> 2,   // PMU+0x854
+	PMU_IRQ_ONKEY_BIT = 0x00000001u,
+	PMU_INT_WAKE_BIT = 0x00000002u,   // PMU+0x24 wake-cause latch bit
 	PMU_IRQ_ADC_BIT = 0x08000000u,
 };
+static void aladdin_pmu_update_int();
+
+static uint32_t aladdin_pmu_pend_with_live_sources(void)
+{
+	uint32_t pending = aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX];
+	if (intr.active & ((1u << INT_ADC) | (1u << 13)))
+		pending |= PMU_IRQ_ADC_BIT;
+	return pending;
+}
 
 void aladdin_pmu_set_wakeup_reason(uint32_t reason) {
 	wakeup_reason = reason;
 }
 
 void aladdin_pmu_set_adc_pending(bool on) {
-	if (on) {
+	if (on)
 		aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] |= PMU_IRQ_ADC_BIT;
-		int_set(INT_POWER, true);
-	}
+	else
+		aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] &= ~PMU_IRQ_ADC_BIT;
+	aladdin_pmu_update_int();
+}
+
+void aladdin_pmu_on_key_wakeup(void)
+{
+	const bool sleeping = (cpu_events & EVENT_SLEEP) != 0;
+	aladdin_pmu_latch_onkey_wake(sleeping);
+}
+
+void aladdin_pmu_on_key_release(void)
+{
+	/* Real PMU wake causes are latched until firmware acknowledges them
+	 * through PMU W1C registers. Do not clear on raw key release. */
+	aladdin_pmu_update_int();
+}
+
+void aladdin_pmu_latch_onkey_wake(bool from_sleep)
+{
+	/* Keep wake reason in sync with ON-key wake behavior. */
+	wakeup_reason = 0x040000;
+	/* Latch ON wake in both PMU status paths:
+	 * - int_state (PMU+0x24), acknowledged via W1C write to +0x24
+	 * - pending bitmap (PMU+0x854), acknowledged via W1C write to +0x854
+	 * ROM/OS low-power code polls +0x24 during wake bring-up. */
+	aladdin_pmu.int_state |= PMU_INT_WAKE_BIT;
+	aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] |= PMU_IRQ_ONKEY_BIT;
+	/* During deep sleep wake, firmware polls PMU wake-cause state first.
+	 * Avoid forcing an immediate IRQ exception into low-power stubs, which can
+	 * vector into uninitialized/default handlers. */
+	if (from_sleep)
+		int_set(INT_POWER, false);
+	else
+		aladdin_pmu_update_int();
 }
 
 void aladdin_pmu_reset(void) {
@@ -69,7 +113,7 @@ void aladdin_pmu_reset(void) {
 	/* Observed reads from 0x9014080C expect this bit high. */
 	aladdin_pmu.noidea[3] = 0x00100000;
 	// Special cases for 0x808-0x810, see aladdin_pmu_read
-	//aladdin_pmu.noidea[4] = 0x111;
+	aladdin_pmu.noidea[4] = 0x111;
 	aladdin_pmu.noidea[5] = 0x1;
 	aladdin_pmu.noidea[6] = 0x100;
 	aladdin_pmu.noidea[7] = 0x10;
@@ -131,12 +175,41 @@ static int cx2_clamp_int(int value, int min, int max)
 
 static void aladdin_pmu_update_int()
 {
-	uint32_t pending = aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX];
-	if (intr.active & ((1u << INT_ADC) | (1u << 13)))
-		pending |= PMU_IRQ_ADC_BIT;
-	bool on = (aladdin_pmu.int_state != 0)
+	uint32_t pending = aladdin_pmu_pend_with_live_sources();
+	/* ADC completion has dedicated VIC lines (11/13). Keep its PMU pending bit
+	 * visible to firmware, but do not mirror it onto INT_POWER. Otherwise the
+	 * power IRQ can stay asserted through sleep and break ON-key wake flow. */
+	pending &= ~PMU_IRQ_ADC_BIT;
+	/* PMU+0x24 wake bit (0x2) is status-only for ROM wake polling; it should
+	 * not by itself level-assert INT_POWER. */
+	bool on = ((aladdin_pmu.int_state & ~PMU_INT_WAKE_BIT) != 0)
 		|| ((pending & aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX]) != 0);
 	int_set(INT_POWER, on);
+}
+
+static uint32_t aladdin_pmu_status_80c_read_value(void)
+{
+	uint32_t value = aladdin_pmu.noidea[3];
+	/* PMU+0x80C model bucket in bits[24:20] is polled during boot.
+	 * Preserve firmware-owned bits, but keep a sane default bucket (1). */
+	uint32_t model = asic_user_flags & 0x1Fu;
+	if (model == 0)
+		model = 1;
+	value &= ~0x01F00000u;
+	value |= model << 20;
+	return value;
+}
+
+static uint32_t aladdin_pmu_status_810_read_value(void)
+{
+	uint32_t value = aladdin_pmu.noidea[4];
+	/* Keep mandatory status bits stable while exposing ON-key state at bit8. */
+	value |= 0x11u;
+	if (keypad.key_map[0] & (1 << 9))
+		value &= ~0x100u;
+	else
+		value |= 0x100u;
+	return value;
 }
 
 
@@ -211,20 +284,18 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		if(offset == 0x808)
 			return 0x010C9231; //0x0021DB19; // efuse
 		else if(offset == 0x80C)
-			return asic_user_flags << 20;
+			return aladdin_pmu_status_80c_read_value();
 		else if(offset == 0x810)
 		{
 			adc_cx2_background_step();
-			return 0x11 | ((keypad.key_map[0] & 1<<9) ? 0 : 0x100);
+			return aladdin_pmu_status_810_read_value();
 		}
 		else if(offset == 0x850)
 			return aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX];
 		else if(offset == 0x854)
 		{
 			adc_cx2_background_step();
-			uint32_t pending = aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX];
-			if (intr.active & ((1u << INT_ADC) | (1u << 13)))
-				pending |= PMU_IRQ_ADC_BIT;
+			uint32_t pending = aladdin_pmu_pend_with_live_sources();
 			return pending & aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX];
 		}
 		else if(offset == 0x858)
@@ -249,21 +320,16 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 		case 0x00: return;
 		case 0x04: return; // No idea
 		case 0x08: aladdin_pmu_ctrl_08 = value; return;
-		case 0x20:
-			if(value & 2)
-			{
-				/* enter sleep, jump to 0 when On pressed. */
-				cpu_events |= EVENT_SLEEP;
-				event_clear(SCHED_TIMERS);
-				event_clear(SCHED_TIMER_FAST);
-				// Reset clocks but preserve int_enable for wake-on-key
-				uint32_t saved_int_enable = aladdin_pmu.int_enable;
-				aladdin_pmu_reset();
-				aladdin_pmu.int_enable = saved_int_enable;
-			}
-			else
+			case 0x20:
 				aladdin_pmu.disable[0] = value;
-
+				if(value & 2) {
+					/* Sleep transition should leave only ON-key wake path active. */
+					keypad_release_all_keys();
+					/* Enter sleep. Keep PMU state/registers intact across sleep. */
+					cpu_events |= EVENT_SLEEP;
+					event_clear(SCHED_TIMERS);
+				event_clear(SCHED_TIMER_FAST);
+			}
 			return;
 		case 0x24:
 			aladdin_pmu.int_state &= ~value;
@@ -290,23 +356,31 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 		}
 		case 0x50: aladdin_pmu.disable[1] = value; return;
 		case 0x60: aladdin_pmu.disable[2] = value; return;
-		case 0xC4: aladdin_pmu.int_enable = value; return;
+		case 0xC4:
+			aladdin_pmu.int_enable = value;
+			aladdin_pmu_update_int();
+			return;
 		}
 	}
-	else if(offset == 0x80C || offset == 0x810)
-		return bad_write_word(addr, value);
 	else if(offset >= 0x800 && offset < 0x900)
 	{
+		if (offset == 0x80C) {
+			aladdin_pmu.noidea[3] = value;
+			return;
+		}
+		if (offset == 0x810) {
+			aladdin_pmu.noidea[4] = value;
+			return;
+		}
 		if (offset == 0x850) {
 			aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX] = value;
+			aladdin_pmu_update_int();
 			return;
 		}
 		if (offset == 0x854) {
-			/* 0xFFFFFFFF is used as a pre-write before read; only zero clears. */
-			if (value == 0) {
-				aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] &= ~PMU_IRQ_ADC_BIT;
-				aladdin_pmu_update_int();
-			}
+			/* W1C: writing 1 clears corresponding pending bits. */
+			aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] &= ~value;
+			aladdin_pmu_update_int();
 			return;
 		}
 		aladdin_pmu.noidea[(offset & 0xFF) >> 2] = value;
@@ -553,6 +627,9 @@ void dma_cx2_write_word(uint32_t addr, uint32_t value)
 bool cx2_suspend(emu_snapshot *snapshot)
 {
     return snapshot_write(snapshot, &aladdin_pmu, sizeof(aladdin_pmu))
+            && snapshot_write(snapshot, &wakeup_reason, sizeof(wakeup_reason))
+            && snapshot_write(snapshot, &aladdin_pmu_ctrl_08, sizeof(aladdin_pmu_ctrl_08))
+            && snapshot_write(snapshot, &tg2989_pmic, sizeof(tg2989_pmic))
             && snapshot_write(snapshot, &cx2_backlight, sizeof(cx2_backlight))
             && snapshot_write(snapshot, &cx2_lcd_spi, sizeof(cx2_lcd_spi))
             && snapshot_write(snapshot, &dma, sizeof(dma));
@@ -560,8 +637,14 @@ bool cx2_suspend(emu_snapshot *snapshot)
 
 bool cx2_resume(const emu_snapshot *snapshot)
 {
-    return snapshot_read(snapshot, &aladdin_pmu, sizeof(aladdin_pmu))
+    bool ok = snapshot_read(snapshot, &aladdin_pmu, sizeof(aladdin_pmu))
+            && snapshot_read(snapshot, &wakeup_reason, sizeof(wakeup_reason))
+            && snapshot_read(snapshot, &aladdin_pmu_ctrl_08, sizeof(aladdin_pmu_ctrl_08))
+            && snapshot_read(snapshot, &tg2989_pmic, sizeof(tg2989_pmic))
             && snapshot_read(snapshot, &cx2_backlight, sizeof(cx2_backlight))
             && snapshot_read(snapshot, &cx2_lcd_spi, sizeof(cx2_lcd_spi))
             && snapshot_read(snapshot, &dma, sizeof(dma));
+    if (ok)
+        aladdin_pmu_update_int();
+    return ok;
 }
