@@ -34,6 +34,7 @@ signals:
     void speedChanged(double value);
     void usblinkChanged(bool state);
     void turboModeChanged(bool state);
+    void lcdFrameReady();
 
     // Debugging
     void debugStr(QString str);

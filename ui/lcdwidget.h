@@ -3,7 +3,6 @@
 
 #include <QGraphicsView>
 #include <QKeyEvent>
-#include <QTimer>
 
 class LCDWidget : public QWidget
 {
@@ -28,8 +27,6 @@ signals:
     void closed();
     void scaleChanged(int percent);
 
-private:
-    QTimer refresh_timer;
 };
 
 #endif // LCDWIDGET_H

@@ -116,6 +116,11 @@ void gui_usblink_changed(bool state)
     emit requireEmuThread().usblinkChanged(state);
 }
 
+void gui_lcd_frame_ready(void)
+{
+    emit requireEmuThread().lcdFrameReady();
+}
+
 void throttle_timer_off()
 {
     requireEmuThread().setTurboMode(true);
@@ -271,8 +276,7 @@ bool EmuThread::stop()
 void EmuThread::reset()
 {
     usblink_queue_reset();
-
-    cpu_events |= EVENT_RESET;
+    emu_request_reset_hard();
 }
 
 bool EmuThread::resume(QString path)

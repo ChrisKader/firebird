@@ -63,6 +63,7 @@ bool keypad_resume(const emu_snapshot *snapshot);
 #define KEYPAD_ROWS 8
 #define KEYPAD_COLS 11
 void keypad_set_key(int row, int col, bool state);
+void keypad_release_all_keys(void);
 void keypad_int_check();
 void keypad_on_pressed();
 uint32_t keypad_read(uint32_t addr);

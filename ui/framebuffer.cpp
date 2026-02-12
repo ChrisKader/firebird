@@ -56,7 +56,11 @@ void paintFramebuffer(QPainter *p)
 
     QRect painterWindowScaled(p->window().topLeft(), p->window().size() / devicePixelRatio);
 
-    if(hdq1w.lcd_contrast == 0)
+    if(cpu_events & EVENT_SLEEP)
+    {
+        p->fillRect(painterWindowScaled, Qt::black);
+    }
+    else if(hdq1w.lcd_contrast == 0)
     {
         p->fillRect(painterWindowScaled, Qt::transparent);
         p->setPen(QGuiApplication::palette().color(QPalette::WindowText));

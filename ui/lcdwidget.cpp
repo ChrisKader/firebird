@@ -9,10 +9,6 @@ LCDWidget::LCDWidget(QWidget *parent, Qt::WindowFlags f)
 {
     setMinimumSize(320, 240);
     setFocusPolicy(Qt::StrongFocus);
-
-    connect(&refresh_timer, SIGNAL(timeout()), this, SLOT(update()));
-
-    refresh_timer.setInterval(1000 / 30); // 30 fps
 }
 
 void LCDWidget::mousePressEvent(QMouseEvent *event)
@@ -47,15 +43,11 @@ void LCDWidget::mouseMoveEvent(QMouseEvent *event)
 void LCDWidget::showEvent(QShowEvent *e)
 {
     QWidget::showEvent(e);
-
-    refresh_timer.start();
 }
 
 void LCDWidget::hideEvent(QHideEvent *e)
 {
     QWidget::hideEvent(e);
-
-    refresh_timer.stop();
 }
 
 void LCDWidget::closeEvent(QCloseEvent *e)

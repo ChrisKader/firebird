@@ -15,6 +15,7 @@
 #include <QLabel>
 
 #include "core/debug_api.h"
+#include "core/emu.h"
 #include "ui/widgettheme.h"
 
 PortMonitorWidget::PortMonitorWidget(QWidget *parent)
@@ -186,8 +187,11 @@ void PortMonitorWidget::refresh()
 
 QString PortMonitorWidget::decodePeripheralValue(uint32_t addr, uint32_t val) const
 {
+    const uint32_t lcd_control_addr = emulate_cx ? 0xC0000018u : 0xC000001Cu;
+    const uint32_t lcd_int_mask_addr = emulate_cx ? 0xC000001Cu : 0xC0000018u;
+
     /* LCD Control register */
-    if (addr == 0xC000001C) {
+    if (addr == lcd_control_addr) {
         QStringList parts;
         int bpp_code = (val >> 1) & 7;
         const char *bpp_names[] = {"1bpp","2bpp","4bpp","8bpp","16bpp","24bpp","16bpp565","12bpp"};
@@ -197,6 +201,18 @@ QString PortMonitorWidget::decodePeripheralValue(uint32_t addr, uint32_t val) co
         if (val & (1 << 11)) parts << QStringLiteral("Power=ON");
         else parts << QStringLiteral("Power=OFF");
         return parts.join(QStringLiteral(", "));
+    }
+
+    if (addr == lcd_int_mask_addr) {
+        if (val == 0)
+            return QStringLiteral("(none)");
+        QStringList bits;
+        if (val & 0x2u) bits << QStringLiteral("FUF");
+        if (val & 0x4u) bits << QStringLiteral("LNB");
+        if (val & 0x8u) bits << QStringLiteral("VCOMP");
+        if (val & 0x10u) bits << QStringLiteral("BER");
+        return bits.isEmpty() ? QStringLiteral("0x%1").arg(val, 8, 16, QLatin1Char('0'))
+                              : bits.join(QStringLiteral(", "));
     }
 
     /* VIC IRQ/FIQ status */
@@ -315,7 +331,13 @@ void PortMonitorWidget::addCommonPorts()
     addPortEntry(0xC0000000, QStringLiteral("LCD Timing 0"), lcd);
     addPortEntry(0xC0000004, QStringLiteral("LCD Timing 1"), lcd);
     addPortEntry(0xC0000014, QStringLiteral("LCD Upper Panel Base"), lcd);
-    addPortEntry(0xC000001C, QStringLiteral("LCD Control"), lcd);
+    if (emulate_cx) {
+        addPortEntry(0xC0000018, QStringLiteral("LCD Control"), lcd);
+        addPortEntry(0xC000001C, QStringLiteral("LCD Int Mask"), lcd);
+    } else {
+        addPortEntry(0xC0000018, QStringLiteral("LCD Int Mask"), lcd);
+        addPortEntry(0xC000001C, QStringLiteral("LCD Control"), lcd);
+    }
 
     /* Interrupt Controller group */
     auto *vic = findOrCreateGroup(QStringLiteral("Interrupt Controller"));

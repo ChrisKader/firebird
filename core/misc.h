@@ -178,6 +178,7 @@ extern timer_cx_state timer_cx;
 uint32_t timer_cx_read(uint32_t addr);
 void timer_cx_write(uint32_t addr, uint32_t value);
 void timer_cx_reset(void);
+void timer_cx_wake(void);
 
 typedef struct hdq1w_state {
     uint8_t lcd_contrast;

@@ -35,6 +35,10 @@ extern uint32_t cpu_events __asm__("cpu_events");
 #define EVENT_WAITING 16
 #define EVENT_SLEEP 32
 
+#define EMU_RESET_SOFT 0
+#define EMU_RESET_HARD 1
+extern uint8_t emu_reset_kind;
+
 // Settings
 extern bool exiting, debug_on_start, debug_on_warn, print_on_warn, debug_suppress_warn;
 extern BootOrder boot_order;
@@ -72,7 +76,7 @@ typedef enum charger_state {
 
 extern int battery_mv_override;             /* millivolts, -1 = default */
 extern charger_state_t charger_state_override;
-extern int8_t usb_cable_connected_override; /* -1 = follow link state, 0/1 = force */
+extern int8_t usb_cable_connected_override; /* -1 = auto, 0/1 = force cable disconnected/connected */
 
 static inline int16_t hw_override_get_adc_battery_level(void)
 {
@@ -155,6 +159,8 @@ __attribute__((noreturn)) void error(const char *fmt, ...);
 void throttle_timer_on();
 void throttle_timer_off();
 void throttle_timer_wait(unsigned int usec);
+void emu_request_reset_soft(void);
+void emu_request_reset_hard(void);
 void add_reset_proc(void (*proc)(void));
 
 // Uses emu_longjmp to return into the main loop.
@@ -172,6 +178,7 @@ void gui_set_busy(bool busy); // To change the cursor, for instance
 void gui_status_printf(const char *fmt, ...); // Status output
 void gui_show_speed(double speed); // Speed display output
 void gui_usblink_changed(bool state); // Notification for usblink state changes
+void gui_lcd_frame_ready(void); // Notification for LCD frame-latched event
 void gui_debugger_entered_or_left(bool entered); // Notification for debug events
 
 

@@ -10,6 +10,7 @@
 #include "interrupt.h"
 #include "mem.h"
 #include "cx2.h"
+#include "cpu.h"
 
 /* 900E0000: Keypad controller */
 keypad_state keypad;
@@ -30,23 +31,36 @@ void keypad_int_check() {
                       | (keypad.kpc.gpio_int_enable & keypad.kpc.gpio_int_active));
 }
 
+void keypad_release_all_keys(void)
+{
+    std::lock_guard<std::recursive_mutex> lg(keypad_mut);
+    memset(keypad.key_map, 0, sizeof(keypad.key_map));
+}
+
 void keypad_on_pressed() {
+    bool sleeping = (cpu_events & EVENT_SLEEP) != 0;
+
     if(emulate_cx2) {
-        // CX II: Register 0x901400C4 bit 0 enables the ON key interrupt.
-        // The OS sets this before entering sleep so INT_POWER can wake the device.
-        if(aladdin_pmu.int_enable & 1)
-            int_set(INT_POWER, true);
+        if (sleeping) {
+            /* Route wake through PMU state so OS wake FSM sees a PMU cause. */
+            aladdin_pmu_on_key_wakeup();
+        } else {
+            // CX II: Register 0x901400C4 bit 0 enables the ON key interrupt.
+            if(aladdin_pmu.int_enable & 1)
+                int_set(INT_POWER, true);
+        }
     } else {
         // Classic/CX: Check PMU on_irq_enabled register (0x900B0010)
         if(pmu.on_irq_enabled)
             int_set(INT_POWER, true);
     }
 
-    if(cpu_events & EVENT_SLEEP) {
+    if(sleeping) {
         assert(emulate_cx2);
         cpu_events &= ~EVENT_SLEEP;
-        timer_cx_reset();
-        cpu_reset();
+        timer_cx_wake();
+        /* Ensure emulation loop re-enters CPU execution immediately. */
+        cycle_count_delta = -1;
     }
 }
 
@@ -439,8 +453,16 @@ void keypad_set_key(int row, int col, bool state)
     else
         keypad.key_map[row] &= ~(1 << col);
 
-    if(state && row == 0 && col == 9)
-        keypad_on_pressed();
+    if (row == 0 && col == 9) {
+        if (state) {
+            keypad_on_pressed();
+        } else {
+            if (emulate_cx2)
+                aladdin_pmu_on_key_release();
+            else
+                int_set(INT_POWER, false);
+        }
+    }
 }
 
 void touchpad_set_state(float x, float y, bool contact, bool down)

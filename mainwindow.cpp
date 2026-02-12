@@ -2485,8 +2485,6 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     int savedChargerState = hw.chargerState;
     if (savedChargerState >= CHARGER_DISCONNECTED && savedChargerState <= CHARGER_CHARGING)
         hw_override_set_charger_state((charger_state_t)savedChargerState);
-    else if (hw_override_get_adc_charging() >= 0)
-        hw_override_set_charger_state(hw_override_get_adc_charging() ? CHARGER_CHARGING : CHARGER_DISCONNECTED);
     else
         hw_override_set_charger_state(CHARGER_AUTO);
     if (m_hwConfig)
@@ -3125,6 +3123,8 @@ void MainWindow::setActive(bool b)
         connect(&emuThread(), SIGNAL(resumed(bool)), this, SLOT(resumed(bool)), Qt::QueuedConnection);
         connect(&emuThread(), SIGNAL(suspended(bool)), this, SLOT(suspended(bool)), Qt::QueuedConnection);
         connect(&emuThread(), SIGNAL(stopped()), this, SLOT(stopped()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(lcdFrameReady()), ui->lcdView, SLOT(update()), Qt::QueuedConnection);
+        connect(&emuThread(), SIGNAL(lcdFrameReady()), &lcd, SLOT(update()), Qt::QueuedConnection);
 
         // We might have missed a few events
         updateUIActionState(emuThread().isRunning());
@@ -3141,6 +3141,8 @@ void MainWindow::setActive(bool b)
         disconnect(&emuThread(), SIGNAL(resumed(bool)), this, SLOT(resumed(bool)));
         disconnect(&emuThread(), SIGNAL(suspended(bool)), this, SLOT(suspended(bool)));
         disconnect(&emuThread(), SIGNAL(stopped()), this, SLOT(stopped()));
+        disconnect(&emuThread(), SIGNAL(lcdFrameReady()), ui->lcdView, SLOT(update()));
+        disconnect(&emuThread(), SIGNAL(lcdFrameReady()), &lcd, SLOT(update()));
 
         // Close the config dialog
         if (config_dialog)

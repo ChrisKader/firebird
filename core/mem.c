@@ -524,6 +524,10 @@ bool memory_initialize(uint32_t sdram_size)
             add_reset_proc(serial_cx2_reset);
             apb_set_map(0x08, unknown_9008_read, unknown_9008_write);
             apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word);
+            /* CX II firmware primarily uses 0x900B ADC, but mirror C400 as well
+             * so either MMIO window sees the same controller state. */
+            read_word_map[0xC4 >> 2] = adc_cx2_read_word;
+            write_word_map[0xC4 >> 2] = adc_cx2_write_word;
             apb_set_map(0x10, tg2989_pmic_read, tg2989_pmic_write);
             add_reset_proc(tg2989_pmic_reset);
             apb_set_map(0x12, memc_ddr_read, memc_ddr_write);

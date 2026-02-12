@@ -27,6 +27,7 @@
 int cycle_count_delta = 0;
 
 uint32_t cpu_events;
+uint8_t emu_reset_kind = EMU_RESET_HARD;
 
 bool do_translate = true;
 uint32_t product = 0x0E0, features = 0, asic_user_flags = 0;
@@ -92,6 +93,18 @@ void warn(const char *fmt, ...) {
         debugger(DBG_EXCEPTION, 0);
 }
 
+void emu_request_reset_soft(void)
+{
+    __atomic_store_n(&emu_reset_kind, EMU_RESET_SOFT, __ATOMIC_RELAXED);
+    cpu_events |= EVENT_RESET;
+}
+
+void emu_request_reset_hard(void)
+{
+    __atomic_store_n(&emu_reset_kind, EMU_RESET_HARD, __ATOMIC_RELAXED);
+    cpu_events |= EVENT_RESET;
+}
+
 __attribute__((noreturn))
 void error(const char *fmt, ...) {
     va_list va;
@@ -110,7 +123,7 @@ void error(const char *fmt, ...) {
         longjmp(debugger_error_jmp, 1);
     }
     debugger(DBG_EXCEPTION, 0);
-    cpu_events |= EVENT_RESET;
+    emu_request_reset_hard();
     return_to_loop();
 }
 
@@ -182,6 +195,9 @@ struct gui_busy_raii {
 
 static void emu_reset()
 {
+    const uint8_t reset_kind = __atomic_load_n(&emu_reset_kind, __ATOMIC_RELAXED);
+    __atomic_store_n(&emu_reset_kind, EMU_RESET_HARD, __ATOMIC_RELAXED);
+
     memset(mem_areas[1].ptr, 0, mem_areas[1].size);
 
     memset(&arm, 0, sizeof arm);
@@ -195,6 +211,8 @@ static void emu_reset()
 
     nspire_log_hook_reset();
     memory_reset();
+    if (emulate_cx && reset_kind == EMU_RESET_HARD)
+        fastboot_cx_reset();
 }
 
 bool snapshot_read(const emu_snapshot *snapshot, void *dest, int size)
