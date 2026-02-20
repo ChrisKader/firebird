@@ -10,6 +10,37 @@
 
 usb_cx2_state usb_cx2;
 
+static bool usb_cx2_physical_vbus_present()
+{
+    if (hw_override_get_usb_otg_cable() > 0)
+        return false;
+
+    const int8_t cable = hw_override_get_usb_cable_connected();
+    if (cable >= 0) {
+        if (cable == 0)
+            return false;
+        const int vbus_mv_forced = hw_override_get_vbus_mv();
+        return vbus_mv_forced >= 4500;
+    }
+
+    const int vbus_mv = hw_override_get_vbus_mv();
+    if (vbus_mv >= 0)
+        return vbus_mv >= 4500;
+
+    return false;
+}
+
+static uint32_t usb_cx2_otgcs_idle_value()
+{
+    /* Values aligned with observed firmware logs:
+     *   connected:    otgcsr=b20000
+     *   disconnected: otgcsr=b02e00
+     */
+    if (usb_cx2_physical_vbus_present())
+        return 0x00B20000u;
+    return 0x00B02E00u;
+}
+
 static void usb_cx2_int_check()
 {
     // Update device controller group interrupt status
@@ -107,6 +138,8 @@ static void usb_cx2_packet_from_calc(uint8_t ep, uint8_t *packet, size_t size)
 
 void usb_cx2_reset()
 {
+    const bool attached = usb_cx2_physical_vbus_present();
+
     usb_cx2 = {};
     usb_cx2.usbcmd = 0x80000;
     usb_cx2.portsc = 0xEC000004;
@@ -114,18 +147,32 @@ void usb_cx2_reset()
     usb_cx2.imr = 0xF;
     usb_cx2.otgier = 0;
 
-    // High speed, B-device, Acts as device
-    usb_cx2.otgcs = (2 << 22) | (1 << 21) | (1 << 20);
+    // High speed, B-device, acts as device.
+    // OTG connection bits must match physical VBUS/cable state.
+    usb_cx2.otgcs = usb_cx2_otgcs_idle_value();
 
-    // Reset IRQ
-    usb_cx2.gisr[1] |= 0b1111 << 16;
-    usb_cx2.gisr[2] |= 1;
+    /* Only raise initial reset-related device IRQs when physically attached.
+     * If disconnected, these spuriously trigger jungo attach/enable paths. */
+    if (attached) {
+        usb_cx2.gisr[1] |= 0b1111 << 16;
+        usb_cx2.gisr[2] |= 1;
+    }
 
     usb_cx2_int_check();
 }
 
 void usb_cx2_bus_reset_on()
 {
+    if (!usb_cx2_physical_vbus_present()) {
+        usb_cx2.portsc &= ~(0x0C000101u);
+        usb_cx2.usbsts &= ~4u;
+        usb_cx2.otgisr = 0;
+        usb_cx2.otgcs = usb_cx2_otgcs_idle_value();
+        usb_cx2.gisr[2] &= ~(1u << 9);
+        usb_cx2_int_check();
+        return;
+    }
+
     usb_cx2.portsc &= ~1;
     usb_cx2.portsc |= 0x0C000100;
     usb_cx2.usbsts |= 0x40;
@@ -139,15 +186,25 @@ void usb_cx2_bus_reset_on()
 
 void usb_cx2_bus_reset_off()
 {
-    usb_cx2.otgcs = (2 << 22) | (1 << 21) | (1 << 20) | (1 << 17);
-    usb_cx2.otgisr = (1 << 9) | (1 << 8);
+    const bool attached = usb_cx2_physical_vbus_present();
+    usb_cx2.otgcs = usb_cx2_otgcs_idle_value();
+    usb_cx2.otgisr = attached ? ((1u << 9) | (1u << 8)) : 0u;
 
-    // Device idle
-    usb_cx2.gisr[2] |= (1 << 9);
+    /* Device-idle IRQ should only be raised when physically attached.
+     * Raising it while detached triggers guest Jungo notify callbacks
+     * (DEVICE_ENABLE/CONNECT) and can make power logic think USB appeared. */
+    if (attached)
+        usb_cx2.gisr[2] |= (1u << 9);
+    else
+        usb_cx2.gisr[2] &= ~(1u << 9);
 
     usb_cx2.portsc &= ~0x0C000100;
-    usb_cx2.portsc |= 1;
-    usb_cx2.usbsts |= 4;
+    if (attached) {
+        usb_cx2.portsc |= 1;
+        usb_cx2.usbsts |= 4;
+    } else {
+        usb_cx2.portsc &= ~1u;
+    }
     usb_cx2_int_check();
     //gui_debug_printf("usb reset off\n");
 }
@@ -385,6 +442,13 @@ void usb_cx2_write_word(uint32_t addr, uint32_t value)
         usb_cx2.miscr = value;
         return;
     case 0x080: // OTGCS
+        if (!usb_cx2_physical_vbus_present()) {
+            /* Keep detached OTG state stable while unplugged.
+             * Guest writes here during init; do not let them synthesize
+             * attach/session transitions without physical VBUS. */
+            usb_cx2.otgcs = usb_cx2_otgcs_idle_value();
+            return;
+        }
         usb_cx2.otgcs = value;
         return;
     case 0x084: // OTGISR

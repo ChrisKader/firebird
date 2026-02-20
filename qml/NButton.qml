@@ -28,6 +28,13 @@ Rectangle {
 
     signal clicked()
 
+    function forceRelease() {
+        if (!pressed && !fixed)
+            return;
+        fixed = false;
+        pressed = false;
+    }
+
     border.width: active ? 2 : 1
     border.color: border_color
     radius: 3
@@ -42,6 +49,21 @@ Rectangle {
 
         if(!_fromCpp)
             Emu.setButtonState(root.keymap_id, root.pressed);
+    }
+
+    onVisibleChanged: {
+        if (!visible)
+            forceRelease();
+    }
+
+    onEnabledChanged: {
+        if (!enabled)
+            forceRelease();
+    }
+
+    Component.onDestruction: {
+        if (pressed && !_fromCpp)
+            Emu.setButtonState(root.keymap_id, false);
     }
 
     Connections {
@@ -105,6 +127,11 @@ Rectangle {
 
             parent.pressed = newState;
         }
+
+        onCanceled: {
+            if (!root.fixed)
+                parent.pressed = false;
+        }
     }
 
     MouseArea {
@@ -141,6 +168,11 @@ Rectangle {
 
             if(mouse.button === Qt.LeftButton
                     && !root.fixed)
+                parent.pressed = false;
+        }
+
+        onCanceled: {
+            if (!root.fixed)
                 parent.pressed = false;
         }
     }

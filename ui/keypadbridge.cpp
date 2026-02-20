@@ -6,8 +6,19 @@
 #include "core/emu.h"
 #include "app/qmlbridge.h"
 #include <QHash>
+#include <QSet>
+#include <QTimer>
+#include <chrono>
 
 QtKeypadBridge qt_keypad_bridge;
+static QSet<int> pressed_calc_keys;
+static QHash<int, qint64> pressed_at_ms;
+
+static qint64 monotonicMs()
+{
+    using namespace std::chrono;
+    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+}
 
 const char *keyIdToName(unsigned int id)
 {
@@ -93,6 +104,11 @@ void setKeypad(unsigned int keymap_id, bool state)
     //assert(col < KEYPAD_COLS); Not needed.
 
     ::keypad_set_key(row, col, state);
+    if (state)
+        pressed_calc_keys.insert(static_cast<int>(keymap_id));
+    else
+        pressed_calc_keys.remove(static_cast<int>(keymap_id));
+
     if (QMLBridge *bridge = qmlBridgeInstance())
         bridge->notifyButtonStateChanged(row, col, state);
 
@@ -128,11 +144,14 @@ static void setTouchpadFromArrow(Qt::Key key, bool active)
     }
 }
 
-static void releaseTrackedKeys()
+static void releaseAllCalcKeys()
 {
-    for (auto calc_key : pressed_keys)
-        setKeypad(calc_key, false);
+    const auto keys = pressed_calc_keys.values();
+    for (int calc_key : keys)
+        setKeypad(static_cast<unsigned int>(calc_key), false);
+    pressed_calc_keys.clear();
     pressed_keys.clear();
+    pressed_at_ms.clear();
 }
 
 static void releaseTouchpadKeysOnFocusOut()
@@ -301,7 +320,21 @@ void keyToKeypad(QKeyEvent *event)
     // If physkey is already pressed, then this must the the release event
     if (pressed != pressed_keys.end())
     {
-        setKeypad(*pressed, false);
+        const int calc_key = *pressed;
+        const qint64 now_ms = monotonicMs();
+        const qint64 pressed_ms = pressed_at_ms.take(physkey);
+        constexpr qint64 kMinTapVisibleMs = 12;
+        const qint64 held_ms = now_ms - pressed_ms;
+        if (held_ms >= kMinTapVisibleMs) {
+            setKeypad(calc_key, false);
+        } else {
+            const int release_delay_ms = static_cast<int>(kMinTapVisibleMs - held_ms);
+            QTimer::singleShot(release_delay_ms, [physkey, calc_key]() {
+                if (pressed_keys.contains(physkey))
+                    return;
+                setKeypad(calc_key, false);
+            });
+        }
         pressed_keys.erase(pressed);
     }
     else if (event->type() == QEvent::KeyPress) // But press only on the press event
@@ -327,6 +360,7 @@ void keyToKeypad(QKeyEvent *event)
         if (translated != QtKeyMap.end())
         {
             pressed_keys.insert(physkey, *translated);
+            pressed_at_ms.insert(physkey, monotonicMs());
             setKeypad(*translated, true);
         }
     }
@@ -335,7 +369,7 @@ void keyToKeypad(QKeyEvent *event)
 void QtKeypadBridge::keyPressEvent(QKeyEvent *event)
 {
     if (cpu_events & EVENT_SLEEP)
-        releaseTrackedKeys();
+        releaseAllCalcKeys();
 
     // Ignore autorepeat, calc os must handle it on its own
     if(event->isAutoRepeat())
@@ -435,10 +469,12 @@ bool QtKeypadBridge::eventFilter(QObject *obj, QEvent *event)
         keyPressEvent(static_cast<QKeyEvent*>(event));
     else if(event->type() == QEvent::KeyRelease)
         keyReleaseEvent(static_cast<QKeyEvent*>(event));
-    else if(event->type() == QEvent::FocusOut)
+    else if(event->type() == QEvent::FocusOut
+            || event->type() == QEvent::Hide
+            || event->type() == QEvent::WindowDeactivate)
     {
-        // Release all keys on focus change
-        releaseTrackedKeys();
+        // Release all keys when input target is no longer active/visible.
+        releaseAllCalcKeys();
         releaseTouchpadKeysOnFocusOut();
         return false;
     }

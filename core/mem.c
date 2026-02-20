@@ -281,7 +281,7 @@ void null_write_word(uint32_t addr, uint32_t value) {
     (void) value;
 }
 
-void (*reset_procs[24])(void);
+void (*reset_procs[32])(void);
 unsigned int reset_proc_count;
 
 void add_reset_proc(void (*proc)(void))
@@ -425,6 +425,7 @@ bool memory_initialize(uint32_t sdram_size)
     write_byte_map[0xAC >> 2] = sdio_write_byte;
     write_half_map[0xAC >> 2] = sdio_write_half;
     write_word_map[0xAC >> 2] = sdio_write_word;
+    add_reset_proc(sdio_reset);
 
     if(!emulate_cx2)
     {
@@ -459,8 +460,13 @@ bool memory_initialize(uint32_t sdram_size)
     write_word_map[0xC0 >> 2] = lcd_write_word;
     add_reset_proc(lcd_reset);
 
-    read_word_map[0xC4 >> 2] = adc_read_word;
-    write_word_map[0xC4 >> 2] = adc_write_word;
+    if (!emulate_cx2) {
+        read_word_map[0xC4 >> 2] = adc_read_word;
+        write_word_map[0xC4 >> 2] = adc_write_word;
+    } else {
+        read_word_map[0xC4 >> 2] = adc_cx2_read_word;
+        write_word_map[0xC4 >> 2] = adc_cx2_write_word;
+    }
     add_reset_proc(adc_reset);
 
     des_initialize();

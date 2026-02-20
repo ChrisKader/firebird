@@ -448,10 +448,13 @@ void keypad_set_key(int row, int col, bool state)
     assert(row < KEYPAD_ROWS);
     assert(col < KEYPAD_COLS);
 
+    const uint16_t mask = (uint16_t)(1u << col);
+    const bool was_set = (keypad.key_map[row] & mask) != 0;
     if(state)
         keypad.key_map[row] |= 1 << col;
     else
         keypad.key_map[row] &= ~(1 << col);
+    const bool changed = was_set != state;
 
     if (row == 0 && col == 9) {
         if (state) {
@@ -462,6 +465,16 @@ void keypad_set_key(int row, int col, bool state)
             else
                 int_set(INT_POWER, false);
         }
+    }
+
+    if (changed) {
+        /* Host key events can be brief; if we only wait for the guest's next
+         * scheduled keypad scan window, DIAGS navigation taps may be missed.
+         * Trigger a near-immediate scan/IRQ edge when matrix state changes. */
+        if (keypad.kpc.control & 2)
+            event_set(SCHED_KEYPAD, 1);
+        keypad.kpc.int_active |= 2;
+        keypad_int_check();
     }
 }
 

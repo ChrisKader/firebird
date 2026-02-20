@@ -203,6 +203,7 @@ void spi_write_word(uint32_t addr, uint32_t value);
 uint8_t sdio_read_byte(uint32_t addr);
 uint16_t sdio_read_half(uint32_t addr);
 uint32_t sdio_read_word(uint32_t addr);
+void sdio_reset(void);
 void sdio_write_byte(uint32_t addr, uint8_t value);
 void sdio_write_half(uint32_t addr, uint16_t value);
 void sdio_write_word(uint32_t addr, uint32_t value);
@@ -230,7 +231,25 @@ void adc_write_word(uint32_t addr, uint32_t value);
 
 // CX2 battery/charger helpers (defined in misc.c, used by cx2.cpp too)
 bool cx2_battery_override_active(void);
+bool cx2_effective_battery_present(void);
 charger_state_t cx2_effective_charger_state(void);
+typedef struct cx2_power_rails {
+    bool battery_present;
+    charger_state_t charger_state;
+    uint16_t battery_code;
+    uint16_t vsys_code;
+    uint16_t vsled_code;
+    uint16_t vref_code;
+    uint16_t vref_aux_code;
+    uint16_t vbus_code;
+    int battery_mv;
+    int vsys_mv;
+    int vsled_mv;
+    int vbus_mv;
+    int vref_mv;
+    int vref_aux_mv;
+} cx2_power_rails_t;
+void cx2_get_power_rails(cx2_power_rails_t *rails);
 
 // CX2: 0x900B0000
 uint32_t adc_cx2_read_word(uint32_t addr);

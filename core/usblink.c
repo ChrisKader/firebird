@@ -838,6 +838,8 @@ extern void usb_receive_setup_packet(int endpoint, void *packet);
 extern void usb_receive_packet(int endpoint, void *packet, uint32_t size);
 
 void usblink_reset() {
+    const bool was_link_active = usblink_connected || (usblink_state != 0);
+
     if (put_file_state) {
         put_file_state = 0;
         if (put_file)
@@ -849,6 +851,14 @@ void usblink_reset() {
     usblink_state = 0;
     usblink_sending = false;
     usblink_cx2_reset();
+
+    /* CX II "charger only" and plain disconnect paths call usblink_reset()
+     * just to tear down data link state. Do not synthesize a USB bus-reset-off
+     * transition unless a data session was actually active; that transition can
+     * raise Jungo device-enable callbacks and make the OS think a USB data link
+     * was plugged in. */
+    if (emulate_cx2 && was_link_active)
+        usb_cx2_bus_reset_off();
 }
 
 void usblink_connect() {

@@ -44,6 +44,7 @@ typedef struct cx2_backlight_state {
 uint32_t cx2_backlight_read(uint32_t addr);
 void cx2_backlight_write(uint32_t addr, uint32_t value);
 void cx2_backlight_reset();
+void cx2_backlight_refresh_lcd_contrast(void);
 
 typedef struct cx2_lcd_spi_state {
 	bool busy;

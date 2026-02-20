@@ -86,6 +86,7 @@
 #include "ui/materialicons.h"
 #include "ui_mainwindow.h"
 #include "app/qmlbridge.h"
+#include "app/powercontrol.h"
 #include "app/baselinelayout.h"
 #include "ui/framebuffer.h"
 #include "ui/keypadbridge.h"
@@ -128,6 +129,12 @@ static constexpr const char *kSettingHwBrightnessOverride = "hwBrightnessOverrid
 static constexpr const char *kSettingHwKeypadTypeOverride = "hwKeypadTypeOverride";
 static constexpr const char *kSettingHwBatteryMvOverride = "hwBatteryMvOverride";
 static constexpr const char *kSettingHwChargerStateOverride = "hwChargerStateOverride";
+static constexpr const char *kSettingHwBatteryPresentOverride = "hwBatteryPresentOverride";
+static constexpr const char *kSettingHwUsbCableConnectedOverride = "hwUsbCableConnectedOverride";
+static constexpr const char *kSettingHwUsbOtgOverride = "hwUsbOtgOverride";
+static constexpr const char *kSettingHwDockAttachedOverride = "hwDockAttachedOverride";
+static constexpr const char *kSettingHwVbusMvOverride = "hwVbusMvOverride";
+static constexpr const char *kSettingHwVsledMvOverride = "hwVsledMvOverride";
 static constexpr const char *kSettingWindowLayoutJson = "windowLayoutJson";
 static constexpr const char *kSettingDockLayoutJson = "dockLayoutJson";
 static constexpr const char *kSettingLayoutProfile = "layoutProfile";
@@ -206,6 +213,12 @@ struct HwOverrides {
     int keypadType = -1;
     int batteryMv = -1;
     int chargerState = -1;
+    int batteryPresent = -1;
+    int usbCableConnected = -1;
+    int usbOtgCable = -1;
+    int dockAttached = -1;
+    int vbusMv = -1;
+    int vsledMv = -1;
 };
 
 static HwOverrides readHwOverridesFromSettings(QSettings *settings)
@@ -222,6 +235,12 @@ static HwOverrides readHwOverridesFromSettings(QSettings *settings)
     overrides.keypadType = readValue(kSettingHwKeypadTypeOverride);
     overrides.batteryMv = readValue(kSettingHwBatteryMvOverride);
     overrides.chargerState = readValue(kSettingHwChargerStateOverride);
+    overrides.batteryPresent = readValue(kSettingHwBatteryPresentOverride);
+    overrides.usbCableConnected = readValue(kSettingHwUsbCableConnectedOverride);
+    overrides.usbOtgCable = readValue(kSettingHwUsbOtgOverride);
+    overrides.dockAttached = readValue(kSettingHwDockAttachedOverride);
+    overrides.vbusMv = readValue(kSettingHwVbusMvOverride);
+    overrides.vsledMv = readValue(kSettingHwVsledMvOverride);
     return overrides;
 }
 
@@ -229,13 +248,19 @@ static void writeHwOverridesToSettings(QSettings *settings, const HwOverrides &o
 {
     if (!settings)
         return;
-    const std::array<std::pair<const char *, int>, 6> values = {{
+    const std::array<std::pair<const char *, int>, 12> values = {{
         { kSettingHwBatteryOverride, overrides.batteryRaw },
         { kSettingHwChargingOverride, overrides.charging },
         { kSettingHwBrightnessOverride, overrides.brightness },
         { kSettingHwKeypadTypeOverride, overrides.keypadType },
         { kSettingHwBatteryMvOverride, overrides.batteryMv },
         { kSettingHwChargerStateOverride, overrides.chargerState },
+        { kSettingHwBatteryPresentOverride, overrides.batteryPresent },
+        { kSettingHwUsbCableConnectedOverride, overrides.usbCableConnected },
+        { kSettingHwUsbOtgOverride, overrides.usbOtgCable },
+        { kSettingHwDockAttachedOverride, overrides.dockAttached },
+        { kSettingHwVbusMvOverride, overrides.vbusMv },
+        { kSettingHwVsledMvOverride, overrides.vsledMv },
     }};
     for (const auto &entry : values)
         settings->setValue(QString::fromLatin1(entry.first), entry.second);
@@ -2475,18 +2500,69 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
 
     m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
 
-    // Restore HW config overrides
+    // Restore HW config overrides.
+    // Battery/charger overrides are coupled: never restore a forced charger state
+    // unless battery override itself is active.
     const HwOverrides hw = readHwOverridesFromSettings(settings);
-    hw_override_set_adc_battery_level(static_cast<int16_t>(hw.batteryRaw));
-    hw_override_set_adc_charging(static_cast<int8_t>(hw.charging));
+    auto clampTriState = [](int value) -> int8_t {
+        if (value < 0)
+            return -1;
+        return value ? 1 : 0;
+    };
+    const bool forceCx2SafeBaseline = emulate_cx2;
+    const int8_t batteryPresent = forceCx2SafeBaseline ? 1 : clampTriState(hw.batteryPresent);
+    const int8_t usbCable = forceCx2SafeBaseline ? 0 : clampTriState(hw.usbCableConnected);
+    const int8_t usbOtg = forceCx2SafeBaseline ? 0 : clampTriState(hw.usbOtgCable);
+    const int8_t dockAttached = forceCx2SafeBaseline ? 0 : clampTriState(hw.dockAttached);
+
+    hw_override_set_battery_present(batteryPresent);
+    hw_override_set_usb_cable_connected(usbCable);
+    hw_override_set_usb_otg_cable(usbOtg);
+    hw_override_set_dock_attached(dockAttached);
+
+    int restoredBatteryMv = forceCx2SafeBaseline ? -1 : hw.batteryMv;
+    /* Old settings may contain non-mV payloads (for example bool/int flags)
+     * in the battery-mV key. Reject out-of-range values so CX II falls back
+     * to the model default instead of clamping to a fake 3000mV low battery. */
+    if (restoredBatteryMv >= 0
+            && (restoredBatteryMv < 3000 || restoredBatteryMv > 4200))
+        restoredBatteryMv = -1;
+
+    int restoredVbusMv = forceCx2SafeBaseline ? 0 : hw.vbusMv;
+    int restoredVsledMv = forceCx2SafeBaseline ? 0 : hw.vsledMv;
+    if (restoredVbusMv > 5500)
+        restoredVbusMv = 5500;
+    if (restoredVsledMv > 5500)
+        restoredVsledMv = 5500;
+    /* Normalize persisted rail overrides so "disconnected" truly means no
+     * external power at boot. This avoids stale non-zero rail values causing
+     * charging state without any cable/dock attachment. */
+    if (usbOtg > 0 || usbCable <= 0)
+        restoredVbusMv = 0;
+    if (dockAttached <= 0)
+        restoredVsledMv = 0;
+    else if (restoredVsledMv < 0)
+        restoredVsledMv = 0;
+    hw_override_set_vbus_mv(restoredVbusMv);
+    hw_override_set_vsled_mv(restoredVsledMv);
+    const bool batteryOverrideActive = (restoredBatteryMv >= 0);
+    if (batteryOverrideActive) {
+        /* Legacy raw battery override is ignored for CX II power model. */
+        hw_override_set_adc_battery_level(-1);
+        hw_override_set_battery_mv(restoredBatteryMv);
+        /* Never restore legacy forced charging state on CX II.
+         * Charging status should come from physical rails/events only. */
+        hw_override_set_adc_charging(-1);
+        hw_override_set_charger_state(CHARGER_AUTO);
+    } else {
+        hw_override_set_adc_battery_level(-1);
+        hw_override_set_battery_mv(-1);
+        hw_override_set_adc_charging(-1);
+        hw_override_set_charger_state(CHARGER_AUTO);
+    }
     hw_override_set_lcd_contrast(static_cast<int16_t>(hw.brightness));
     hw_override_set_adc_keypad_type(static_cast<int16_t>(hw.keypadType));
-    hw_override_set_battery_mv(hw.batteryMv);
-    int savedChargerState = hw.chargerState;
-    if (savedChargerState >= CHARGER_DISCONNECTED && savedChargerState <= CHARGER_CHARGING)
-        hw_override_set_charger_state((charger_state_t)savedChargerState);
-    else
-        hw_override_set_charger_state(CHARGER_AUTO);
+    PowerControl::refreshPowerState();
     if (m_hwConfig)
         m_hwConfig->syncOverridesFromGlobals();
 
@@ -2766,6 +2842,12 @@ void MainWindow::savePersistentUiState()
         static_cast<int>(hw_override_get_adc_keypad_type()),
         hw_override_get_battery_mv(),
         static_cast<int>(hw_override_get_charger_state()),
+        static_cast<int>(hw_override_get_battery_present()),
+        static_cast<int>(hw_override_get_usb_cable_connected()),
+        static_cast<int>(hw_override_get_usb_otg_cable()),
+        static_cast<int>(hw_override_get_dock_attached()),
+        hw_override_get_vbus_mv(),
+        hw_override_get_vsled_mv(),
     };
     writeHwOverridesToSettings(settings, hw);
 
@@ -3709,16 +3791,9 @@ void MainWindow::launchIdaInstantDebugging()
 
 void MainWindow::connectUSB()
 {
-    if (usblink_connected) {
-        hw_override_set_usb_cable_connected(0);
-        usblink_queue_reset();
-        usblink_reset();
-    } else {
-        hw_override_set_usb_cable_connected(1);
-        usblink_connect();
-    }
-
-    usblinkChanged(false);
+    const bool cableConnected = PowerControl::isUsbCableConnected();
+    PowerControl::setUsbCableConnected(!cableConnected);
+    usblinkChanged(PowerControl::isUsbCableConnected());
 }
 
 void MainWindow::usblinkChanged(bool state)

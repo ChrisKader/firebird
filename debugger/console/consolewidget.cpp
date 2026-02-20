@@ -15,6 +15,9 @@
 #include <QToolButton>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QByteArray>
+#include <QProcessEnvironment>
+#include <cstdio>
 
 #include "ui/ansitextwriter.h"
 #include "ui/widgettheme.h"
@@ -27,6 +30,64 @@ static bool hasAnsiEscape(const QString &s)
 static bool needsControlProcessing(const QString &s)
 {
     return s.contains(QLatin1Char('\r')) || hasAnsiEscape(s);
+}
+
+static bool consoleMirrorStdoutEnabled()
+{
+    static int enabled = -1;
+    if (enabled < 0) {
+        const QByteArray v = qgetenv("FIREBIRD_CONSOLE_STDOUT");
+        enabled = (!v.isEmpty() && v != "0") ? 1 : 0;
+    }
+    return enabled != 0;
+}
+
+static const char *tagPrefix(ConsoleTag tag)
+{
+    switch (tag) {
+    case ConsoleTag::Uart:  return "[UART] ";
+    case ConsoleTag::Debug: return "[DBG]  ";
+    case ConsoleTag::Sys:   return "[SYS]  ";
+    case ConsoleTag::Nlog:  return "[NLOG] ";
+    }
+    return "[???]  ";
+}
+
+static void mirrorConsoleRawToStdout(const QString &text)
+{
+    if (!consoleMirrorStdoutEnabled() || text.isEmpty())
+        return;
+    const QByteArray bytes = text.toUtf8();
+    if (!bytes.isEmpty()) {
+        std::fwrite(bytes.constData(), 1, static_cast<size_t>(bytes.size()), stdout);
+        std::fflush(stdout);
+    }
+}
+
+static void mirrorConsoleTaggedToStdout(ConsoleTag tag, const QString &text)
+{
+    if (!consoleMirrorStdoutEnabled() || text.isEmpty())
+        return;
+
+    QString out;
+    out.reserve(text.size() + 16);
+    bool atLineStart = true;
+    const QString prefix = QString::fromLatin1(tagPrefix(tag));
+    for (QChar ch : text) {
+        if (atLineStart) {
+            out += prefix;
+            atLineStart = false;
+        }
+        out += ch;
+        if (ch == QLatin1Char('\n'))
+            atLineStart = true;
+    }
+
+    const QByteArray bytes = out.toUtf8();
+    if (!bytes.isEmpty()) {
+        std::fwrite(bytes.constData(), 1, static_cast<size_t>(bytes.size()), stdout);
+        std::fflush(stdout);
+    }
 }
 
 ConsoleWidget::ConsoleWidget(QWidget *parent)
@@ -347,6 +408,8 @@ void ConsoleWidget::insertDebugFormattedText(const QString &text)
 
 void ConsoleWidget::appendOutput(const QString &text)
 {
+    mirrorConsoleRawToStdout(text);
+
     /* Plain text output (user commands, raw messages).
      * Timestamped, solid default text color -- no tag. */
     const WidgetTheme &t = currentWidgetTheme();
@@ -381,6 +444,8 @@ void ConsoleWidget::appendOutput(const QString &text)
 
 void ConsoleWidget::appendTaggedOutput(ConsoleTag tag, const QString &text)
 {
+    mirrorConsoleTaggedToStdout(tag, text);
+
     /* Each tagged line gets: [MM:SS.mmm] [TAG] <body>
      * Keep tagged line state across calls so CR-based progress output can
      * overwrite in place instead of creating a new timestamp/tag line. */

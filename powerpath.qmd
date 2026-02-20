@@ -1,0 +1,250 @@
+```mermaid
+flowchart TB
+  %% ═══════════════════════════════════════════════════════
+  %%  PHYSICAL INPUTS
+  %% ═══════════════════════════════════════════════════════
+  subgraph IN["User-Provided Physical Inputs"]
+    direction LR
+
+    subgraph IN_BAT["Battery"]
+      VBAT[/"VBAT (mV)<br/>range: 0–4200"/]
+      BAT_PRES["battery_present: true | false"]
+    end
+
+    subgraph IN_USB["Top USB Port"]
+      VBUS[/"VBUS (mV)<br/>0 or 4500–5250"/]
+      USB_TYPE["usb_type: none | SDP | CDP | DCP | OTG"]
+      USB_ATT["usb_attached: true | false"]
+    end
+
+    subgraph IN_DOCK["Dock / Sled"]
+      VSLED[/"VSLED (mV)<br/>0 or 4500–5250"/]
+      DOCK_ST["dock_attached: true | false"]
+    end
+
+    RESET(["Reset event<br/>battery_pull | watchdog | button"])
+    ONKEY(["ON key event"])
+    RTC_ALRM(["RTC alarm event"])
+  end
+
+  %% ═══════════════════════════════════════════════════════
+  %%  INPUT QUALIFICATION
+  %% ═══════════════════════════════════════════════════════
+  subgraph QUAL["Input Qualification (separate checks)"]
+    direction LR
+    BAT_PRESENT_OK{"battery_present?"}
+    BAT_RUN_OK{"VBAT >= VBAT_RUN_MIN"}
+    BAT_PRECHG{"VBAT < VBAT_PRECHARGE_MIN"}
+    USB_OK{"usb_attached AND usb_type!=none AND VBUS >= VBUS_VALID_MIN"}
+    DOCK_OK{"dock_attached AND VSLED >= VSLED_VALID_MIN"}
+  end
+
+  VBAT --> BAT_RUN_OK
+  VBAT --> BAT_PRECHG
+  BAT_PRES --> BAT_PRESENT_OK
+  VBUS --> USB_OK
+  USB_TYPE --> USB_OK
+  USB_ATT --> USB_OK
+  VSLED --> DOCK_OK
+  DOCK_ST --> DOCK_OK
+
+  %% ═══════════════════════════════════════════════════════
+  %%  SOURCE ARBITRATION + INPUT CAPABILITY
+  %% ═══════════════════════════════════════════════════════
+  subgraph ARB["Source Arbitration (firmware/PMIC policy-driven)"]
+    direction TB
+    CAP["source_capability:<br/>SDP=500mA, CDP/DCP~1500mA, OTG=charge_inhibit,<br/>dock capability from dock state"]
+    POLICY["policy_select_source:<br/>usb | dock | battery | none<br/>(depends on thermals, charge state, source capability, OS policy)"]
+    SRC_OUT(["source_in_use"])
+    CAP --> POLICY --> SRC_OUT
+  end
+
+  USB_OK --> CAP
+  USB_TYPE --> CAP
+  DOCK_OK --> CAP
+  BAT_PRESENT_OK --> POLICY
+  BAT_RUN_OK --> POLICY
+  USB_OK --> POLICY
+  DOCK_OK --> POLICY
+
+  %% ═══════════════════════════════════════════════════════
+  %%  VSYS MODEL (DETAILED, APPROXIMATION)
+  %% ═══════════════════════════════════════════════════════
+  subgraph VSM["VSYS Derivation Model (approximation with explicit path logic)"]
+    direction TB
+    U_PATH["Vusb_path = USB_OK ? clamp(VBUS - USB_PATH_DROP_MV, 0, VSYS_EXT_TARGET_MV) : 0"]
+    D_PATH["Vdock_path = DOCK_OK ? clamp(VSLED - DOCK_PATH_DROP_MV, 0, VSYS_EXT_TARGET_MV) : 0"]
+    B_PATH["Vbat_path = BAT_PRESENT_OK ? max(VBAT - BAT_PATH_DROP_MV, 0) : 0"]
+    EXT_SEL["Vext_sel =<br/>if source_in_use==usb then Vusb_path<br/>else if source_in_use==dock then Vdock_path<br/>else 0"]
+    VSYS["VSYS = max(Vext_sel, Vbat_path)"]
+    PG["power_good = VSYS >= VSYS_PGOOD_MIN"]
+    UVLO["uvlo_trip = VSYS < VSYS_UVLO_MIN"]
+  end
+
+  SRC_OUT --> EXT_SEL
+  USB_OK --> U_PATH
+  DOCK_OK --> D_PATH
+  BAT_PRESENT_OK --> B_PATH
+  U_PATH --> EXT_SEL
+  D_PATH --> EXT_SEL
+  EXT_SEL --> VSYS
+  B_PATH --> VSYS
+  VSYS --> PG
+  VSYS --> UVLO
+
+  %% ═══════════════════════════════════════════════════════
+  %%  CHARGE-PATH CONTROLLER
+  %% ═══════════════════════════════════════════════════════
+  subgraph CHG["Charge-Path Controller"]
+    direction LR
+    subgraph CHG_SM["Charge State Machine"]
+      direction TB
+      CS_IDLE["IDLE<br/>no usable external source"]
+      CS_NOCH["CONNECTED_NOT_CHARGING<br/>source valid, charging inhibited"]
+      CS_PRE["PRECHARGE<br/>VBAT < VBAT_PRECHARGE_MIN"]
+      CS_CC["CONSTANT_CURRENT"]
+      CS_CV["CONSTANT_VOLTAGE"]
+      CS_DONE["DONE"]
+      CS_FAULT["FAULT"]
+
+      CS_IDLE -->|"ext source valid + charge allowed"| CS_PRE
+      CS_IDLE -->|"ext source valid + charge inhibited"| CS_NOCH
+      CS_NOCH -->|"charge allowed"| CS_PRE
+      CS_NOCH -->|"source removed"| CS_IDLE
+      CS_PRE -->|"VBAT >= precharge threshold"| CS_CC
+      CS_CC -->|"VBAT approaches CV target"| CS_CV
+      CS_CV -->|"termination current reached"| CS_DONE
+      CS_PRE -->|"fault/timeout"| CS_FAULT
+      CS_CC -->|"fault/timeout"| CS_FAULT
+      CS_CV -->|"fault/timeout"| CS_FAULT
+      CS_DONE -->|"VBAT droops"| CS_CC
+      CS_FAULT -->|"reset/recover"| CS_IDLE
+    end
+    CHG_FLAGS(["charge_state"])
+  end
+
+  SRC_OUT --> CHG_SM
+  CAP --> CHG_SM
+  BAT_PRECHG --> CHG_SM
+  CHG_SM --> CHG_FLAGS
+
+  %% ═══════════════════════════════════════════════════════
+  %%  DERIVED OUTPUTS / STATUS FLAGS
+  %% ═══════════════════════════════════════════════════════
+  subgraph PP["Derived Power/Status Outputs"]
+    direction TB
+    BLEVEL["battery_level_class:<br/>critical | low | medium | full"]
+    WAKE["wake_reason_flags:<br/>USB insert, dock insert, ON key, RTC, reset"]
+    SRCFLAG["source_flags:<br/>usb_present, dock_present, battery_present"]
+  end
+
+  BAT_RUN_OK --> BLEVEL
+  RESET --> WAKE
+  ONKEY --> WAKE
+  RTC_ALRM --> WAKE
+  USB_OK --> SRCFLAG
+  DOCK_OK --> SRCFLAG
+  BAT_PRESENT_OK --> SRCFLAG
+
+  %% ═══════════════════════════════════════════════════════
+  %%  SYSTEM DOMAINS
+  %% ═══════════════════════════════════════════════════════
+  subgraph DOM["System Power Domains"]
+    direction LR
+    subgraph DOM_AON["Always-On Domain"]
+      RTC["RTC"]
+      WAKE_CTRL["Wake controller"]
+      PMU_REGS["PMU registers"]
+    end
+    subgraph DOM_CORE["Core Domain"]
+      CPU["ARM926EJ-S"]
+      SDRAM["SDRAM"]
+      NAND["NAND Flash"]
+    end
+    subgraph DOM_PER["Peripheral Domains"]
+      LCD_CTL["LCD controller"]
+      USB_PHY["USB PHY / FOTG210"]
+      KEYPAD["Keypad scanner"]
+      TPD["Touchpad"]
+      WLAN["WLAN"]
+    end
+  end
+
+  VSYS -->|"valid VSYS"| DOM_AON
+  PG -->|"domain enable"| DOM_CORE
+  VSYS -->|"when ungated"| DOM_CORE
+  VSYS -->|"clock/power gated"| DOM_PER
+
+  %% ═══════════════════════════════════════════════════════
+  %%  SYSTEM POWER STATES
+  %% ═══════════════════════════════════════════════════════
+  subgraph PSTATE["System Power States (guest-visible)"]
+    direction LR
+    S_OFF(["OFF"])
+    S_STBY(["STANDBY"])
+    S_DOFF(["DISPLAY_OFF_USB"])
+    S_WDISP(["WAKEUP_DISPLAY"])
+    S_RUN(["ACTIVE"])
+  end
+
+  PG --> PSTATE
+  UVLO --> PSTATE
+  WAKE --> PSTATE
+
+  %% ═══════════════════════════════════════════════════════
+  %%  ADC MODEL
+  %% ═══════════════════════════════════════════════════════
+  subgraph ADC_BLK["ADC Measurement Model"]
+    direction TB
+    ADC_MAP["channel_map:<br/>confirmed: ADC6=VBUS, ADC7=VSLED<br/>other channels: TBD by firmware validation"]
+    ADC_REF["reference rails: VREF, VREF2 (separate modeled rails)"]
+    ADC_CONV["10-bit conversion:<br/>code = quantize(Vinput/VREF) + noise(±LSB) + offset_cal"]
+  end
+
+  VBAT -.->|"analog tap"| ADC_MAP
+  VBUS -.->|"analog tap"| ADC_MAP
+  VSLED -.->|"analog tap"| ADC_MAP
+  VSYS -.->|"analog tap"| ADC_MAP
+  ADC_REF --> ADC_CONV
+  ADC_MAP --> ADC_CONV
+
+  %% ═══════════════════════════════════════════════════════
+  %%  PMU FIRMWARE LOOP (FEEDBACK)
+  %% ═══════════════════════════════════════════════════════
+  subgraph PMU["PMU Firmware Loop"]
+    direction TB
+    PMU_TRIG["triggers:<br/>periodic poll + IRQ/events"]
+    PMU_EVAL["evaluate:<br/>source validity, battery class, thermal/charge conditions, wake conditions"]
+    PMU_ACT["act:<br/>update policy, charge enable/current, power flags, wake/shutdown transitions"]
+    PMU_TRIG --> PMU_EVAL --> PMU_ACT
+  end
+
+  ADC_CONV -->|"ADC codes"| PMU_TRIG
+  CHG_FLAGS --> PMU_EVAL
+  SRC_OUT --> PMU_EVAL
+  WAKE --> PMU_TRIG
+
+  PMU_ACT -->|"update selection policy"| POLICY
+  PMU_ACT -->|"update charge control"| CHG_SM
+  PMU_ACT -->|"assert/deassert power flags"| PG
+  PMU_ACT -->|"state transition command"| PSTATE
+
+  %% ═══════════════════════════════════════════════════════
+  %%  STYLE (high-contrast, non-purple)
+  %% ═══════════════════════════════════════════════════════
+  classDef input fill:#D9F2FF,stroke:#0B6FA4,color:#06263A,stroke-width:1.5px
+  classDef qual fill:#FFF3D6,stroke:#C67A00,color:#3A2500,stroke-width:1.5px
+  classDef pwr fill:#E3F7E8,stroke:#2E8B57,color:#113322,stroke-width:1.5px
+  classDef dom fill:#EAF0FF,stroke:#3559A8,color:#1A2A57,stroke-width:1.5px
+  classDef adc fill:#FFE3EE,stroke:#C23A6B,color:#4A1027,stroke-width:1.5px
+  classDef pmu fill:#FFF9CC,stroke:#B28A00,color:#3E3200,stroke-width:1.5px
+  classDef state fill:#DFF7F2,stroke:#0E8C79,color:#073A33,stroke-width:1.5px
+
+  class VBAT,BAT_PRES,VBUS,USB_TYPE,USB_ATT,VSLED,DOCK_ST,RESET,ONKEY,RTC_ALRM input
+  class BAT_PRESENT_OK,BAT_RUN_OK,BAT_PRECHG,USB_OK,DOCK_OK qual
+  class SRC_OUT,VSYS,PG,UVLO,CHG_FLAGS,BLEVEL,WAKE,SRCFLAG pwr
+  class RTC,WAKE_CTRL,PMU_REGS,CPU,SDRAM,NAND,LCD_CTL,USB_PHY,KEYPAD,TPD,WLAN dom
+  class ADC_MAP,ADC_REF,ADC_CONV adc
+  class PMU_TRIG,PMU_EVAL,PMU_ACT pmu
+  class S_OFF,S_STBY,S_DOFF,S_WDISP,S_RUN state
+```

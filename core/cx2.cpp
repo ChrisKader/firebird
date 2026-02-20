@@ -15,11 +15,22 @@ static struct {
 
 enum {
 	TG2989_PMIC_REG_ID_STATUS = 0x04u,
+	TG2989_PMIC_REG_PWR_STATUS0 = 0x08u,
+	TG2989_PMIC_REG_PWR_STATUS1 = 0x0Cu,
+	TG2989_PMIC_REG_PWR_STATUS2 = 0x10u,
+	TG2989_PMIC_REG_PWR_MODE = 0x30u,
+	TG2989_PMIC_REG_PWR_FLAGS = 0x48u,
 	TG2989_PMIC_ID_READY_BIT = 0x00000001u,
 	TG2989_PMIC_ID_MODEL_SHIFT = 20,
 	TG2989_PMIC_ID_MODEL_MASK = 0x01F00000u,
 	TG2989_PMIC_ID_MODEL_TG2985 = 1u,
 	TG2989_PMIC_ID_VARIANT_SIGN = 0x80000000u,
+	TG2989_PMIC_PWR_STATUS0_BATT = 0x10044300u,
+	TG2989_PMIC_PWR_STATUS0_USB = 0x10044F00u,
+	TG2989_PMIC_PWR_MODE_BATT = 0x21020303u,
+	TG2989_PMIC_PWR_MODE_USB = 0x18020303u,
+	TG2989_PMIC_PWR_FLAGS_BATT = 0x00000003u,
+	TG2989_PMIC_PWR_FLAGS_USB = 0x0000000Fu,
 };
 
 static uint32_t tg2989_pmic_id_status_value(void)
@@ -33,6 +44,40 @@ static uint32_t tg2989_pmic_id_status_value(void)
 	 */
 	return TG2989_PMIC_ID_READY_BIT
 		| (TG2989_PMIC_ID_MODEL_TG2985 << TG2989_PMIC_ID_MODEL_SHIFT);
+}
+
+static bool tg2989_external_power_present(void)
+{
+	cx2_power_rails_t rails = {};
+	cx2_get_power_rails(&rails);
+	return rails.vbus_mv >= 4500 || rails.vsled_mv >= 4500;
+}
+
+static void tg2989_pmic_refresh_power_status(void)
+{
+	static int last_ext_present = -1;
+	const bool ext_present = tg2989_external_power_present();
+	tg2989_pmic.reg[TG2989_PMIC_REG_PWR_STATUS0 >> 2] =
+		ext_present ? TG2989_PMIC_PWR_STATUS0_USB : TG2989_PMIC_PWR_STATUS0_BATT;
+	tg2989_pmic.reg[TG2989_PMIC_REG_PWR_MODE >> 2] =
+		ext_present ? TG2989_PMIC_PWR_MODE_USB : TG2989_PMIC_PWR_MODE_BATT;
+	tg2989_pmic.reg[TG2989_PMIC_REG_PWR_FLAGS >> 2] =
+		ext_present ? TG2989_PMIC_PWR_FLAGS_USB : TG2989_PMIC_PWR_FLAGS_BATT;
+
+	if (last_ext_present != (int)ext_present) {
+		last_ext_present = ext_present ? 1 : 0;
+		cx2_power_rails_t rails = {};
+		cx2_get_power_rails(&rails);
+		fprintf(stderr,
+			"[FBDBG] PMIC ext_present=%d vbus_mv=%d vsled_mv=%d battery_mv=%d present=%d charger_state=%d\n",
+			last_ext_present,
+			rails.vbus_mv,
+			rails.vsled_mv,
+			rails.battery_mv,
+			rails.battery_present ? 1 : 0,
+			(int)rails.charger_state);
+		fflush(stderr);
+	}
 }
 
 // Wakeup reason at PMU+0x00. Value 0x040000 = wakeupOnKey.
@@ -112,7 +157,6 @@ void aladdin_pmu_reset(void) {
 	aladdin_pmu.noidea[1] = 0x1;
 	/* Observed reads from 0x9014080C expect this bit high. */
 	aladdin_pmu.noidea[3] = 0x00100000;
-	// Special cases for 0x808-0x810, see aladdin_pmu_read
 	aladdin_pmu.noidea[4] = 0x111;
 	aladdin_pmu.noidea[5] = 0x1;
 	aladdin_pmu.noidea[6] = 0x100;
@@ -130,8 +174,12 @@ void aladdin_pmu_reset(void) {
 void tg2989_pmic_reset(void)
 {
 	memset(&tg2989_pmic, 0, sizeof(tg2989_pmic));
-	/* 0x04 is the PMIC ID/status word used by DIAGS and early boot code. */
+	/* +0x00 mirrors the efuse/ID word on real TG2985E hardware. */
+	tg2989_pmic.reg[0] = 0x010C9231u;
+	/* +0x04 is the PMIC ID/status word used by DIAGS and early boot code. */
 	tg2989_pmic.reg[TG2989_PMIC_REG_ID_STATUS >> 2] = tg2989_pmic_id_status_value();
+	/* Initialize power-status domain from observed battery-only dump values. */
+	tg2989_pmic_refresh_power_status();
 }
 
 uint32_t tg2989_pmic_read(uint32_t addr)
@@ -139,8 +187,10 @@ uint32_t tg2989_pmic_read(uint32_t addr)
 	uint32_t offset = addr & 0xFFFFu;
 	if (offset == TG2989_PMIC_REG_ID_STATUS)
 		return tg2989_pmic_id_status_value();
-	if (offset < 0x100u)
+	if (offset < 0x100u) {
+		tg2989_pmic_refresh_power_status();
 		return tg2989_pmic.reg[offset >> 2];
+	}
 	return bad_read_word(addr);
 }
 
@@ -215,50 +265,82 @@ static uint32_t aladdin_pmu_status_810_read_value(void)
 
 static uint32_t aladdin_pmu_disable2_read_value()
 {
-	uint32_t value = aladdin_pmu.disable[2];
-	charger_state_t charger = cx2_effective_charger_state();
-	/* PMU+0x60 packs a 10-bit battery field in [15:6]. */
-	uint32_t batt_field = adc_cx2_effective_battery_code() & 0x03FFu;
-	value &= ~0x0000FFC0u;
-	value |= batt_field << 6;
+	/* Keep this register synthesized from rail state instead of pass-through
+	 * firmware scratch bits. Guest power code treats this as an ADC-like value;
+	 * leaking arbitrary upper bits can produce absurd source voltages
+	 * (for example 917698mV) and force incorrect charge states. */
+	uint32_t value = aladdin_pmu.disable[2] & 0x3Fu;
 
-	/* Keep charger state deterministic from the override/live USB model while
-	 * preserving firmware-owned bits outside the explicit charger field. */
-	value &= ~0x00030000u;
-	switch (charger) {
-	case CHARGER_CONNECTED_NOT_CHARGING:
-		value |= 0x00010000u;
-		break;
-	case CHARGER_CHARGING:
-		value |= 0x00030000u;
-		break;
-	default:
-		break;
+	/* CX II power code consumes this as a wider battery-code field.
+	 * Keep it in bits [17:6] (12-bit) using the firmware's observed scale
+	 * (~3300mV at code 1008) to avoid the stuck ~3010mV floor and bogus
+	 * over-range source readings when high bits are reused for non-ADC data. */
+	cx2_power_rails_t rails = {};
+	cx2_get_power_rails(&rails);
+	uint32_t batt_code = 0;
+	if (rails.battery_present) {
+		int mv = cx2_clamp_int(rails.battery_mv, 0, 5500);
+		batt_code = (uint32_t)((mv * 1008 + 1650) / 3300);
+		if (batt_code > 0x0FFFu)
+			batt_code = 0x0FFFu;
 	}
+	value &= ~0x0003FFC0u;
+	value |= (batt_code & 0x0FFFu) << 6;
+	return value;
+}
+
+static uint32_t aladdin_pmu_disable1_read_value()
+{
+	/* Source-voltage channel used by guest battery stats. Keep it synthesized
+	 * from external rails so USB transitions cannot leak stale scratch bits
+	 * into absurd source readings (e.g. 917698mV). */
+	uint32_t value = aladdin_pmu.disable[1] & 0x3Fu;
+
+	cx2_power_rails_t rails = {};
+	cx2_get_power_rails(&rails);
+
+	int src_mv = rails.vbus_mv;
+	if (rails.vsled_mv > src_mv)
+		src_mv = rails.vsled_mv;
+	if (src_mv < 0)
+		src_mv = 0;
+
+	uint32_t src_code = (uint32_t)((src_mv * 1008 + 1650) / 3300);
+	if (src_code > 0x0FFFu)
+		src_code = 0x0FFFu;
+
+	value &= ~0x0003FFC0u;
+	value |= (src_code & 0x0FFFu) << 6;
 	return value;
 }
 
 static uint32_t aladdin_pmu_disable0_read_value()
 {
 	uint32_t value = aladdin_pmu.disable[0];
-	/* CX II UI paths treat 0x400 as battery-present and 0x100 as external
-	 * source present. Setting only 0x100 while disconnected leads to
-	 * "--%" in status while still showing a charge icon on home. */
-	value |= 0x00000400u;
-	if (cx2_effective_charger_state() == CHARGER_DISCONNECTED)
-		value &= ~0x00000100u;
+	/* Bit 0x400 = battery present, bit 0x100 = external source present.
+	 * Firmware checks these during boot to determine power state. */
+	if (cx2_effective_battery_present())
+		value |= 0x00000400u;
 	else
+		value &= ~0x00000400u;
+	if (cx2_effective_charger_state() != CHARGER_DISCONNECTED)
 		value |= 0x00000100u;
+	else
+		value &= ~0x00000100u;
 	return value;
 }
 
 static uint32_t aladdin_pmu_usb_phy_status_read_value()
 {
-	if (cx2_effective_charger_state() == CHARGER_DISCONNECTED)
-		return 0;
-
-	/* PHY is ready when enabled via PMU+0x20 bit 10 (0x400). */
-	return (aladdin_pmu.disable[0] & 0x400) ? 0x3C : 0;
+	/* Observed on hardware dumps:
+	 *   battery/no-USB: 0x2
+	 *   USB attached:   0xE
+	 */
+	uint32_t value = 0x2u;
+	if (cx2_effective_charger_state() != CHARGER_DISCONNECTED
+			&& (aladdin_pmu.disable[0] & 0x400))
+		value |= 0xCu;
+	return value;
 }
 
 uint32_t aladdin_pmu_read(uint32_t addr)
@@ -274,7 +356,7 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		case 0x20: return aladdin_pmu_disable0_read_value();
 		case 0x24: return aladdin_pmu.int_state;
 		case 0x30: return aladdin_pmu.clocks;
-		case 0x50: return aladdin_pmu.disable[1];
+		case 0x50: return aladdin_pmu_disable1_read_value();
 		case 0x60: return aladdin_pmu_disable2_read_value();
 		case 0xC4: return aladdin_pmu.int_enable;
 		}
@@ -282,7 +364,7 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 	else if(offset >= 0x800 && offset < 0x900)
 	{
 		if(offset == 0x808)
-			return 0x010C9231; //0x0021DB19; // efuse
+			return 0x010C9231;
 		else if(offset == 0x80C)
 			return aladdin_pmu_status_80c_read_value();
 		else if(offset == 0x810)
@@ -438,6 +520,21 @@ void memc_ddr_write(uint32_t addr, uint32_t value)
 /* 90130000: ??? for LCD backlight */
 static struct cx2_backlight_state cx2_backlight;
 
+static uint8_t cx2_backlight_contrast_from_pwm(void)
+{
+	/* Per Hackspire: period=255, value 0 (brightest) to 225 (darkest). */
+	if (cx2_backlight.pwm_period == 0)
+		return 0;
+	int contrast = LCD_CONTRAST_MAX
+		- (int)((cx2_backlight.pwm_value * LCD_CONTRAST_MAX) / cx2_backlight.pwm_period);
+	return (uint8_t)cx2_clamp_int(contrast, 0, LCD_CONTRAST_MAX);
+}
+
+void cx2_backlight_refresh_lcd_contrast(void)
+{
+	hdq1w.lcd_contrast = cx2_backlight_contrast_from_pwm();
+}
+
 void cx2_backlight_reset()
 {
 	/* Default to brightest setting on cold boot. */
@@ -471,15 +568,10 @@ void cx2_backlight_write(uint32_t addr, uint32_t value)
 	else if(offset != 0x020)
 		bad_write_word(addr, value);
 
-	// Mirror the PWM duty cycle to hdq1w.lcd_contrast (unless GUI override is active).
-	// Per Hackspire: period=255, value 0 (brightest) to 225 (darkest).
-	// Map to [0, LCD_CONTRAST_MAX] range for rendering.
-	if(hw_override_get_lcd_contrast() < 0) {
-		if(cx2_backlight.pwm_period == 0)
-			hdq1w.lcd_contrast = 0;
-		else
-			hdq1w.lcd_contrast = LCD_CONTRAST_MAX - (cx2_backlight.pwm_value * LCD_CONTRAST_MAX) / cx2_backlight.pwm_period;
-	}
+	/* Mirror PWM duty cycle to the rendered LCD brightness unless GUI override
+	 * is active. */
+	if(hw_override_get_lcd_contrast() < 0)
+		cx2_backlight_refresh_lcd_contrast();
 }
 
 /* 90040000: FTSSP010 SPI controller connected to the LCD.

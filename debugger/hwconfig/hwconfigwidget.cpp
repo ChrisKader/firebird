@@ -1,9 +1,15 @@
 #include "hwconfigwidget.h"
 
+#include <algorithm>
+#include <climits>
+#include <cstdlib>
+
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
 
+#include "app/powercontrol.h"
+#include "core/cx2.h"
 #include "core/emu.h"
 #include "core/misc.h"
 #include "core/mem.h"
@@ -11,6 +17,12 @@
 namespace {
 constexpr int kBatteryMvMin = 3000;
 constexpr int kBatteryMvMax = 4200;
+constexpr int kRailMvMin = 0;
+constexpr int kRailMvMax = 5500;
+constexpr int kCx2BrightnessMinStep = -6;
+constexpr int kCx2BrightnessMaxStep = 3;
+constexpr int kCx2BrightnessDarkPwm = 0xF3;
+constexpr int kCx2BrightnessStepPwm = 0x0F;
 
 int battery_mv_from_legacy_raw(int raw)
 {
@@ -31,11 +43,41 @@ int legacy_raw_from_battery_mv(int mv)
             / (kBatteryMvMax - kBatteryMvMin);
 }
 
-charger_state_t charging_state_from_legacy(int8_t value)
+int cx2_contrast_from_step(int step)
 {
-    if (value > 0)
-        return CHARGER_CHARGING;
-    return CHARGER_DISCONNECTED;
+    if (step < kCx2BrightnessMinStep)
+        step = kCx2BrightnessMinStep;
+    if (step > kCx2BrightnessMaxStep)
+        step = kCx2BrightnessMaxStep;
+
+    const int pwm = kCx2BrightnessDarkPwm - (step - kCx2BrightnessMinStep) * kCx2BrightnessStepPwm;
+    int contrast = LCD_CONTRAST_MAX - (pwm * LCD_CONTRAST_MAX) / 255;
+    if (contrast < 0)
+        contrast = 0;
+    if (contrast > LCD_CONTRAST_MAX)
+        contrast = LCD_CONTRAST_MAX;
+    return contrast;
+}
+
+QString format_rail_with_code(int mv, uint16_t code)
+{
+    return QStringLiteral("%1 mV (0x%2)")
+        .arg(mv)
+        .arg(code, 3, 16, QLatin1Char('0'));
+}
+
+QString charger_state_to_text(charger_state_t state)
+{
+    switch (state) {
+    case CHARGER_CHARGING:
+        return QStringLiteral("Charging");
+    case CHARGER_CONNECTED_NOT_CHARGING:
+        return QStringLiteral("Connected, idle");
+    case CHARGER_DISCONNECTED:
+        return QStringLiteral("Disconnected");
+    default:
+        return QStringLiteral("Auto");
+    }
 }
 }
 
@@ -55,6 +97,118 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     infoLayout->addRow(tr("Flash:"), m_flashSizeLabel);
     layout->addWidget(infoGroup);
 
+    /* -- Power State ----------------------------------------- */
+    auto *powerGroup = new QGroupBox(tr("Power State"), this);
+    auto *powerLayout = new QFormLayout(powerGroup);
+    m_usbSourceCombo = new QComboBox(powerGroup);
+    m_usbSourceCombo->addItem(tr("Disconnected"), static_cast<int>(PowerControl::UsbPowerSource::Disconnected));
+    m_usbSourceCombo->addItem(tr("Computer (data)"), static_cast<int>(PowerControl::UsbPowerSource::Computer));
+    m_usbSourceCombo->addItem(tr("Charger (power only)"), static_cast<int>(PowerControl::UsbPowerSource::Charger));
+    m_usbSourceCombo->addItem(tr("OTG cable (host-id)"), static_cast<int>(PowerControl::UsbPowerSource::OtgCable));
+    m_batteryPresentCheck = new QCheckBox(tr("Battery inserted"), powerGroup);
+    m_batteryPresentCheck->setChecked(true);
+    m_dockPresentCheck = new QCheckBox(tr("Dock attached"), powerGroup);
+    m_dockPresentCheck->setChecked(false);
+    m_vbusSlider = new QSlider(Qt::Horizontal, powerGroup);
+    m_vbusSlider->setRange(kRailMvMin, kRailMvMax);
+    m_vbusSlider->setValue(5000);
+    m_vbusInputLabel = new QLabel(QStringLiteral("5000 mV"), powerGroup);
+    m_vbusInputLabel->setMinimumWidth(72);
+    m_vsledSlider = new QSlider(Qt::Horizontal, powerGroup);
+    m_vsledSlider->setRange(kRailMvMin, kRailMvMax);
+    m_vsledSlider->setValue(0);
+    m_vsledInputLabel = new QLabel(QStringLiteral("0 mV"), powerGroup);
+    m_vsledInputLabel->setMinimumWidth(72);
+    m_backResetButton = new QPushButton(tr("Press Back Reset"), powerGroup);
+    m_batteryRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    m_vsysRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    m_vsledRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    m_vbusRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    m_vrefRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    m_vrefAuxRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    m_chargeStateLabel = new QLabel(QStringLiteral("--"), powerGroup);
+    powerLayout->addRow(tr("USB source:"), m_usbSourceCombo);
+    powerLayout->addRow(m_batteryPresentCheck);
+    powerLayout->addRow(m_dockPresentCheck);
+    {
+        auto *row = new QHBoxLayout;
+        row->addWidget(m_vbusSlider, 1);
+        row->addWidget(m_vbusInputLabel);
+        powerLayout->addRow(tr("VBUS input:"), row);
+    }
+    {
+        auto *row = new QHBoxLayout;
+        row->addWidget(m_vsledSlider, 1);
+        row->addWidget(m_vsledInputLabel);
+        powerLayout->addRow(tr("VSLED input:"), row);
+    }
+    powerLayout->addRow(m_backResetButton);
+    powerLayout->addRow(tr("Charge state:"), m_chargeStateLabel);
+    powerLayout->addRow(tr("VBAT:"), m_batteryRailLabel);
+    powerLayout->addRow(tr("VSYS:"), m_vsysRailLabel);
+    powerLayout->addRow(tr("VSLED:"), m_vsledRailLabel);
+    powerLayout->addRow(tr("VBUS:"), m_vbusRailLabel);
+    powerLayout->addRow(tr("VREF:"), m_vrefRailLabel);
+    powerLayout->addRow(tr("VREF2:"), m_vrefAuxRailLabel);
+    layout->addWidget(powerGroup);
+
+    connect(m_usbSourceCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
+        const int data = m_usbSourceCombo->currentData().toInt();
+        PowerControl::setUsbPowerSource(static_cast<PowerControl::UsbPowerSource>(data));
+        const bool usbPowered = data == static_cast<int>(PowerControl::UsbPowerSource::Computer)
+            || data == static_cast<int>(PowerControl::UsbPowerSource::Charger);
+        m_vbusSlider->setEnabled(usbPowered);
+        if (!usbPowered) {
+            m_vbusSlider->blockSignals(true);
+            m_vbusSlider->setValue(0);
+            m_vbusSlider->blockSignals(false);
+            m_vbusInputLabel->setText(QStringLiteral("0 mV"));
+        } else if (m_vbusSlider->value() < 4500) {
+            m_vbusSlider->blockSignals(true);
+            m_vbusSlider->setValue(5000);
+            m_vbusSlider->blockSignals(false);
+            m_vbusInputLabel->setText(QStringLiteral("5000 mV"));
+        }
+        applyExternalRailOverrides();
+        updatePowerRailsReadout();
+    });
+    connect(m_batteryPresentCheck, &QCheckBox::toggled, this, [this](bool on) {
+        PowerControl::setBatteryPresent(on);
+        m_batteryOverride->setEnabled(on);
+        m_batterySlider->setEnabled(on && m_batteryOverride->isChecked());
+        applyBatteryOverride();
+        updatePowerRailsReadout();
+    });
+    connect(m_dockPresentCheck, &QCheckBox::toggled, this, [this](bool on) {
+        m_vsledSlider->setEnabled(on);
+        if (!on) {
+            m_vsledSlider->blockSignals(true);
+            m_vsledSlider->setValue(0);
+            m_vsledSlider->blockSignals(false);
+            m_vsledInputLabel->setText(QStringLiteral("0 mV"));
+        } else if (m_vsledSlider->value() < 4500) {
+            m_vsledSlider->blockSignals(true);
+            m_vsledSlider->setValue(5000);
+            m_vsledSlider->blockSignals(false);
+            m_vsledInputLabel->setText(QStringLiteral("5000 mV"));
+        }
+        applyExternalRailOverrides();
+        updatePowerRailsReadout();
+    });
+    connect(m_vbusSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_vbusInputLabel->setText(QStringLiteral("%1 mV").arg(v));
+        applyExternalRailOverrides();
+        updatePowerRailsReadout();
+    });
+    connect(m_vsledSlider, &QSlider::valueChanged, this, [this](int v) {
+        m_vsledInputLabel->setText(QStringLiteral("%1 mV").arg(v));
+        applyExternalRailOverrides();
+        updatePowerRailsReadout();
+    });
+    connect(m_backResetButton, &QPushButton::clicked, this, []() {
+        PowerControl::pressBackResetButton();
+    });
+
     /* -- Battery -------------------------------------------- */
     auto *batteryGroup = new QGroupBox(tr("Battery"), this);
     auto *batteryLayout = new QVBoxLayout(batteryGroup);
@@ -73,27 +227,17 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     batteryRow->addWidget(m_batteryLabel);
     batteryLayout->addLayout(batteryRow);
 
-    m_chargerStateCombo = new QComboBox(batteryGroup);
-    m_chargerStateCombo->addItem(tr("Disconnected"), (int)CHARGER_DISCONNECTED);
-    m_chargerStateCombo->addItem(tr("Connected (idle)"), (int)CHARGER_CONNECTED_NOT_CHARGING);
-    m_chargerStateCombo->addItem(tr("Charging"), (int)CHARGER_CHARGING);
-    m_chargerStateCombo->setEnabled(false);
-    batteryLayout->addWidget(m_chargerStateCombo);
     layout->addWidget(batteryGroup);
 
     connect(m_batteryOverride, &QCheckBox::toggled, this, [this](bool on) {
-        m_batterySlider->setEnabled(on);
-        m_chargerStateCombo->setEnabled(on);
+        const bool batteryPresent = PowerControl::isBatteryPresent();
+        m_batterySlider->setEnabled(on && batteryPresent);
         applyBatteryOverride();
     });
     connect(m_batterySlider, &QSlider::valueChanged, this, [this](int v) {
         m_batteryLabel->setText(QStringLiteral("%1 mV").arg(v));
         applyBatteryOverride();
     });
-    connect(m_chargerStateCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this]() {
-        applyBatteryOverride();
-    });
-
     /* -- Display Contrast ----------------------------------- */
     auto *displayGroup = new QGroupBox(tr("Display Contrast"), this);
     auto *displayLayout = new QVBoxLayout(displayGroup);
@@ -107,7 +251,7 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     m_contrastSlider->setValue(LCD_CONTRAST_MAX);
     m_contrastSlider->setEnabled(false);
     m_contrastLabel = new QLabel(QString::number(LCD_CONTRAST_MAX), displayGroup);
-    m_contrastLabel->setMinimumWidth(40);
+    m_contrastLabel->setMinimumWidth(96);
     contrastRow->addWidget(m_contrastSlider, 1);
     contrastRow->addWidget(m_contrastLabel);
     displayLayout->addLayout(contrastRow);
@@ -118,7 +262,7 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
         applyContrastOverride();
     });
     connect(m_contrastSlider, &QSlider::valueChanged, this, [this](int v) {
-        m_contrastLabel->setText(QString::number(v));
+        setContrastLabelForValues(v, contrastFromSliderValue(v));
         applyContrastOverride();
     });
 
@@ -144,6 +288,8 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     m_pollTimer->setInterval(200);
     connect(m_pollTimer, &QTimer::timeout, this, &HwConfigWidget::pollContrast);
 
+    updateContrastSliderMode();
+    updateKeypadTypeChoices();
     syncOverridesFromGlobals();
 }
 
@@ -157,62 +303,121 @@ void HwConfigWidget::refresh()
         prodStr = QStringLiteral("0x%1 (CX)").arg(product, 3, 16, QLatin1Char('0'));
     else
         prodStr = QStringLiteral("0x%1 (Classic)").arg(product, 3, 16, QLatin1Char('0'));
+    if (product >= 0x0F0)
+        prodStr += QStringLiteral("  Features: %1").arg((features & 1u) ? QStringLiteral("CAS")
+                                                                         : QStringLiteral("non-CAS"));
     m_productLabel->setText(prodStr);
 
     uint32_t ram_size = mem_areas[1].size;
     m_flashSizeLabel->setText(QStringLiteral("%1 MB RAM").arg(ram_size / (1024 * 1024)));
 
+    updateContrastSliderMode();
+    updateKeypadTypeChoices();
+
     /* Read current contrast */
     if (!m_contrastOverride->isChecked()) {
         int contrast = hdq1w.lcd_contrast;
+        int sliderValue = sliderValueFromContrast(contrast);
         m_contrastSlider->blockSignals(true);
-        m_contrastSlider->setValue(contrast);
+        m_contrastSlider->setValue(sliderValue);
         m_contrastSlider->blockSignals(false);
-        m_contrastLabel->setText(QString::number(contrast));
+        setContrastLabelForValues(sliderValue, contrast);
     }
+
+    const int sourceData = static_cast<int>(PowerControl::usbPowerSource());
+    const int sourceIndex = m_usbSourceCombo->findData(sourceData);
+    m_usbSourceCombo->blockSignals(true);
+    if (sourceIndex >= 0)
+        m_usbSourceCombo->setCurrentIndex(sourceIndex);
+    m_usbSourceCombo->blockSignals(false);
+    m_batteryPresentCheck->blockSignals(true);
+    m_batteryPresentCheck->setChecked(PowerControl::isBatteryPresent());
+    m_batteryPresentCheck->blockSignals(false);
+    m_dockPresentCheck->blockSignals(true);
+    m_dockPresentCheck->setChecked(PowerControl::isDockAttached());
+    m_dockPresentCheck->blockSignals(false);
+    m_vbusSlider->blockSignals(true);
+    m_vbusSlider->setValue(PowerControl::usbBusMillivolts());
+    m_vbusSlider->blockSignals(false);
+    m_vbusInputLabel->setText(QStringLiteral("%1 mV").arg(m_vbusSlider->value()));
+    m_vbusSlider->setEnabled(sourceData == static_cast<int>(PowerControl::UsbPowerSource::Computer)
+        || sourceData == static_cast<int>(PowerControl::UsbPowerSource::Charger));
+    m_vsledSlider->blockSignals(true);
+    m_vsledSlider->setValue(PowerControl::dockRailMillivolts());
+    m_vsledSlider->blockSignals(false);
+    m_vsledInputLabel->setText(QStringLiteral("%1 mV").arg(m_vsledSlider->value()));
+    m_vsledSlider->setEnabled(m_dockPresentCheck->isChecked());
+    updatePowerRailsReadout();
 }
 
 void HwConfigWidget::syncOverridesFromGlobals()
 {
     const int16_t savedBatteryRaw = hw_override_get_adc_battery_level();
     const int savedBatteryMvOverride = hw_override_get_battery_mv();
-    int savedBatteryMv = (savedBatteryMvOverride >= 0)
-        ? savedBatteryMvOverride : battery_mv_from_legacy_raw(savedBatteryRaw);
+    int savedBatteryMv = -1;
+    if (savedBatteryMvOverride >= 0) {
+        savedBatteryMv = savedBatteryMvOverride;
+    } else if (!emulate_cx2) {
+        savedBatteryMv = battery_mv_from_legacy_raw(savedBatteryRaw);
+    }
     if (savedBatteryMv < 0)
         savedBatteryMv = 4000;
 
-    const charger_state_t chargerOverride = hw_override_get_charger_state();
-    charger_state_t savedCharging = (chargerOverride >= CHARGER_DISCONNECTED
-        && chargerOverride <= CHARGER_CHARGING)
-        ? chargerOverride : charging_state_from_legacy(hw_override_get_adc_charging());
     const int16_t savedContrast = hw_override_get_lcd_contrast();
     const int16_t savedKeypad   = hw_override_get_adc_keypad_type();
+    const bool batteryPresent = PowerControl::isBatteryPresent();
+    const bool dockPresent = PowerControl::isDockAttached();
+    const int vbusMv = PowerControl::usbBusMillivolts();
+    const int vsledMv = PowerControl::dockRailMillivolts();
+    const int usbSourceData = static_cast<int>(PowerControl::usbPowerSource());
+
+    m_batteryPresentCheck->blockSignals(true);
+    m_batteryPresentCheck->setChecked(batteryPresent);
+    m_batteryPresentCheck->blockSignals(false);
+    m_dockPresentCheck->blockSignals(true);
+    m_dockPresentCheck->setChecked(dockPresent);
+    m_dockPresentCheck->blockSignals(false);
+    int usbSourceIndex = m_usbSourceCombo->findData(usbSourceData);
+    if (usbSourceIndex < 0)
+        usbSourceIndex = 0;
+    m_usbSourceCombo->blockSignals(true);
+    m_usbSourceCombo->setCurrentIndex(usbSourceIndex);
+    m_usbSourceCombo->blockSignals(false);
+    m_vbusSlider->blockSignals(true);
+    m_vbusSlider->setValue(vbusMv);
+    m_vbusSlider->blockSignals(false);
+    m_vbusInputLabel->setText(QStringLiteral("%1 mV").arg(vbusMv));
+    m_vbusSlider->setEnabled(usbSourceData == static_cast<int>(PowerControl::UsbPowerSource::Computer)
+        || usbSourceData == static_cast<int>(PowerControl::UsbPowerSource::Charger));
+    m_vsledSlider->blockSignals(true);
+    m_vsledSlider->setValue(vsledMv);
+    m_vsledSlider->blockSignals(false);
+    m_vsledInputLabel->setText(QStringLiteral("%1 mV").arg(vsledMv));
+    m_vsledSlider->setEnabled(dockPresent);
 
     m_batterySlider->blockSignals(true);
     m_batterySlider->setValue(savedBatteryMv);
     m_batterySlider->blockSignals(false);
     m_batteryLabel->setText(QStringLiteral("%1 mV").arg(savedBatteryMv));
 
-    int stateIndex = m_chargerStateCombo->findData((int)savedCharging);
-    if (stateIndex < 0)
-        stateIndex = 0;
-    m_chargerStateCombo->blockSignals(true);
-    m_chargerStateCombo->setCurrentIndex(stateIndex);
-    m_chargerStateCombo->blockSignals(false);
-
-    bool batteryOn = (savedBatteryMvOverride >= 0 || savedBatteryRaw >= 0);
+    bool batteryOn = (savedBatteryMvOverride >= 0)
+        || (!emulate_cx2 && savedBatteryRaw >= 0);
     m_batteryOverride->blockSignals(true);
     m_batteryOverride->setChecked(batteryOn);
     m_batteryOverride->blockSignals(false);
-    m_batterySlider->setEnabled(batteryOn);
-    m_chargerStateCombo->setEnabled(batteryOn);
+    m_batteryOverride->setEnabled(batteryPresent);
+    m_batterySlider->setEnabled(batteryOn && batteryPresent);
     applyBatteryOverride();
+    applyExternalRailOverrides();
+    updatePowerRailsReadout();
 
-    int contrast = (savedContrast >= 0) ? savedContrast : LCD_CONTRAST_MAX;
+    updateContrastSliderMode();
+    int contrast = (savedContrast >= 0) ? savedContrast : hdq1w.lcd_contrast;
+    int sliderValue = sliderValueFromContrast(contrast);
     m_contrastSlider->blockSignals(true);
-    m_contrastSlider->setValue(contrast);
+    m_contrastSlider->setValue(sliderValue);
     m_contrastSlider->blockSignals(false);
-    m_contrastLabel->setText(QString::number(contrast));
+    setContrastLabelForValues(sliderValue, contrast);
     bool contrastOn = savedContrast >= 0;
     m_contrastOverride->blockSignals(true);
     m_contrastOverride->setChecked(contrastOn);
@@ -220,7 +425,10 @@ void HwConfigWidget::syncOverridesFromGlobals()
     m_contrastSlider->setEnabled(contrastOn);
     applyContrastOverride();
 
-    if (savedKeypad >= 0) {
+    updateKeypadTypeChoices();
+    if (emulate_cx2) {
+        m_keypadTypeCombo->setCurrentIndex(0);
+    } else if (savedKeypad >= 0) {
         int idx = m_keypadTypeCombo->findData((int)savedKeypad);
         if (idx >= 0)
             m_keypadTypeCombo->setCurrentIndex(idx);
@@ -234,37 +442,71 @@ void HwConfigWidget::syncOverridesFromGlobals()
 
 void HwConfigWidget::applyBatteryOverride()
 {
-    if (m_batteryOverride->isChecked()) {
-        int mv = m_batterySlider->value();
-        int stateData = m_chargerStateCombo->currentData().toInt();
-        if (stateData < CHARGER_DISCONNECTED || stateData > CHARGER_CHARGING)
-            stateData = CHARGER_DISCONNECTED;
-        const charger_state_t chargerState = (charger_state_t)stateData;
-        hw_override_set_battery_mv(mv);
-        hw_override_set_adc_battery_level((int16_t)legacy_raw_from_battery_mv(mv));
-        hw_override_set_charger_state(chargerState);
-        hw_override_set_adc_charging((chargerState == CHARGER_CHARGING) ? 1 : 0);
-    } else {
+    if (!PowerControl::isBatteryPresent()) {
         hw_override_set_battery_mv(-1);
         hw_override_set_adc_battery_level(-1);
         hw_override_set_adc_charging(-1);
         hw_override_set_charger_state(CHARGER_AUTO);
+        m_batterySlider->setEnabled(false);
+        const int sourceData = static_cast<int>(PowerControl::usbPowerSource());
+        const int sourceIndex = m_usbSourceCombo->findData(sourceData);
+        m_usbSourceCombo->blockSignals(true);
+        if (sourceIndex >= 0)
+            m_usbSourceCombo->setCurrentIndex(sourceIndex);
+        m_usbSourceCombo->blockSignals(false);
+        PowerControl::refreshPowerState();
+        updatePowerRailsReadout();
+        return;
     }
+
+    if (m_batteryOverride->isChecked()) {
+        int mv = m_batterySlider->value();
+        hw_override_set_battery_mv(mv);
+        hw_override_set_adc_battery_level((int16_t)legacy_raw_from_battery_mv(mv));
+    } else {
+        hw_override_set_battery_mv(-1);
+        hw_override_set_adc_battery_level(-1);
+    }
+    hw_override_set_adc_charging(-1);
+    hw_override_set_charger_state(CHARGER_AUTO);
+    const int sourceData = static_cast<int>(PowerControl::usbPowerSource());
+    const int sourceIndex = m_usbSourceCombo->findData(sourceData);
+    m_usbSourceCombo->blockSignals(true);
+    if (sourceIndex >= 0)
+        m_usbSourceCombo->setCurrentIndex(sourceIndex);
+    m_usbSourceCombo->blockSignals(false);
+    PowerControl::refreshPowerState();
+    updatePowerRailsReadout();
+}
+
+void HwConfigWidget::applyExternalRailOverrides()
+{
+    PowerControl::setDockAttached(m_dockPresentCheck->isChecked());
+    PowerControl::setUsbBusMillivolts(m_vbusSlider->value());
+    PowerControl::setDockRailMillivolts(m_vsledSlider->value());
+    PowerControl::refreshPowerState();
 }
 
 void HwConfigWidget::applyContrastOverride()
 {
     if (m_contrastOverride->isChecked()) {
-        hw_override_set_lcd_contrast((int16_t)m_contrastSlider->value());
+        const int contrast = contrastFromSliderValue(m_contrastSlider->value());
+        hw_override_set_lcd_contrast((int16_t)contrast);
         /* Apply immediately to the hdq1w register */
-        hdq1w.lcd_contrast = (uint8_t)m_contrastSlider->value();
+        hdq1w.lcd_contrast = (uint8_t)contrast;
     } else {
         hw_override_set_lcd_contrast(-1);
+        if (emulate_cx2)
+            cx2_backlight_refresh_lcd_contrast();
     }
 }
 
 void HwConfigWidget::applyKeypadType()
 {
+    if (emulate_cx2) {
+        hw_override_set_adc_keypad_type(73);
+        return;
+    }
     int val = m_keypadTypeCombo->currentData().toInt();
     hw_override_set_adc_keypad_type((int16_t)val);
 }
@@ -287,10 +529,119 @@ void HwConfigWidget::pollContrast()
         return;
 
     int contrast = hdq1w.lcd_contrast;
-    if (m_contrastSlider->value() != contrast) {
+    int sliderValue = sliderValueFromContrast(contrast);
+    if (m_contrastSlider->value() != sliderValue) {
         m_contrastSlider->blockSignals(true);
-        m_contrastSlider->setValue(contrast);
+        m_contrastSlider->setValue(sliderValue);
         m_contrastSlider->blockSignals(false);
-        m_contrastLabel->setText(QString::number(contrast));
+        setContrastLabelForValues(sliderValue, contrast);
     }
+
+    updatePowerRailsReadout();
+}
+
+void HwConfigWidget::updatePowerRailsReadout()
+{
+    if (!m_chargeStateLabel)
+        return;
+
+    if (!emulate_cx2) {
+        m_chargeStateLabel->setText(QStringLiteral("n/a"));
+        m_batteryRailLabel->setText(QStringLiteral("n/a"));
+        m_vsysRailLabel->setText(QStringLiteral("n/a"));
+        m_vsledRailLabel->setText(QStringLiteral("n/a"));
+        m_vbusRailLabel->setText(QStringLiteral("n/a"));
+        m_vrefRailLabel->setText(QStringLiteral("n/a"));
+        m_vrefAuxRailLabel->setText(QStringLiteral("n/a"));
+        return;
+    }
+
+    cx2_power_rails_t rails{};
+    cx2_get_power_rails(&rails);
+    m_chargeStateLabel->setText(charger_state_to_text(rails.charger_state));
+    m_batteryRailLabel->setText(
+        rails.battery_present
+            ? format_rail_with_code(rails.battery_mv, rails.battery_code)
+            : QStringLiteral("absent (0x%1)").arg(rails.battery_code, 3, 16, QLatin1Char('0')));
+    m_vsysRailLabel->setText(format_rail_with_code(rails.vsys_mv, rails.vsys_code));
+    m_vsledRailLabel->setText(format_rail_with_code(rails.vsled_mv, rails.vsled_code));
+    m_vbusRailLabel->setText(format_rail_with_code(rails.vbus_mv, rails.vbus_code));
+    m_vrefRailLabel->setText(format_rail_with_code(rails.vref_mv, rails.vref_code));
+    m_vrefAuxRailLabel->setText(format_rail_with_code(rails.vref_aux_mv, rails.vref_aux_code));
+}
+
+void HwConfigWidget::updateKeypadTypeChoices()
+{
+    const int current = m_keypadTypeCombo->currentData().toInt();
+    m_keypadTypeCombo->blockSignals(true);
+    m_keypadTypeCombo->clear();
+    m_keypadTypeCombo->addItem(tr("Touchpad"), 73);
+    if (emulate_cx2) {
+        m_keypadTypeCombo->setEnabled(false);
+        m_keypadTypeCombo->setCurrentIndex(0);
+    } else {
+        m_keypadTypeCombo->addItem(tr("Classic Clickpad"), 10);
+        m_keypadTypeCombo->addItem(tr("TI-84+ Keypad"), 30);
+        m_keypadTypeCombo->addItem(tr("Default (auto)"), -1);
+        m_keypadTypeCombo->setEnabled(true);
+        int idx = m_keypadTypeCombo->findData(current);
+        if (idx < 0)
+            idx = m_keypadTypeCombo->findData(-1);
+        if (idx < 0)
+            idx = 0;
+        m_keypadTypeCombo->setCurrentIndex(idx);
+    }
+    m_keypadTypeCombo->blockSignals(false);
+}
+
+void HwConfigWidget::updateContrastSliderMode()
+{
+    const int value = m_contrastSlider->value();
+    m_contrastSlider->blockSignals(true);
+    if (emulate_cx2) {
+        m_contrastSlider->setRange(kCx2BrightnessMinStep, kCx2BrightnessMaxStep);
+        m_contrastSlider->setSingleStep(1);
+        m_contrastSlider->setPageStep(1);
+        int mapped = sliderValueFromContrast(value);
+        m_contrastSlider->setValue(mapped);
+    } else {
+        m_contrastSlider->setRange(0, LCD_CONTRAST_MAX);
+        m_contrastSlider->setSingleStep(1);
+        m_contrastSlider->setPageStep(8);
+        m_contrastSlider->setValue(std::clamp(value, 0, LCD_CONTRAST_MAX));
+    }
+    m_contrastSlider->blockSignals(false);
+}
+
+int HwConfigWidget::sliderValueFromContrast(int contrast) const
+{
+    if (!emulate_cx2)
+        return std::clamp(contrast, 0, LCD_CONTRAST_MAX);
+
+    int bestStep = kCx2BrightnessMinStep;
+    int bestDiff = INT_MAX;
+    for (int step = kCx2BrightnessMinStep; step <= kCx2BrightnessMaxStep; step++) {
+        const int mapped = cx2_contrast_from_step(step);
+        const int diff = std::abs(mapped - contrast);
+        if (diff < bestDiff) {
+            bestDiff = diff;
+            bestStep = step;
+        }
+    }
+    return bestStep;
+}
+
+int HwConfigWidget::contrastFromSliderValue(int sliderValue) const
+{
+    if (!emulate_cx2)
+        return std::clamp(sliderValue, 0, LCD_CONTRAST_MAX);
+    return cx2_contrast_from_step(sliderValue);
+}
+
+void HwConfigWidget::setContrastLabelForValues(int sliderValue, int contrast)
+{
+    if (emulate_cx2)
+        m_contrastLabel->setText(QStringLiteral("%1 (step %2)").arg(contrast).arg(sliderValue));
+    else
+        m_contrastLabel->setText(QString::number(contrast));
 }

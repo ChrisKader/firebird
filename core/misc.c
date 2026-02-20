@@ -21,6 +21,11 @@ int16_t adc_keypad_type_override = -1;
 int battery_mv_override = -1;
 charger_state_t charger_state_override = CHARGER_AUTO;
 int8_t usb_cable_connected_override = -1;
+int8_t usb_otg_cable_override = -1;
+int8_t battery_present_override = -1;
+int vbus_mv_override = -1;
+int vsled_mv_override = -1;
+int8_t dock_attached_override = -1;
 
 /* 8FFF0000 */
 void sdramctl_write_word(uint32_t addr, uint32_t value) {
@@ -123,24 +128,133 @@ static void gpio_int_check(void) {
     int_set(INT_GPIO, active != 0);
 }
 
+static bool gpio_cx2_usb_plug_present(void)
+{
+    /* Hackspire GPIO pin mapping:
+     *   GPIO20 (section 2 bit 4) is high when top USB plug is attached. */
+    if (hw_override_get_usb_otg_cable() > 0)
+        return true;
+
+    const int8_t cable_override = hw_override_get_usb_cable_connected();
+    if (cable_override >= 0) {
+        if (cable_override == 0)
+            return false;
+        const int vbus_mv_forced = hw_override_get_vbus_mv();
+        return vbus_mv_forced >= 4500;
+    }
+
+    const int vbus_mv = hw_override_get_vbus_mv();
+    if (vbus_mv >= 0)
+        return vbus_mv >= 4500;
+
+    return false;
+}
+
+static bool gpio_cx2_cradle_attached(void)
+{
+    /* Hardware register dump confirms dock detect (section 2 bit 3) is
+     * active-high: 0 when no dock, 1 when dock attached. */
+    const int8_t dock_override = hw_override_get_dock_attached();
+    return dock_override > 0;
+}
+
+static bool gpio_cx2_cradle_power_present(void)
+{
+    /* TI_Cradle_Initialize distinguishes "cradle detect" from "cradle power
+     * detect". Model power-detect as a separate active-high signal derived
+     * from dock rail availability rather than mirroring active-low detect. */
+    if (!gpio_cx2_cradle_attached())
+        return false;
+
+    const int vsled_mv = hw_override_get_vsled_mv();
+    if (vsled_mv >= 0)
+        return vsled_mv >= 4500;
+
+    /* With no explicit dock-rail override, default to unpowered.
+     * Physical dock attach and dock power are separate signals. */
+    return false;
+}
+
+static void gpio_sync_cx2_detect_inputs(void)
+{
+    if (!emulate_cx2)
+        return;
+
+    /* Section 2 — confirmed by hardware register dump:
+     *   All bits LOW when no USB / no dock connected.
+     *   bit 4 (GPIO20): USB plug present (active-high)
+     *   bit 3 (GPIO19): dock/cradle detect (active-high per HW dump)
+     *   bit 6 (GPIO22): cradle power detect (active-high) */
+    if (gpio_cx2_usb_plug_present())
+        gpio.input.b[2] |= 0x10u;
+    else
+        gpio.input.b[2] &= (uint8_t)~0x10u;
+
+    if (gpio_cx2_cradle_attached())
+        gpio.input.b[2] |= 0x08u;
+    else
+        gpio.input.b[2] &= (uint8_t)~0x08u;
+
+    if (gpio_cx2_cradle_power_present())
+        gpio.input.b[2] |= 0x40u;
+    else
+        gpio.input.b[2] &= (uint8_t)~0x40u;
+
+    /* TI-Nspire.bin cradle init checks logical GPIO IDs 7 and 3 via the GPIO
+     * service command path (0x3EF). Across observed table variants these can
+     * resolve either to GPIO19/20 (section2) or legacy alias slots. Keep
+     * alias bits low on all banks unless explicitly driven by modeled sources
+     * so disconnected boot does not report cradle-power-high. */
+    if (!gpio_cx2_cradle_attached() && !gpio_cx2_cradle_power_present()) {
+        int i;
+        for (i = 0; i < 8; i++)
+            gpio.input.b[i] &= (uint8_t)~0x88u;
+    }
+}
+
+static uint8_t gpio_effective_input_byte(int port)
+{
+    if (emulate_cx2)
+        gpio_sync_cx2_detect_inputs();
+    return gpio.input.b[port];
+}
+
+static uint8_t gpio_data_byte(int port)
+{
+    /* GPIO data register reflects physical input on input-configured pins and
+     * output latch on output-configured pins. */
+    uint8_t input = gpio_effective_input_byte(port);
+    uint8_t direction = gpio.direction.b[port];
+    return (uint8_t)((input & direction) | (gpio.output.b[port] & ~direction));
+}
+
 void gpio_reset() {
     memset(&gpio, 0, sizeof gpio);
     gpio.direction.w = 0xFFFFFFFFFFFFFFFF;
     gpio.output.w    = 0x0000000000000000;
 
-    gpio.input.w     = 0x00001000071F001F;
+    /* CX II boot must not report pre-attached cradle/sled/USB unless the user
+     * explicitly overrides those rails. Start all CX II GPIO inputs low and
+     * let gpio_sync_cx2_detect_inputs() drive only modeled detect pins. */
+    gpio.input.w = emulate_cx2 ? 0x0000000000000000ULL : 0x00000000071F001FULL;
+    gpio_sync_cx2_detect_inputs();
     gpio.prev_input.w = gpio.input.w;
     touchpad_gpio_reset();
 }
 uint32_t gpio_read(uint32_t addr) {
     int port = addr >> 6 & 7;
     switch (addr & 0x3F) {
+        case 0x00: return gpio_data_byte(port);
         case 0x04: return gpio.int_status.b[port];
         case 0x08: return gpio.int_mask.b[port];
         case 0x0C: return gpio.int_edge.b[port];
         case 0x10: return gpio.direction.b[port];
         case 0x14: return gpio.output.b[port];
-        case 0x18: return gpio.input.b[port] | gpio.output.b[port];
+        case 0x18:
+            /* CX II GPIO service command 0x3EF reads +0x18 as physical pin
+             * level. Returning output-latched state here can report false
+             * highs on detect lines (e.g. cradle power/detect). */
+            return gpio_effective_input_byte(port);
         case 0x1C: return gpio.invert.b[port];
         case 0x20: return gpio.sticky.b[port];
         case 0x24: return gpio.unknown_24.b[port];
@@ -168,6 +282,7 @@ void gpio_write(uint32_t addr, uint32_t value) {
             if (change & 0xA)
                 touchpad_gpio_change();
             return;
+        case 0x00: /* Data register write alias */
         case 0x14:
             change = (gpio.output.b[port] ^ value) << (8*port);
             gpio.output.b[port] = value;
@@ -420,6 +535,8 @@ uint32_t unknown_9008_read(uint32_t addr) {
     switch (addr & 0xFFFF) {
         case 0x00: return 0;
         case 0x08: return 0;
+        /* FTSSP010 Status Register: TFE | TNF in idle state. */
+        case 0x0C: return 0x06;
         case 0x10: return 0;
         case 0x1C: return 0;
         case 0x60: return 0;
@@ -1261,59 +1378,191 @@ void spi_write_word(uint32_t addr, uint32_t value) {
 }
 
 /* AC000000: SDIO */
+typedef struct sdio_state {
+    uint16_t block_size;
+    uint16_t block_count;
+    uint32_t argument;
+    uint16_t transfer_mode;
+    uint16_t command;
+    uint32_t response[4];
+    uint32_t present_state;
+    uint32_t host_control_power;
+    uint32_t clock_timeout_reset;
+    uint8_t timeout_control;
+    uint8_t software_reset;
+    uint16_t normal_int_status;
+    uint16_t error_int_status;
+    uint16_t normal_int_status_enable;
+    uint16_t error_int_status_enable;
+    uint16_t normal_int_signal_enable;
+    uint16_t error_int_signal_enable;
+    uint16_t auto_cmd_error_status;
+    uint16_t host_control2;
+} sdio_state;
+
+static sdio_state sdio;
+
+void sdio_reset(void)
+{
+    memset(&sdio, 0, sizeof(sdio));
+    /* Default to "no SDIO card/module present" for plain handheld boot.
+     * This prevents guest WLAN/SDIO init from treating absent hardware as
+     * a valid attached module and wedging in probe flows. */
+    sdio.present_state = 0x00000000u;
+}
+
 uint8_t sdio_read_byte(uint32_t addr) {
     switch (addr & 0x3FFFFFF) {
-        case 0x29: return -1;
+        case 0x28: return sdio.timeout_control;
+        case 0x29: return sdio.software_reset;
+        case 0x2E: return (uint8_t)sdio.error_int_status;
+        case 0x2F: return (uint8_t)(sdio.error_int_status >> 8);
     }
     return bad_read_byte(addr);
 }
 uint16_t sdio_read_half(uint32_t addr) {
     switch (addr & 0x3FFFFFF) {
-        case 0x10: return -1;
-        case 0x12: return -1;
-        case 0x14: return -1;
-        case 0x16: return -1;
-        case 0x18: return -1;
-        case 0x1A: return -1;
-        case 0x1C: return -1;
-        case 0x1E: return -1;
-        case 0x2C: return -1;
-        case 0x30: return -1;
+        case 0x04: return sdio.block_size;
+        case 0x06: return sdio.block_count;
+        case 0x0C: return sdio.transfer_mode;
+        case 0x0E: return sdio.command;
+        case 0x10: return (uint16_t)(sdio.response[0] & 0xFFFFu);
+        case 0x12: return (uint16_t)(sdio.response[0] >> 16);
+        case 0x14: return (uint16_t)(sdio.response[1] & 0xFFFFu);
+        case 0x16: return (uint16_t)(sdio.response[1] >> 16);
+        case 0x18: return (uint16_t)(sdio.response[2] & 0xFFFFu);
+        case 0x1A: return (uint16_t)(sdio.response[2] >> 16);
+        case 0x1C: return (uint16_t)(sdio.response[3] & 0xFFFFu);
+        case 0x1E: return (uint16_t)(sdio.response[3] >> 16);
+        case 0x2C: return sdio.normal_int_status;
+        case 0x2E: return sdio.error_int_status;
+        case 0x30: return sdio.normal_int_status_enable;
+        case 0x32: return sdio.error_int_status_enable;
+        case 0x34: return sdio.normal_int_signal_enable;
+        case 0x36: return sdio.error_int_signal_enable;
+        case 0x38: return sdio.auto_cmd_error_status;
+        case 0x3A: return sdio.host_control2;
+        case 0x3C: return 0;      /* capabilities low */
+        case 0x3E: return 0;      /* capabilities high */
+        case 0xFE: return 0x0002; /* host controller version */
     }
     return bad_read_half(addr);
 }
 uint32_t sdio_read_word(uint32_t addr) {
     switch (addr & 0x3FFFFFF) {
-        case 0x20: return -1;
+        case 0x00:
+            return (uint32_t)sdio.block_size | ((uint32_t)sdio.block_count << 16);
+        case 0x08:
+            return sdio.argument;
+        case 0x20:
+            return sdio.present_state;
+        case 0x24:
+            return sdio.host_control_power;
+        case 0x28:
+            return sdio.clock_timeout_reset;
+        case 0x3C:
+            return 0;
+        case 0x40:
+            return 0;
     }
     return bad_read_word(addr);
 }
 void sdio_write_byte(uint32_t addr, uint8_t value) {
     switch (addr & 0x3FFFFFF) {
-        case 0x29: return;
-        case 0x2E: return;
-        case 0x2F: return;
+        case 0x28:
+            sdio.timeout_control = value;
+            sdio.clock_timeout_reset = (sdio.clock_timeout_reset & 0xFFFFFF00u) | value;
+            return;
+        case 0x29:
+            sdio.software_reset = value;
+            if (value) {
+                /* Minimal controller reset semantics used by driver init. */
+                sdio.normal_int_status = 0;
+                sdio.error_int_status = 0;
+                sdio.software_reset = 0;
+            }
+            return;
+        case 0x2E:
+            sdio.error_int_status &= (uint16_t)~value;
+            return;
+        case 0x2F:
+            sdio.error_int_status &= (uint16_t)~((uint16_t)value << 8);
+            return;
     }
     bad_write_byte(addr, value);
 }
 void sdio_write_half(uint32_t addr, uint16_t value) {
     switch (addr & 0x3FFFFFF) {
-        case 0x04: return;
-        case 0x0C: return;
-        case 0x0E: return;
-        case 0x2C: return;
-        case 0x30: return;
-        case 0x32: return;
-        case 0x34: return;
-        case 0x36: return;
+        case 0x04:
+            sdio.block_size = value;
+            return;
+        case 0x06:
+            sdio.block_count = value;
+            return;
+        case 0x0C:
+            sdio.transfer_mode = value;
+            return;
+        case 0x0E:
+            sdio.command = value;
+            /* Immediately complete command/data when card is present.
+             * If absent, raise error status so the guest can bail out
+             * cleanly instead of spinning waiting for usable media. */
+            if (sdio.present_state & 0x00010000u) {
+                sdio.normal_int_status |= 0x0001u; /* Command Complete */
+                if (sdio.transfer_mode & 0x0001u)
+                    sdio.normal_int_status |= 0x0002u; /* Transfer Complete */
+            } else {
+                sdio.normal_int_status |= 0x8001u; /* Error + Command complete */
+                sdio.error_int_status |= 0x0001u;  /* Command Timeout */
+                if (sdio.transfer_mode & 0x0001u)
+                    sdio.error_int_status |= 0x0010u; /* Data Timeout */
+            }
+            return;
+        case 0x2C:
+            sdio.normal_int_status &= (uint16_t)~value; /* W1C */
+            return;
+        case 0x2E:
+            sdio.error_int_status &= (uint16_t)~value;  /* W1C */
+            return;
+        case 0x30:
+            sdio.normal_int_status_enable = value;
+            return;
+        case 0x32:
+            sdio.error_int_status_enable = value;
+            return;
+        case 0x34:
+            sdio.normal_int_signal_enable = value;
+            return;
+        case 0x36:
+            sdio.error_int_signal_enable = value;
+            return;
+        case 0x38:
+            sdio.auto_cmd_error_status = value;
+            return;
+        case 0x3A:
+            sdio.host_control2 = value;
+            return;
     }
     bad_write_half(addr, value);
 }
 void sdio_write_word(uint32_t addr, uint32_t value) {
     switch (addr & 0x3FFFFFF) {
-        case 0x00: return;
-        case 0x08: return;
-        case 0x20: return;
+        case 0x00:
+            sdio.block_size = (uint16_t)(value & 0xFFFFu);
+            sdio.block_count = (uint16_t)(value >> 16);
+            return;
+        case 0x08:
+            sdio.argument = value;
+            return;
+        case 0x20:
+            return;
+        case 0x24:
+            sdio.host_control_power = value;
+            return;
+        case 0x28:
+            sdio.clock_timeout_reset = value;
+            sdio.timeout_control = (uint8_t)(value & 0xFFu);
+            return;
     }
     bad_write_word(addr, value);
 }
@@ -1352,16 +1601,69 @@ static adc_cx2_state adc_cx2;
 enum {
     CX2_BATTERY_MV_MIN = 3000,
     CX2_BATTERY_MV_MAX = 4200,
+    CX2_BATTERY_RUN_MV_MIN = 3300,
+    CX2_BATTERY_PRECHARGE_MV = 3000,
+    CX2_VBUS_MV_MIN = 0,
+    CX2_VBUS_MV_MAX = 5500,
+    CX2_VSLED_MV_MIN = 0,
+    CX2_VSLED_MV_MAX = 5500,
+    CX2_VBUS_VALID_MV_MIN = 4500,
+    CX2_VSLED_VALID_MV_MIN = 4500,
+    CX2_VSYS_EXT_TARGET_MV = 3600,
+    CX2_VSYS_PGOOD_MV_MIN = 3200,
+    CX2_USB_PATH_DROP_MV = 100,
+    CX2_DOCK_PATH_DROP_MV = 100,
+    CX2_BAT_PATH_DROP_MV = 50,
     /* Test mode: emulate a direct 10-bit battery ADC domain. */
     CX2_ADC_CODE_MIN = 0x0000,
     CX2_ADC_CODE_MAX = 0x03FF,
 };
 
+typedef enum cx2_source_in_use {
+    CX2_SOURCE_NONE = 0,
+    CX2_SOURCE_BATTERY,
+    CX2_SOURCE_USB,
+    CX2_SOURCE_DOCK,
+} cx2_source_in_use_t;
+
+typedef struct cx2_power_model_state {
+    bool battery_present;
+    bool usb_attached;
+    bool usb_otg;
+    bool dock_attached;
+    bool battery_run_ok;
+    bool battery_precharge;
+    bool usb_ok;
+    bool dock_ok;
+    cx2_source_in_use_t source;
+    charger_state_t charger_state;
+    int battery_mv;
+    int vbus_mv;
+    int vsled_mv;
+    int vsys_mv;
+    bool power_good;
+    uint16_t battery_code;
+    uint16_t vbus_code;
+    uint16_t vsled_code;
+    uint16_t vsys_code;
+    uint16_t vref_code;
+    uint16_t vref_aux_code;
+} cx2_power_model_state_t;
+
+static uint32_t cx2_adc_vref_code(void);
+static uint32_t cx2_adc_vref_aux_code(void);
+
 bool cx2_battery_override_active(void)
 {
-    /* Primary path is millivolt override; keep legacy raw override as fallback. */
-    return hw_override_get_battery_mv() >= 0
-        || hw_override_get_adc_battery_level() >= 0;
+    return hw_override_get_battery_mv() >= 0;
+}
+
+bool cx2_effective_battery_present(void)
+{
+    const int8_t present_override = hw_override_get_battery_present();
+    if (present_override >= 0)
+        return present_override != 0;
+    return true;
 }
 
 static int clamp_int(int value, int min, int max)
@@ -1379,16 +1681,61 @@ static int cx2_effective_battery_mv(void)
     if (battery_mv >= 0)
         return clamp_int(battery_mv, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX);
 
-    /* Compatibility fallback: accept legacy raw override if mV override is unset. */
-    const int raw = hw_override_get_adc_battery_level();
-    if (raw >= 0) {
-        int clamped_raw = clamp_int(raw, 0, 930);
-        return CX2_BATTERY_MV_MIN
-            + (clamped_raw * (CX2_BATTERY_MV_MAX - CX2_BATTERY_MV_MIN) + 465) / 930;
-    }
-
     /* Default to a full battery, matching classic ADC default behavior. */
     return CX2_BATTERY_MV_MAX;
+}
+
+static bool cx2_effective_usb_attached(void)
+{
+    const int8_t usb_override = hw_override_get_usb_cable_connected();
+    if (usb_override >= 0) {
+        if (usb_override == 0)
+            return false;
+        const int vbus_mv_forced = hw_override_get_vbus_mv();
+        return vbus_mv_forced >= CX2_VBUS_VALID_MV_MIN;
+    }
+
+    /* Physical model default: disconnected unless an explicit rail override
+     * says VBUS is actually present. Internal usblink/session state must not
+     * implicitly power the PMU path. */
+    const int vbus_mv = hw_override_get_vbus_mv();
+    if (vbus_mv >= 0)
+        return vbus_mv >= CX2_VBUS_VALID_MV_MIN;
+    return false;
+}
+
+static bool cx2_effective_usb_otg(void)
+{
+    return hw_override_get_usb_otg_cable() > 0;
+}
+
+static int cx2_effective_vbus_mv(void)
+{
+    const int vbus_mv = hw_override_get_vbus_mv();
+    if (vbus_mv >= 0)
+        return clamp_int(vbus_mv, CX2_VBUS_MV_MIN, CX2_VBUS_MV_MAX);
+
+    return 0;
+}
+
+static bool cx2_effective_dock_attached(void)
+{
+    const int8_t dock_override = hw_override_get_dock_attached();
+    if (dock_override >= 0)
+        return dock_override != 0;
+    return false;
+}
+
+static int cx2_effective_vsled_mv(void)
+{
+    const int vsled_mv = hw_override_get_vsled_mv();
+    if (vsled_mv >= 0)
+        return clamp_int(vsled_mv, CX2_VSLED_MV_MIN, CX2_VSLED_MV_MAX);
+
+    if (!cx2_effective_dock_attached())
+        return 0;
+    /* Do not implicitly source dock power just because a dock is attached. */
+    return 0;
 }
 
 static uint16_t cx2_adc_code_from_mv(int mv)
@@ -1409,9 +1756,92 @@ static uint16_t cx2_adc_code_from_mv(int mv)
     return (uint16_t)clamp_int(code, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
 }
 
+static uint16_t cx2_adc_code_from_vbus_mv(int mv)
+{
+    /* Physical rail to ADC code mapping:
+     * 0mV -> 0x000, 5000mV -> 0x330.
+     * This avoids reporting "present-ish" voltage when the rail is truly 0mV. */
+    int clamped_mv = clamp_int(mv, 0, 5000);
+    int code = (clamped_mv * 0x330 + 2500) / 5000;
+    return (uint16_t)clamp_int(code, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
+}
+
+static uint16_t cx2_adc_code_from_vsys_mv(int mv)
+{
+    int clamped_mv = clamp_int(mv, 0, CX2_BATTERY_MV_MAX);
+    int code = (clamped_mv * 0x397 + CX2_BATTERY_MV_MAX / 2) / CX2_BATTERY_MV_MAX;
+    return (uint16_t)clamp_int(code, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
+}
+
+static void cx2_build_power_model(cx2_power_model_state_t *state)
+{
+    memset(state, 0, sizeof(*state));
+    state->battery_present = cx2_effective_battery_present();
+    state->battery_mv = state->battery_present ? cx2_effective_battery_mv() : 0;
+    state->usb_attached = cx2_effective_usb_attached();
+    state->usb_otg = cx2_effective_usb_otg();
+    state->dock_attached = cx2_effective_dock_attached();
+    state->vbus_mv = cx2_effective_vbus_mv();
+    state->vsled_mv = state->dock_attached ? cx2_effective_vsled_mv() : 0;
+    state->battery_run_ok = state->battery_present && state->battery_mv >= CX2_BATTERY_RUN_MV_MIN;
+    state->battery_precharge = state->battery_present && state->battery_mv < CX2_BATTERY_PRECHARGE_MV;
+    state->usb_ok = state->usb_attached && !state->usb_otg && state->vbus_mv >= CX2_VBUS_VALID_MV_MIN;
+    state->dock_ok = state->dock_attached && state->vsled_mv >= CX2_VSLED_VALID_MV_MIN;
+
+    if (state->usb_ok)
+        state->source = CX2_SOURCE_USB;
+    else if (state->dock_ok)
+        state->source = CX2_SOURCE_DOCK;
+    else if (state->battery_present)
+        state->source = CX2_SOURCE_BATTERY;
+    else
+        state->source = CX2_SOURCE_NONE;
+
+    int vusb_path = state->usb_ok
+        ? clamp_int(state->vbus_mv - CX2_USB_PATH_DROP_MV, 0, CX2_VSYS_EXT_TARGET_MV)
+        : 0;
+    int vdock_path = state->dock_ok
+        ? clamp_int(state->vsled_mv - CX2_DOCK_PATH_DROP_MV, 0, CX2_VSYS_EXT_TARGET_MV)
+        : 0;
+    int vbat_path = state->battery_present ? state->battery_mv - CX2_BAT_PATH_DROP_MV : 0;
+    if (vbat_path < 0)
+        vbat_path = 0;
+
+    int vext_sel = 0;
+    if (state->source == CX2_SOURCE_USB)
+        vext_sel = vusb_path;
+    else if (state->source == CX2_SOURCE_DOCK)
+        vext_sel = vdock_path;
+
+    state->vsys_mv = (vext_sel > vbat_path) ? vext_sel : vbat_path;
+    state->power_good = state->vsys_mv >= CX2_VSYS_PGOOD_MV_MIN;
+
+    const charger_state_t charger_override = hw_override_get_charger_state();
+    if (charger_override >= CHARGER_DISCONNECTED && charger_override <= CHARGER_CHARGING) {
+        state->charger_state = charger_override;
+    } else if (!state->usb_ok && !state->dock_ok) {
+        state->charger_state = CHARGER_DISCONNECTED;
+    } else if (!state->battery_present || state->usb_otg) {
+        state->charger_state = CHARGER_CONNECTED_NOT_CHARGING;
+    } else if (state->battery_precharge || state->battery_mv < (CX2_BATTERY_MV_MAX - 20)) {
+        state->charger_state = CHARGER_CHARGING;
+    } else {
+        state->charger_state = CHARGER_CONNECTED_NOT_CHARGING;
+    }
+
+    state->vref_code = (uint16_t)(cx2_adc_vref_code() & CX2_ADC_CODE_MAX);
+    state->vref_aux_code = (uint16_t)(cx2_adc_vref_aux_code() & CX2_ADC_CODE_MAX);
+    state->battery_code = state->battery_present ? cx2_adc_code_from_mv(state->battery_mv) : 0;
+    state->vbus_code = cx2_adc_code_from_vbus_mv(state->vbus_mv);
+    state->vsled_code = cx2_adc_code_from_vbus_mv(state->vsled_mv);
+    state->vsys_code = cx2_adc_code_from_vsys_mv(state->vsys_mv);
+}
+
 uint32_t adc_cx2_effective_battery_code(void)
 {
-    return cx2_adc_code_from_mv(cx2_effective_battery_mv());
+    cx2_power_model_state_t state;
+    cx2_build_power_model(&state);
+    return state.battery_code;
 }
 
 static uint32_t cx2_adc_vref_code(void)
@@ -1446,36 +1876,40 @@ static uint32_t cx2_adc_bg_reload(void)
 
 charger_state_t cx2_effective_charger_state(void)
 {
-    const charger_state_t charger_override = hw_override_get_charger_state();
-    if (charger_override >= CHARGER_DISCONNECTED
-            && charger_override <= CHARGER_CHARGING)
-        return charger_override;
-    const int8_t usb_override = hw_override_get_usb_cable_connected();
-    if (usb_override >= 0)
-        return usb_override ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
-    if (cx2_battery_override_active())
-        return (hw_override_get_adc_charging() > 0) ? CHARGER_CHARGING : CHARGER_DISCONNECTED;
-    /* Do not infer charging from link/session state. Treat auto as disconnected
-     * unless an explicit charger/USB override is provided. */
-    return CHARGER_DISCONNECTED;
+    cx2_power_model_state_t state;
+    cx2_build_power_model(&state);
+    return state.charger_state;
 }
 
-static uint32_t cx2_adc_vbus_code(void)
+static int cx2_adc_code_to_mv(uint32_t code, uint32_t vref_code, uint32_t full_scale_mv)
 {
-    /* Channel 6 participates in bootloader VBUS-present checks.
-     * Keep this in the same ADC sample domain as the other channels.
-     * Disconnected: below VBUS-present threshold.
-     * Connected/charging: above VBUS-present threshold. */
-    switch (cx2_effective_charger_state()) {
-    case CHARGER_DISCONNECTED:
-        return 0x1C0u;
-    case CHARGER_CONNECTED_NOT_CHARGING:
-        return 0x2C0u;
-    case CHARGER_CHARGING:
-        return 0x330u;
-    default:
-        return 0x1C0u;
-    }
+    if (vref_code == 0u)
+        return 0;
+    return (int)((code * full_scale_mv + (vref_code / 2u)) / vref_code);
+}
+
+void cx2_get_power_rails(cx2_power_rails_t *rails)
+{
+    if (!rails)
+        return;
+
+    cx2_power_model_state_t state;
+    cx2_build_power_model(&state);
+
+    rails->battery_present = state.battery_present;
+    rails->charger_state = state.charger_state;
+    rails->battery_code = state.battery_code;
+    rails->vsys_code = state.vsys_code;
+    rails->vsled_code = state.vsled_code;
+    rails->vref_code = state.vref_code;
+    rails->vref_aux_code = state.vref_aux_code;
+    rails->vbus_code = state.vbus_code;
+    rails->battery_mv = state.battery_mv;
+    rails->vsys_mv = state.vsys_mv;
+    rails->vsled_mv = state.vsled_mv;
+    rails->vbus_mv = state.vbus_mv;
+    rails->vref_mv = 3225;
+    rails->vref_aux_mv = cx2_adc_code_to_mv(state.vref_aux_code, state.vref_code, 3225u);
 }
 
 static void cx2_adc_refresh_samples(void)
@@ -1483,24 +1917,24 @@ static void cx2_adc_refresh_samples(void)
     if (cpu_events & EVENT_SLEEP)
         return;
 
-    uint32_t batt = adc_cx2_effective_battery_code();
-    uint32_t vref = cx2_adc_vref_code();
-    uint32_t vref_aux = cx2_adc_vref_aux_code();
+    cx2_power_model_state_t state;
+    cx2_build_power_model(&state);
+
+    uint32_t batt = state.battery_code;
+    uint32_t vref = state.vref_code;
+    uint32_t vref_aux = state.vref_aux_code;
+    /* Slot 0x18: compound format read back by firmware.
+     * Upper bits = channel control (programmed by firmware, default 0x2A00),
+     * bits [17:16] = charger state, bits [9:0] = VBUS ADC code. */
     uint32_t slot18 = adc_cx2.slot18_programmed_valid
-        ? adc_cx2.slot18_programmed_ctrl
-        : 0x00002A00u;
+        ? adc_cx2.slot18_programmed_ctrl : 0x00002A00u;
     slot18 &= ~(0x00030000u | CX2_ADC_CODE_MAX);
-    switch (cx2_effective_charger_state()) {
-    case CHARGER_CONNECTED_NOT_CHARGING:
-        slot18 |= 0x00010000u;
-        break;
-    case CHARGER_CHARGING:
-        slot18 |= 0x00030000u;
-        break;
-    default:
-        break;
+    switch (state.charger_state) {
+    case CHARGER_CONNECTED_NOT_CHARGING: slot18 |= 0x00010000u; break;
+    case CHARGER_CHARGING:               slot18 |= 0x00020000u; break;
+    default: break;
     }
-    slot18 |= cx2_adc_vbus_code() & CX2_ADC_CODE_MAX;
+    slot18 |= state.vbus_code & CX2_ADC_CODE_MAX;
 
     /* 0x900B0000..0x900B001C: 8-entry sample bank.
      * All battery slots use the same normal-polarity code (higher mV =
@@ -1514,6 +1948,25 @@ static void cx2_adc_refresh_samples(void)
     adc_cx2.reg[0x14u >> 2] = vref_aux;
     adc_cx2.reg[0x18u >> 2] = slot18;
     adc_cx2.reg[0x1Cu >> 2] = batt;
+
+    /* Channel-window result registers (+0x10 in each 0x20-byte channel block)
+     * are consumed by firmware conversion paths. Keep them coherent with the
+     * live rail model to avoid falling back to floor-voltage behavior. */
+    for (uint32_t chan = 0; chan < 7u; chan++) {
+        uint32_t base = (0x100u + chan * 0x20u) >> 2;
+        uint32_t code = batt;
+        switch (chan) {
+        case 0: code = batt; break;
+        case 1: code = batt; break;
+        case 2: code = state.vsys_code; break;
+        case 3: code = state.vsys_code; break;
+        case 4: code = vref; break;
+        case 5: code = state.vsled_code; break;
+        case 6: code = state.vbus_code; break;
+        default: break;
+        }
+        adc_cx2.reg[base + (0x10u >> 2)] = code & CX2_ADC_CODE_MAX;
+    }
 }
 
 static bool cx2_adc_channel_offset(uint32_t offset, uint32_t *chan, uint32_t *regoff)
@@ -1685,6 +2138,14 @@ void adc_reset() {
     cx2_adc_update_irq();
 }
 uint32_t adc_read_word(uint32_t addr) {
+    if (emulate_cx2) {
+        static bool warned_legacy_adc_for_cx2 = false;
+        if (!warned_legacy_adc_for_cx2) {
+            warned_legacy_adc_for_cx2 = true;
+            fprintf(stderr, "[FBDBG] WARNING: legacy adc_read_word used in CX II path (addr=%08X)\n", addr);
+            fflush(stderr);
+        }
+    }
     int n;
     if (!(addr & 0x100)) {
         switch (addr & 0xFF) {
@@ -1742,8 +2203,31 @@ void adc_write_word(uint32_t addr, uint32_t value) {
     return;
 }
 
+static FILE *adc_trace_fp = NULL;
+static int adc_trace_count = 0;
+
+static void adc_trace(const char *tag, uint32_t addr, uint32_t offset, uint32_t val)
+{
+    if (adc_trace_count >= 500) return;
+    if (!adc_trace_fp) {
+        adc_trace_fp = fopen("/tmp/firebird_adc_trace.txt", "w");
+        if (!adc_trace_fp) return;
+    }
+    adc_trace_count++;
+    fprintf(adc_trace_fp, "[%s] %08X +%03X %08X\n", tag, addr, offset, val);
+    if (adc_trace_count % 50 == 0 || adc_trace_count >= 500)
+        fflush(adc_trace_fp);
+}
+
 uint32_t adc_cx2_read_word(uint32_t addr)
 {
+    static bool logged_cx2_adc_path = false;
+    if (!logged_cx2_adc_path) {
+        logged_cx2_adc_path = true;
+        fprintf(stderr, "[FBDBG] adc_cx2_read_word active (first addr=%08X)\n", addr);
+        fflush(stderr);
+    }
+
     uint32_t offset = addr & 0xFFF;
     uint32_t index = offset >> 2;
     if (offset <= 0x1Cu)
@@ -1751,12 +2235,14 @@ uint32_t adc_cx2_read_word(uint32_t addr)
     uint32_t reg = adc_cx2.reg[index];
     if (offset <= 0x1Cu && offset != 0x18u)
         reg &= CX2_ADC_CODE_MAX;
+    adc_trace("RD", addr, offset, reg);
     return reg;
 }
 
 void adc_cx2_write_word(uint32_t addr, uint32_t value)
 {
     uint32_t offset = addr & 0xFFF;
+    adc_trace("WR", addr, offset, value);
     uint32_t index = offset >> 2;
     uint32_t regoff = 0;
     bool is_channel_reg = cx2_adc_channel_offset(offset, NULL, &regoff);

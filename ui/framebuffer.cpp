@@ -19,6 +19,28 @@
 
 LCDScaleMode lcd_scale_mode = LCDScaleMode::Bilinear;
 
+static int render_contrast_level()
+{
+    int contrast = hdq1w.lcd_contrast;
+    if (!emulate_cx2)
+        return contrast;
+
+    /* CX II user-visible backlight steps map to a narrower contrast window
+     * (roughly 0xF3..0x6C PWM -> ~7..85 contrast). Normalize that window to
+     * the full renderer range so "brightest" in-OS looks bright on screen. */
+    constexpr int kCx2ContrastMin = 7;
+    constexpr int kCx2ContrastMax = 85;
+    if (contrast <= 0)
+        return contrast;
+    if (contrast <= kCx2ContrastMin)
+        return 1;
+    if (contrast >= kCx2ContrastMax)
+        return LCD_CONTRAST_MAX;
+    return ((contrast - kCx2ContrastMin) * LCD_CONTRAST_MAX
+        + (kCx2ContrastMax - kCx2ContrastMin) / 2)
+        / (kCx2ContrastMax - kCx2ContrastMin);
+}
+
 QImage renderFramebuffer()
 {
     static std::array<uint16_t, 320 * 240> framebuffer;
@@ -96,9 +118,10 @@ void paintFramebuffer(QPainter *p)
         p->drawImage(imageRect.topLeft(), image);
 
         // Simulate backlight dimming: overlay black with opacity based on contrast.
-        // contrast=LCD_CONTRAST_MAX → fully bright (no overlay), contrast=1 → nearly black.
-        if (hdq1w.lcd_contrast < LCD_CONTRAST_MAX) {
-            int alpha = 255 - (hdq1w.lcd_contrast * 255 / LCD_CONTRAST_MAX);
+        // contrast=LCD_CONTRAST_MAX -> fully bright (no overlay), contrast=1 -> nearly black.
+        int contrast_level = render_contrast_level();
+        if (contrast_level < LCD_CONTRAST_MAX) {
+            int alpha = 255 - (contrast_level * 255 / LCD_CONTRAST_MAX);
             p->setCompositionMode(QPainter::CompositionMode_SourceOver);
             p->fillRect(imageRect, QColor(0, 0, 0, alpha));
             p->setCompositionMode(QPainter::CompositionMode_SourceOver);

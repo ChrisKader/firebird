@@ -77,6 +77,11 @@ typedef enum charger_state {
 extern int battery_mv_override;             /* millivolts, -1 = default */
 extern charger_state_t charger_state_override;
 extern int8_t usb_cable_connected_override; /* -1 = auto, 0/1 = force cable disconnected/connected */
+extern int8_t usb_otg_cable_override;       /* -1 = auto, 0/1 = force OTG-ID cable disconnected/connected */
+extern int8_t battery_present_override;     /* -1 = auto, 0/1 = force absent/present */
+extern int vbus_mv_override;                /* millivolts, -1 = auto */
+extern int vsled_mv_override;               /* millivolts, -1 = auto */
+extern int8_t dock_attached_override;       /* -1 = auto, 0/1 = force detached/attached */
 
 static inline int16_t hw_override_get_adc_battery_level(void)
 {
@@ -146,6 +151,56 @@ static inline int8_t hw_override_get_usb_cable_connected(void)
 static inline void hw_override_set_usb_cable_connected(int8_t value)
 {
     __atomic_store_n(&usb_cable_connected_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int8_t hw_override_get_usb_otg_cable(void)
+{
+    return __atomic_load_n(&usb_otg_cable_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_usb_otg_cable(int8_t value)
+{
+    __atomic_store_n(&usb_otg_cable_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int8_t hw_override_get_battery_present(void)
+{
+    return __atomic_load_n(&battery_present_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_battery_present(int8_t value)
+{
+    __atomic_store_n(&battery_present_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int hw_override_get_vbus_mv(void)
+{
+    return __atomic_load_n(&vbus_mv_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_vbus_mv(int value)
+{
+    __atomic_store_n(&vbus_mv_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int hw_override_get_vsled_mv(void)
+{
+    return __atomic_load_n(&vsled_mv_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_vsled_mv(int value)
+{
+    __atomic_store_n(&vsled_mv_override, value, __ATOMIC_RELAXED);
+}
+
+static inline int8_t hw_override_get_dock_attached(void)
+{
+    return __atomic_load_n(&dock_attached_override, __ATOMIC_RELAXED);
+}
+
+static inline void hw_override_set_dock_attached(int8_t value)
+{
+    __atomic_store_n(&dock_attached_override, value, __ATOMIC_RELAXED);
 }
 
 enum { LOG_CPU, LOG_IO, LOG_FLASH, LOG_INTS, LOG_ICOUNT, LOG_USB, LOG_GDB, MAX_LOG };
