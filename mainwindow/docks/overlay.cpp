@@ -7,32 +7,9 @@
 #include <QTimer>
 #include <QToolButton>
 
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    #include <kddockwidgets/qtcommon/View.h>
-    #include <kddockwidgets/core/TitleBar.h>
-    #include <kddockwidgets/core/View.h>
-#endif
-
+#include "ui/dockbackend.h"
 #include "ui/dockwidget.h"
-#include "ui/kdockwidget.h"
 #include "ui/materialicons.h"
-
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-static QWidget *kddTitleBarWidgetForDock(DockWidget *dock)
-{
-    if (!dock)
-        return nullptr;
-
-    if (auto *kDock = dynamic_cast<KDockWidget *>(dock)) {
-        if (auto *titleBar = kDock->actualTitleBar()) {
-            if (auto *view = titleBar->view())
-                return KDDockWidgets::QtCommon::View_qt::asQWidget(view);
-        }
-    }
-
-    return nullptr;
-}
-#endif
 
 void MainWindow::scheduleCoreDockConnectOverlayRefresh()
 {
@@ -114,10 +91,7 @@ void MainWindow::refreshCoreDockConnectOverlay()
             if (!anchorDock || !anchorDock->isVisible())
                 anchorDock = a ? a : b;
 
-            QWidget *titleBarHost = nullptr;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-            titleBarHost = kddTitleBarWidgetForDock(anchorDock);
-#endif
+            QWidget *titleBarHost = DockBackend::dockTitleBarHostWidget(anchorDock);
             QWidget *overlayParent = titleBarHost ? titleBarHost
                                                   : (anchorDock ? static_cast<QWidget *>(anchorDock)
                                                                 : static_cast<QWidget *>(content_window));

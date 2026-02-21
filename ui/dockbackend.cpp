@@ -5,6 +5,9 @@
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/MainWindow.h>
     #include <kddockwidgets/KDDockWidgets.h>
+    #include <kddockwidgets/qtcommon/View.h>
+    #include <kddockwidgets/core/TitleBar.h>
+    #include <kddockwidgets/core/View.h>
 #else
     #include <QDockWidget>
 #endif
@@ -171,6 +174,21 @@ void resizeDocksCompat(QMainWindow *window,
         qDocks.append(dock);
     window->resizeDocks(qDocks, sizes, orientation);
 #endif
+}
+
+QWidget *dockTitleBarHostWidget(DockWidget *dock)
+{
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    if (!dock)
+        return nullptr;
+    if (auto *titleBar = dock->actualTitleBar()) {
+        if (auto *view = titleBar->view())
+            return KDDockWidgets::QtCommon::View_qt::asQWidget(view);
+    }
+#else
+    Q_UNUSED(dock);
+#endif
+    return nullptr;
 }
 
 } // namespace DockBackend

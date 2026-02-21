@@ -19,10 +19,7 @@
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/DockWidget.h>
     #include <kddockwidgets/LayoutSaver.h>
-    #include <kddockwidgets/qtcommon/View.h>
     #include <kddockwidgets/core/DockWidget.h>
-    #include <kddockwidgets/core/TitleBar.h>
-    #include <kddockwidgets/core/View.h>
 #endif
 
 #include "mainwindow/docks/baselinelayout.h"
@@ -30,7 +27,6 @@
 #include "mainwindow/docks/baseline.h"
 #include "ui/dockbackend.h"
 #include "ui/dockwidget.h"
-#include "ui/kdockwidget.h"
 #include "ui/materialicons.h"
 
 void MainWindow::resetDockLayout()

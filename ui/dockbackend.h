@@ -5,6 +5,7 @@
 #include <QMainWindow>
 #include <QObject>
 #include <QSize>
+#include <QWidget>
 
 #include "ui/dockwidget.h"
 
@@ -42,6 +43,8 @@ void resizeDocksCompat(QMainWindow *window,
                        const QList<DockWidget *> &docks,
                        const QList<int> &sizes,
                        Qt::Orientation orientation);
+
+QWidget *dockTitleBarHostWidget(DockWidget *dock);
 
 } // namespace DockBackend
 

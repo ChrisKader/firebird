@@ -29,7 +29,7 @@ This document is the canonical guide for how to structure new code and refactors
   - `mainwindow/runtime*.cpp`: runtime actions/state transitions.
 - `ui/`: Reusable desktop widgets/components.
   - `ui/models/`: Qt model/view backing models shared with QML/widgets.
-  - `ui/dockbackend.*`: shared docking-backend adapter (KDD vs legacy fallback).
+  - `ui/dockbackend.*`: shared docking-backend adapter (KDD vs legacy fallback) for dock add/tabify/split/remove/resize and titlebar host integration points.
 - `debugger/`: Debug panel widgets and docking manager.
 - `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
