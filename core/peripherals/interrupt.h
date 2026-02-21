@@ -43,19 +43,40 @@ extern "C" {
 #define INT_IRQ30  30
 #define INT_IRQ31  31
 
-/* Named aliases for lines currently modeled in code paths. */
-#define INT_SERIAL   INT_IRQ1
-#define INT_WATCHDOG INT_IRQ3
-#define INT_GPIO     INT_IRQ7
-#define INT_USB      INT_IRQ8
-#define INT_ADC      INT_IRQ11
-#define INT_ADC_ALT  INT_IRQ13
-#define INT_POWER    INT_IRQ15
-#define INT_KEYPAD   INT_IRQ16
-#define INT_TIMER0   INT_IRQ17
-#define INT_TIMER1   INT_IRQ18
-#define INT_TIMER2   INT_IRQ19
-#define INT_LCD      INT_IRQ21
+/* Known IRQ role mappings from firmware analysis. */
+#define INT_SERIAL_UART             INT_IRQ1
+#define INT_WATCHDOG_TIMER          INT_IRQ3
+#define INT_RTC                     INT_IRQ4
+#define INT_GPIO                    INT_IRQ7
+#define INT_USB_OTG                 INT_IRQ8
+#define INT_USB_HOST                INT_IRQ9
+#define INT_ADC                     INT_IRQ11
+#define INT_SD_HOST_CONTROLLER      INT_IRQ13
+#define INT_HDQ_1WIRE               INT_IRQ14
+#define INT_LCD_CONTRAST            INT_IRQ14
+#define INT_HDQ_1WIRE_LCD_CONTRAST  INT_IRQ14
+#define INT_POWER_MANAGEMENT        INT_IRQ15
+#define INT_KEYPAD                  INT_IRQ16
+#define INT_FAST_TIMER              INT_IRQ17
+#define INT_FIRST_TIMER             INT_IRQ18
+#define INT_SECOND_TIMER            INT_IRQ19
+#define INT_I2C                     INT_IRQ20
+#define INT_LCD_CONTROLLER          INT_IRQ21
+
+/* Backward-compatible aliases used by existing code. */
+#define INT_SERIAL   INT_SERIAL_UART
+#define INT_WATCHDOG INT_WATCHDOG_TIMER
+#define INT_USB      INT_USB_OTG
+#define INT_POWER    INT_POWER_MANAGEMENT
+#define INT_TIMER_FAST INT_FAST_TIMER
+#define INT_TIMER_FIRST INT_FIRST_TIMER
+#define INT_TIMER_SECOND INT_SECOND_TIMER
+#define INT_TIMER0   INT_FAST_TIMER
+#define INT_TIMER1   INT_FIRST_TIMER
+#define INT_TIMER2   INT_SECOND_TIMER
+#define INT_LCD      INT_LCD_CONTROLLER
+/* Historical alias retained for existing ADC mirror code paths. */
+#define INT_ADC_ALT  INT_SD_HOST_CONTROLLER
 
 typedef struct interrupt_state {
 	uint32_t active;
