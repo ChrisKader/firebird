@@ -168,6 +168,8 @@ private:
     void updateLayoutHistoryActions();
     void undoLayoutChange();
     void redoLayoutChange();
+    void restoreStartupLayoutFromSettings();
+    void restoreHardwareOverridesFromSettings();
 
     // This changes the current GUI language to the one given in parameter, if available.
     // The change is persistent (saved in settings) if it was successful.

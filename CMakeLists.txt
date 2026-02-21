@@ -126,6 +126,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Main window (stays in root for AUTOUIC)
     main.cpp
     mainwindow.cpp mainwindow.h mainwindow.ui
+    mainwindow/bootstrap.cpp
+    mainwindow/layout_persistence.cpp
     mainwindow/docks.cpp
     mainwindow/docks/reset.cpp
     mainwindow/theme.cpp
@@ -135,6 +137,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
 
 # mainwindow.ui stays in the repo root; runtime module sources include the
 # generated ui header but must not trigger local AUTOUIC lookup.
+set_source_files_properties(mainwindow/bootstrap.cpp PROPERTIES SKIP_AUTOUIC ON)
+set_source_files_properties(mainwindow/layout_persistence.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/docks.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/docks/reset.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/runtime.cpp PROPERTIES SKIP_AUTOUIC ON)
