@@ -28,6 +28,29 @@
 #include "ui/framebuffer.h"
 #include "ui_mainwindow.h"
 
+static bool likelyCx2StartupKit(QMLBridge *bridge)
+{
+    if (!bridge)
+        return false;
+
+    KitModel *model = bridge->getKitModel();
+    if (!model || model->rowCount() <= 0)
+        return false;
+
+    int kitId = bridge->getCurrentKitId();
+    if (kitId < 0)
+        kitId = static_cast<int>(bridge->getDefaultKit());
+
+    int row = bridge->kitIndexForID(static_cast<unsigned int>(kitId));
+    if (row < 0)
+        row = 0;
+
+    const QString type = model->getDataRow(row, KitModel::TypeRole).toString();
+    return type.contains(QStringLiteral("CX II"), Qt::CaseInsensitive)
+        || type.contains(QStringLiteral("CX2"), Qt::CaseInsensitive)
+        || type.contains(QStringLiteral("CX 2"), Qt::CaseInsensitive);
+}
+
 void MainWindow::showSpeed(double value)
 {
     if (status_bar_speed_label)
@@ -191,6 +214,37 @@ void MainWindow::setExtLCD(bool state)
 
     if (ui && ui->actionLCD_Window)
         ui->actionLCD_Window->setChecked(m_dock_ext_lcd->isVisible());
+}
+
+bool MainWindow::resume()
+{
+    /* If there's no kit set, use the default kit */
+    if (qmlBridge()->getCurrentKitId() == -1)
+        qmlBridge()->useDefaultKit();
+
+    if (likelyCx2StartupKit(qmlBridge())) {
+        /* CX II should start with no external accessories unless the user
+         * actively toggles them after boot. Clear stale persisted rails/state
+         * right before launching emulation. */
+        hw_override_set_usb_otg_cable(0);
+        hw_override_set_usb_cable_connected(0);
+        hw_override_set_vbus_mv(0);
+        hw_override_set_dock_attached(0);
+        hw_override_set_vsled_mv(0);
+        PowerControl::refreshPowerState();
+        usblinkChanged(false);
+    }
+
+    applyQMLBridgeSettings();
+
+    auto snapshot_path = qmlBridge()->getSnapshotPath();
+    if (!snapshot_path.isEmpty())
+        return resumeFromPath(snapshot_path);
+    else
+    {
+        QMessageBox::warning(this, tr("Can't resume"), tr("The current kit does not have a snapshot file configured"));
+        return false;
+    }
 }
 
 void MainWindow::suspend()

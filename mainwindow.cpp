@@ -2195,34 +2195,3 @@ void MainWindow::convertTabsToDocks()
 
     ui->tabWidget->setHidden(true);
 }
-
-bool MainWindow::resume()
-{
-    /* If there's no kit set, use the default kit */
-    if (qmlBridge()->getCurrentKitId() == -1)
-        qmlBridge()->useDefaultKit();
-
-    if (likelyCx2StartupKit(qmlBridge())) {
-        /* CX II should start with no external accessories unless the user
-         * actively toggles them after boot. Clear stale persisted rails/state
-         * right before launching emulation. */
-        hw_override_set_usb_otg_cable(0);
-        hw_override_set_usb_cable_connected(0);
-        hw_override_set_vbus_mv(0);
-        hw_override_set_dock_attached(0);
-        hw_override_set_vsled_mv(0);
-        PowerControl::refreshPowerState();
-        usblinkChanged(false);
-    }
-
-    applyQMLBridgeSettings();
-
-    auto snapshot_path = qmlBridge()->getSnapshotPath();
-    if (!snapshot_path.isEmpty())
-        return resumeFromPath(snapshot_path);
-    else
-    {
-        QMessageBox::warning(this, tr("Can't resume"), tr("The current kit does not have a snapshot file configured"));
-        return false;
-    }
-}
