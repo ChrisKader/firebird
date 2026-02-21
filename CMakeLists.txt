@@ -43,15 +43,15 @@ endif()
 
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Core emulator
-    core/arm_interpreter.cpp
+    core/cpu/arm_interpreter.cpp
     core/armcode_bin.h
     core/armsnippets.h
     core/armsnippets_loader.c
     core/asmcode.c core/asmcode.h
     core/bitfield.h
     core/casplus.c core/casplus.h
-    core/coproc.cpp
-    core/cpu.cpp core/cpu.h
+    core/cpu/coproc.cpp
+    core/cpu/cpu.cpp core/cpu.h
     core/cpudefs.h
     core/cx2.cpp core/cx2.h
     core/peripherals/cx2_peripherals.cpp
@@ -80,7 +80,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/schedule.c core/schedule.h
     core/serial.c
     core/sha256.c core/sha256.h
-    core/thumb_interpreter.cpp
+    core/cpu/thumb_interpreter.cpp
     core/translate.h
     core/usb/usb.c core/usb.h
     core/usb/usb_cx2.cpp core/usb_cx2.h
@@ -478,20 +478,20 @@ set(TRANSLATION_AVAILABLE FALSE)
 
 if(FB_ARCH STREQUAL "x86")
     set(TRANSLATION_AVAILABLE TRUE)
-    set(TRANSLATE_SOURCES core/translate_x86.c)
+    set(TRANSLATE_SOURCES core/cpu/translate_x86.c)
     set(ASM_SOURCES core/asmcode_x86.S)
     set(DISABLE_ASMCODE_C TRUE)
 elseif(FB_ARCH STREQUAL "x86_64")
     set(TRANSLATION_AVAILABLE TRUE)
-    set(TRANSLATE_SOURCES core/translate_x86_64.c)
+    set(TRANSLATE_SOURCES core/cpu/translate_x86_64.c)
     set(ASM_SOURCES core/asmcode_x86_64.S)
 elseif(FB_ARCH STREQUAL "arm")
     set(TRANSLATION_AVAILABLE TRUE)
-    set(TRANSLATE_SOURCES core/translate_arm.cpp)
+    set(TRANSLATE_SOURCES core/cpu/translate_arm.cpp)
     set(ASM_SOURCES core/asmcode_arm.S)
 elseif(FB_ARCH STREQUAL "aarch64")
     set(TRANSLATION_AVAILABLE TRUE)
-    set(TRANSLATE_SOURCES core/translate_aarch64.cpp)
+    set(TRANSLATE_SOURCES core/cpu/translate_aarch64.cpp)
     set(ASM_SOURCES core/asmcode_aarch64.S)
 endif()
 
@@ -584,10 +584,10 @@ if(just_show_up_in_qt_creator)
         core/asmcode_x86.S
         core/asmcode_x86_64.S
         core/os/os-emscripten.c
-        core/translate_aarch64.cpp
-        core/translate_arm.cpp
-        core/translate_x86.c
-        core/translate_x86_64.c
+        core/cpu/translate_aarch64.cpp
+        core/cpu/translate_arm.cpp
+        core/cpu/translate_x86.c
+        core/cpu/translate_x86_64.c
         emscripten/main.cpp
         headless/main.cpp
     )
