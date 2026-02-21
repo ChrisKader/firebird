@@ -2475,6 +2475,7 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     // Restore dock layout from named profiles; if unavailable, use built-in C++ default baseline.
     bool restored = false;
     bool usedBuiltInDefaultBaseline = false;
+    QString appliedStartupProfile;
     const QString startupProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
     QJsonObject restoredDebugDockState;
     QJsonObject restoredCoreDockConnections;
@@ -2498,9 +2499,11 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
         resetDockLayout();
         usedBuiltInDefaultBaseline = true;
         restored = true;
-        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), QStringLiteral("default"));
+        appliedStartupProfile = QStringLiteral("default");
+        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), appliedStartupProfile);
     } else {
-        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), autoProfile);
+        appliedStartupProfile = autoProfile;
+        settings->setValue(QString::fromLatin1(kSettingLayoutProfile), appliedStartupProfile);
     }
 
     if (m_debugDocks) {
@@ -2520,6 +2523,42 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     m_layoutUndoHistory.clear();
     m_layoutRedoHistory.clear();
     captureLayoutHistorySnapshot();
+
+    // KDD layout restore can run before final dock geometry settles at startup.
+    // Re-apply the selected profile once on the next event loop tick so relaunch
+    // matches explicit "Load layout profile" behavior.
+    if (!appliedStartupProfile.isEmpty()) {
+        QTimer::singleShot(0, this, [this, appliedStartupProfile]() {
+            QString profileError;
+            QJsonObject debugDockState;
+            QJsonObject coreDockConnections;
+            if (restoreLayoutProfile(content_window,
+                                     appliedStartupProfile,
+                                     &profileError,
+                                     &debugDockState,
+                                     &coreDockConnections)) {
+                if (m_debugDocks && !debugDockState.isEmpty())
+                    m_debugDocks->restoreDockStates(debugDockState);
+                restoreCoreDockConnections(coreDockConnections);
+                if (m_debugDocks)
+                    m_debugDocks->refreshIcons();
+                captureLayoutHistorySnapshot();
+                return;
+            }
+
+            if (appliedStartupProfile == QLatin1String("default")) {
+                resetDockLayout();
+                if (m_debugDocks)
+                    m_debugDocks->refreshIcons();
+                captureLayoutHistorySnapshot();
+                return;
+            }
+
+            qDebug("deferred profile restore failed (%s): %s",
+                   appliedStartupProfile.toUtf8().constData(),
+                   profileError.toUtf8().constData());
+        });
+    }
 
     m_lcdKeypadLinked = settings->value(QStringLiteral("lcdKeypadLinked"), false).toBool();
 
