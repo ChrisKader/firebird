@@ -114,6 +114,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     debugger/portmonitor/portmonitorwidget.cpp debugger/portmonitor/portmonitorwidget.h
     debugger/keyhistory/keyhistorywidget.cpp debugger/keyhistory/keyhistorywidget.h
     debugger/console/consolewidget.cpp debugger/console/consolewidget.h
+    debugger/console/state.cpp
     debugger/memvisualizer/memoryvisualizerwidget.cpp debugger/memvisualizer/memoryvisualizerwidget.h
     debugger/cyclecounter/cyclecounterwidget.cpp debugger/cyclecounter/cyclecounterwidget.h
     debugger/timermonitor/timermonitorwidget.cpp debugger/timermonitor/timermonitorwidget.h
