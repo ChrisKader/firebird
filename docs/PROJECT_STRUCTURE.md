@@ -63,6 +63,7 @@ they should be moved into subsystem folders instead of adding new top-level
     - `core/disassembly/`: ARM disassembly helpers shared by debugger and translation tooling.
     - `core/crypto/`: cryptographic device helpers (DES, SHA256).
     - `core/debug/`: debugger command handling, API, remote debug transport, GDB glue.
+    - `core/jit/`: JIT/translation runtime support (asmcode, arm snippets, literal pool helpers).
     - `core/memory/`: RAM/MMU/address-translation and memory-map dispatch.
     - `core/timing/`: global event scheduler and emulated clock-domain timing coordination.
     - `core/soc/`: model-specific SoC families and platform behavior (CAS+/CX2 PMU and model glue).

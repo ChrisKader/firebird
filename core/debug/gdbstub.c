@@ -36,7 +36,7 @@
 #include "debug.h"
 #include "memory/mem.h"
 #include "cpu/cpu.h"
-#include "armsnippets.h"
+#include "jit/armsnippets.h"
 #include "gdbstub.h"
 #include "cpu/translate.h"
 

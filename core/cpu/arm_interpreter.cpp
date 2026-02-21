@@ -1,6 +1,6 @@
 #include <cassert>
 
-#include "asmcode.h"
+#include "jit/asmcode.h"
 #include "cpu/cpu.h"
 #include "cpu/cpudefs.h"
 #include "debug.h"

@@ -11,24 +11,24 @@ endif
 
 ifeq "$(TRANSLATION_ENABLED)" "TRUE"
     ifneq "$(filter i%86,$(TOOLCHAIN_ARCH))" ""
-        ASMSOURCES += ../core/asmcode_x86.S
+        ASMSOURCES += ../core/jit/asmcode_x86.S
         CSOURCES += ../core/cpu/translate_x86.c
     else ifeq "$(TOOLCHAIN_ARCH)" "x86_64"
-        ASMSOURCES += ../core/asmcode_x86_64.S
-        CSOURCES += ../core/asmcode.c ../core/cpu/translate_x86_64.c
+        ASMSOURCES += ../core/jit/asmcode_x86_64.S
+        CSOURCES += ../core/jit/asmcode.c ../core/cpu/translate_x86_64.c
     else ifneq "$(filter arm%,$(TOOLCHAIN_ARCH))" ""
-        ASMSOURCES += ../core/asmcode_arm.S
-        CSOURCES += ../core/asmcode.c
+        ASMSOURCES += ../core/jit/asmcode_arm.S
+        CSOURCES += ../core/jit/asmcode.c
         CPPSOURCES += ../core/cpu/translate_arm.cpp
     else ifneq "$(filter aarch64 arm64,$(TOOLCHAIN_ARCH))" ""
-        ASMSOURCES += ../core/asmcode_aarch64.S
-        CSOURCES += ../core/asmcode.c
+        ASMSOURCES += ../core/jit/asmcode_aarch64.S
+        CSOURCES += ../core/jit/asmcode.c
         CPPSOURCES += ../core/cpu/translate_aarch64.cpp
     else
         $(error Unknown architecture $(TOOLCHAIN_ARCH))
     endif
 else
-    CSOURCES += ../core/asmcode.c
+    CSOURCES += ../core/jit/asmcode.c
     FLAGS += -DNO_TRANSLATION
 endif
 
@@ -41,7 +41,7 @@ CXXFLAGS += -std=c++11 $(FLAGS)
 LFLAGS +=
 LIBS := -lz
 
-CSOURCES   += ../core/armsnippets_loader.c ../core/soc/casplus.c ../core/crypto/des.c ../core/disassembly/disasm.c ../core/debug/gdbstub.c \
+CSOURCES   += ../core/jit/armsnippets_loader.c ../core/soc/casplus.c ../core/crypto/des.c ../core/disassembly/disasm.c ../core/debug/gdbstub.c \
               ../core/peripherals/interrupt.c ../core/peripherals/lcd.c ../core/peripherals/link.c ../core/memory/mem.c ../core/peripherals/misc.c \
               ../core/memory/mmu.c ../core/timing/schedule.c ../core/peripherals/serial.c ../core/crypto/sha256.c ../core/usb/usb.c ../core/usb/usblink.c \
               ../core/os/os-linux.c

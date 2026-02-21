@@ -121,7 +121,7 @@ win32 {
 }
 
 # A platform-independant implementation of lowlevel access as default
-ASMCODE_IMPL = core/asmcode.c
+ASMCODE_IMPL = core/jit/asmcode.c
 
 TRANSLATE = $$files("core/translate_"$$FB_ARCH".c*")
 equals(TRANSLATION_ENABLED, auto) {
@@ -136,7 +136,7 @@ equals(TRANSLATION_ENABLED, true) {
     ASMCODE_IMPL = $$files("core/asmcode_"$$FB_ARCH".S")
     # Only the asmcode_x86.S functions can be called from outside the JIT
     !equals(FB_ARCH, "x86") {
-        ASMCODE_IMPL += core/asmcode.c
+        ASMCODE_IMPL += core/jit/asmcode.c
     }
 }
 else: DEFINES += NO_TRANSLATION
@@ -173,7 +173,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/cpu/cpu.cpp \
     core/cpu/thumb_interpreter.cpp \
     core/usb/usblink_queue.cpp \
-    core/armsnippets_loader.c \
+    core/jit/armsnippets_loader.c \
     core/soc/casplus.c \
     core/crypto/des.c \
     core/disassembly/disasm.c \
@@ -220,9 +220,9 @@ HEADERS += \
     core/power/powercontrol.h \
     qtkeypadbridge.h \
     core/os/os.h \
-    core/armcode_bin.h \
-    core/armsnippets.h \
-    core/asmcode.h \
+    core/jit/armcode_bin.h \
+    core/jit/armsnippets.h \
+    core/jit/asmcode.h \
     core/bitfield.h \
     core/soc/casplus.h \
     core/cpu/cpu.h \
@@ -286,11 +286,11 @@ SOURCES += qml/Keypad.qml \
 
 # This doesn't exist, but Qt Creator ignores that
 just_show_up_in_qt_creator {
-SOURCES += core/asmcode_arm.S \
-    core/asmcode_aarch64.S \
-    core/asmcode_x86.S \
-    core/asmcode_x86_64.S \
-    core/asmcode.c \
+SOURCES += core/jit/asmcode_arm.S \
+    core/jit/asmcode_aarch64.S \
+    core/jit/asmcode_x86.S \
+    core/jit/asmcode_x86_64.S \
+    core/jit/asmcode.c \
     core/os/os-emscripten.c \
     core/cpu/translate_arm.cpp \
     core/cpu/translate_aarch64.cpp \
@@ -311,9 +311,9 @@ DISTFILES += \
     android/build.gradle
 
 # Generate the binary arm code into armcode_bin.h
-armsnippets.commands = arm-none-eabi-gcc -fno-leading-underscore -c $$PWD/core/armsnippets.S -o armsnippets.o -mcpu=arm926ej-s \
+armsnippets.commands = arm-none-eabi-gcc -fno-leading-underscore -c $$PWD/core/jit/armsnippets.S -o armsnippets.o -mcpu=arm926ej-s \
                         && arm-none-eabi-objcopy -O binary armsnippets.o snippets.bin \
-                        && xxd -i snippets.bin > $$PWD/core/armcode_bin.h \
+                        && xxd -i snippets.bin > $$PWD/core/jit/armcode_bin.h \
                         && rm armsnippets.o
 
 # In case you change armsnippets.S, run "make armsnippets" and update armcode_bin.h

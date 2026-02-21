@@ -2,17 +2,17 @@
 
 #include "emu.h"
 #include "cpu/cpu.h"
-#include "armsnippets.h"
+#include "jit/armsnippets.h"
 #include "memory/mem.h"
 #include "cpu/translate.h"
-#include "armsnippets.h"
+#include "jit/armsnippets.h"
 #include "debug.h"
 
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
 
-#include "armcode_bin.h"
+#include "jit/armcode_bin.h"
 
 struct arm_state armloader_orig_arm_state;
 

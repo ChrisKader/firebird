@@ -7,7 +7,7 @@
 
 #include <condition_variable>
 
-#include "armsnippets.h"
+#include "jit/armsnippets.h"
 #include "debug.h"
 #include "peripherals/interrupt.h"
 #include "emu.h"

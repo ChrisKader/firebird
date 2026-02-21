@@ -44,10 +44,10 @@ endif()
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Core emulator
     core/cpu/arm_interpreter.cpp
-    core/armcode_bin.h
-    core/armsnippets.h
-    core/armsnippets_loader.c
-    core/asmcode.c core/asmcode.h
+    core/jit/armcode_bin.h
+    core/jit/armsnippets.h
+    core/jit/armsnippets_loader.c
+    core/jit/asmcode.c core/jit/asmcode.h
     core/bitfield.h
     core/soc/casplus.c core/soc/casplus.h
     core/cpu/coproc.cpp
@@ -480,20 +480,20 @@ set(TRANSLATION_AVAILABLE FALSE)
 if(FB_ARCH STREQUAL "x86")
     set(TRANSLATION_AVAILABLE TRUE)
     set(TRANSLATE_SOURCES core/cpu/translate_x86.c)
-    set(ASM_SOURCES core/asmcode_x86.S)
+    set(ASM_SOURCES core/jit/asmcode_x86.S)
     set(DISABLE_ASMCODE_C TRUE)
 elseif(FB_ARCH STREQUAL "x86_64")
     set(TRANSLATION_AVAILABLE TRUE)
     set(TRANSLATE_SOURCES core/cpu/translate_x86_64.c)
-    set(ASM_SOURCES core/asmcode_x86_64.S)
+    set(ASM_SOURCES core/jit/asmcode_x86_64.S)
 elseif(FB_ARCH STREQUAL "arm")
     set(TRANSLATION_AVAILABLE TRUE)
     set(TRANSLATE_SOURCES core/cpu/translate_arm.cpp)
-    set(ASM_SOURCES core/asmcode_arm.S)
+    set(ASM_SOURCES core/jit/asmcode_arm.S)
 elseif(FB_ARCH STREQUAL "aarch64")
     set(TRANSLATION_AVAILABLE TRUE)
     set(TRANSLATE_SOURCES core/cpu/translate_aarch64.cpp)
-    set(ASM_SOURCES core/asmcode_aarch64.S)
+    set(ASM_SOURCES core/jit/asmcode_aarch64.S)
 endif()
 
 string(TOUPPER "${TRANSLATION_ENABLED}" TRANSLATION_ENABLED_UPPER)
@@ -517,9 +517,9 @@ else()
 endif()
 
 if(DISABLE_ASMCODE_C AND TRANSLATION_ENABLED_ON)
-    set_source_files_properties(core/asmcode.c PROPERTIES HEADER_FILE_ONLY TRUE)
+    set_source_files_properties(core/jit/asmcode.c PROPERTIES HEADER_FILE_ONLY TRUE)
 else()
-    set_source_files_properties(core/asmcode.c PROPERTIES HEADER_FILE_ONLY FALSE)
+    set_source_files_properties(core/jit/asmcode.c PROPERTIES HEADER_FILE_ONLY FALSE)
 endif()
 
 string(TOUPPER "${SUPPORT_LINUX}" SUPPORT_LINUX_UPPER)
@@ -579,11 +579,11 @@ endif()
 
 if(just_show_up_in_qt_creator)
     target_sources(firebird-emu PUBLIC
-        core/asmcode.c
-        core/asmcode_aarch64.S
-        core/asmcode_arm.S
-        core/asmcode_x86.S
-        core/asmcode_x86_64.S
+        core/jit/asmcode.c
+        core/jit/asmcode_aarch64.S
+        core/jit/asmcode_arm.S
+        core/jit/asmcode_x86.S
+        core/jit/asmcode_x86_64.S
         core/os/os-emscripten.c
         core/cpu/translate_aarch64.cpp
         core/cpu/translate_arm.cpp

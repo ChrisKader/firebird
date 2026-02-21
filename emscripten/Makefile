@@ -6,7 +6,7 @@ CXXFLAGS := -std=c++11 $(FLAGS)
 LFLAGS := --emrun -s TOTAL_MEMORY=536870912
 OUTPUT := firebird
 
-CSOURCES :=    ../core/armsnippets_loader.c ../core/asmcode.c ../core/soc/casplus.c ../core/crypto/des.c ../core/disassembly/disasm.c \
+CSOURCES :=    ../core/jit/armsnippets_loader.c ../core/jit/asmcode.c ../core/soc/casplus.c ../core/crypto/des.c ../core/disassembly/disasm.c \
 	      ../core/debug/gdbstub.c ../core/peripherals/interrupt.c ../core/peripherals/keypad.cpp ../core/peripherals/lcd.c ../core/peripherals/link.c ../core/memory/mem.c \
 	      ../core/peripherals/misc.c ../core/memory/mmu.c ../core/timing/schedule.c ../core/peripherals/serial.c ../core/crypto/sha256.c ../core/usb/usb.c \
               ../core/usb/usblink.c ../core/os/os-emscripten.c

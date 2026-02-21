@@ -22,7 +22,7 @@
 // it doesn't work that often as the mmaped section is too far away.
 // #define REL_BRANCH
 
-#include "asmcode.h"
+#include "jit/asmcode.h"
 #include "cpu/cpu.h"
 #include "cpu/cpudefs.h"
 #include "disassembly/disasm.h"
@@ -54,7 +54,7 @@ uint32_t *translate_buffer = nullptr,
          *translate_current = nullptr,
          *translate_end = nullptr;
 
-#include "literalpool.h"
+#include "jit/literalpool.h"
 
 static unsigned int next_translation_index = 0;
 

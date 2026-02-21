@@ -8,8 +8,8 @@
     #include <ctime>
 #endif
 
-#include "armsnippets.h"
-#include "asmcode.h"
+#include "jit/armsnippets.h"
+#include "jit/asmcode.h"
 #include "cpu/cpu.h"
 #include "cpu/cpudefs.h"
 #include "debug.h"

@@ -5,7 +5,7 @@
 #include "emu.h"
 #include "memory/mem.h"
 #include "cpu/cpu.h"
-#include "asmcode.h"
+#include "jit/asmcode.h"
 #include "cpu/translate.h"
 #include "debug.h"
 
