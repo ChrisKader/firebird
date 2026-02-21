@@ -1,10 +1,10 @@
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 
 #include <QJsonArray>
 #include <QMainWindow>
 #include <QTimer>
 
-#include "ui/docking/dockstate.h"
+#include "ui/docking/state/dockstate.h"
 #include "ui/theme/materialicons.h"
 #include "ui/widgets/disassembly/disassemblywidget.h"
 #include "ui/widgets/registers/registerwidget.h"

@@ -91,10 +91,10 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     app/qmlbridge/runtime.cpp
     ui/models/kitmodel.cpp ui/models/kitmodel.h
     # Shared UI components
-    ui/docking/dockwidget.cpp ui/docking/dockwidget.h
-    ui/docking/dockbackend.cpp ui/docking/dockbackend.h
-    ui/docking/dockstate.h
-    ui/docking/kdockwidget.cpp ui/docking/kdockwidget.h
+    ui/docking/widgets/dockwidget.cpp ui/docking/widgets/dockwidget.h
+    ui/docking/backend/dockbackend.cpp ui/docking/backend/dockbackend.h
+    ui/docking/state/dockstate.h
+    ui/docking/widgets/kdockwidget.cpp ui/docking/widgets/kdockwidget.h
     ui/theme/widgettheme.cpp ui/theme/widgettheme.h
     ui/theme/materialicons.cpp ui/theme/materialicons.h
     ui/screen/lcdwidget.cpp ui/screen/lcdwidget.h
@@ -103,8 +103,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     ui/input/keymap.h
     ui/text/ansitextwriter.cpp ui/text/ansitextwriter.h
     # Debugger subsystem
-    ui/docking/dockmanager.cpp ui/docking/dockmanager.h
-    ui/docking/dockmanager_state.cpp
+    ui/docking/manager/dockmanager.cpp ui/docking/manager/dockmanager.h
+    ui/docking/manager/dockmanager_state.cpp
     ui/widgets/disassembly/disassemblywidget.cpp ui/widgets/disassembly/disassemblywidget.h
     ui/widgets/registers/registerwidget.cpp ui/widgets/registers/registerwidget.h
     ui/widgets/hexview/hexviewwidget.cpp ui/widgets/hexview/hexviewwidget.h
@@ -270,7 +270,7 @@ if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
     if(BUILD_TESTING)
         add_executable(firebird-kdd-layout-tests
             tests/kdd_layout_test.cpp
-            ui/docking/kdockwidget.cpp
+            ui/docking/widgets/kdockwidget.cpp
         )
         target_compile_definitions(firebird-kdd-layout-tests PRIVATE
             FIREBIRD_USE_KDDOCKWIDGETS=1

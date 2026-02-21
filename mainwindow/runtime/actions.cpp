@@ -22,7 +22,7 @@
 #include "core/flash.h"
 #include "core/gif.h"
 #include "core/misc.h"
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/screen/framebuffer.h"
 #include "ui_mainwindow.h"

@@ -23,10 +23,10 @@
 #endif
 
 #include "mainwindow/docks/baselinelayout.h"
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 #include "mainwindow/docks/baseline.h"
-#include "ui/docking/dockbackend.h"
-#include "ui/docking/dockwidget.h"
+#include "ui/docking/backend/dockbackend.h"
+#include "ui/docking/widgets/dockwidget.h"
 #include "ui/theme/materialicons.h"
 
 void MainWindow::resetDockLayout()

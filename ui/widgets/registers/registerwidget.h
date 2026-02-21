@@ -10,7 +10,7 @@
 #include <QTreeWidget>
 #include <stdint.h>
 
-#include "ui/docking/dockstate.h"
+#include "ui/docking/state/dockstate.h"
 
 class RegisterWidget : public QWidget, public DockStateSerializable
 {

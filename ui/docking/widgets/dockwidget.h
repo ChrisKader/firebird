@@ -11,7 +11,7 @@
  * Optionally shows a Material icon from the toggle action. */
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    #include "ui/docking/kdockwidget.h"
+    #include "ui/docking/widgets/kdockwidget.h"
 using DockWidget = KDockWidget;
 #else
 class DockWidget : public QDockWidget

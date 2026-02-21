@@ -17,7 +17,7 @@
 #include "app/emuthread.h"
 #include "dialogs/fbaboutdialog.h"
 #include "ui/screen/lcdwidget.h"
-#include "ui/docking/dockwidget.h"
+#include "ui/docking/widgets/dockwidget.h"
 #include "app/qmlbridge.h"
 
 class DockManager;

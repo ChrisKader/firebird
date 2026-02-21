@@ -1,12 +1,12 @@
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 
 #include <QMainWindow>
 #include <QMenu>
 #include <QShortcut>
 
-#include "ui/docking/dockbackend.h"
-#include "ui/docking/dockwidget.h"
-#include "ui/docking/kdockwidget.h"
+#include "ui/docking/backend/dockbackend.h"
+#include "ui/docking/widgets/dockwidget.h"
+#include "ui/docking/widgets/kdockwidget.h"
 #include "ui/input/keypadbridge.h"
 #include "ui/widgets/disassembly/disassemblywidget.h"
 #include "ui/widgets/registers/registerwidget.h"

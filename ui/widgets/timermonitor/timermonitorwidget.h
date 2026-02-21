@@ -6,7 +6,7 @@
 #include <QComboBox>
 #include <QTimer>
 
-#include "ui/docking/dockstate.h"
+#include "ui/docking/state/dockstate.h"
 
 class TimerMonitorWidget : public QWidget, public DockStateSerializable
 {

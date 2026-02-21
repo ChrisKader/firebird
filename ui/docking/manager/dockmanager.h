@@ -10,7 +10,7 @@
 #include <QPointer>
 #include <cstdint>
 
-#include "ui/docking/dockwidget.h"
+#include "ui/docking/widgets/dockwidget.h"
 
 class QMainWindow;
 class QMenu;

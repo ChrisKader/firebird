@@ -1,6 +1,6 @@
-#include "ui/docking/dockbackend.h"
+#include "ui/docking/backend/dockbackend.h"
 
-#include "ui/docking/dockwidget.h"
+#include "ui/docking/widgets/dockwidget.h"
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/MainWindow.h>

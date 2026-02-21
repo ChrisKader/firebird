@@ -200,7 +200,7 @@ SOURCES += $$ASMCODE_IMPL \
     usblinktreewidget.cpp \
     kitmodel.cpp \
     fbaboutdialog.cpp \
-    ui/docking/dockwidget.cpp \
+    ui/docking/widgets/dockwidget.cpp \
     ui/widgets/main/consolelineedit/consolelineedit.cpp \
     core/cx2.cpp
 
@@ -251,7 +251,7 @@ HEADERS += \
     usblinktreewidget.h \
     kitmodel.h \
     fbaboutdialog.h \
-    ui/docking/dockwidget.h \
+    ui/docking/widgets/dockwidget.h \
     ui/widgets/main/consolelineedit/consolelineedit.h \
     core/cx2.h
 

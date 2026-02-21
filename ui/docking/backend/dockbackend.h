@@ -7,7 +7,7 @@
 #include <QSize>
 #include <QWidget>
 
-#include "ui/docking/dockwidget.h"
+#include "ui/docking/widgets/dockwidget.h"
 
 namespace DockBackend {
 

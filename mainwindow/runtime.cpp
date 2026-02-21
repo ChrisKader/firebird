@@ -28,7 +28,7 @@
 #include "core/misc.h"
 #include "core/usblink_queue.h"
 #include "ui/widgets/console/consolewidget.h"
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/screen/framebuffer.h"
 #include "ui/theme/widgettheme.h"

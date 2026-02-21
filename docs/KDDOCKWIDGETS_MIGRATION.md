@@ -56,11 +56,12 @@ What it does:
 
 ## Wrapper Layer
 
-- `ui/docking/kdockwidget.h` / `ui/docking/kdockwidget.cpp` now provide `KDockWidget`.
-- Current implementation still inherits existing `DockWidget` so behavior is unchanged.
+- `ui/docking/widgets/kdockwidget.h` / `ui/docking/widgets/kdockwidget.cpp` now provide `KDockWidget`.
+- `DockWidget` now aliases `KDockWidget` when `FIREBIRD_USE_KDDOCKWIDGETS` is enabled,
+  and remains a `QDockWidget` subclass on non-KDD builds.
 - Main and debugger dock creation paths now construct `KDockWidget`, which reduces future migration churn when swapping to KDDockWidgets-backed docks.
 
 ## Per-Dock State Hook
 
-- Debug widgets now opt into `DockStateSerializable` (`ui/docking/dockstate.h`) to persist custom per-dock UI state.
+- Debug widgets now opt into `DockStateSerializable` (`ui/docking/state/dockstate.h`) to persist custom per-dock UI state.
 - `DockManager` saves/restores these states under `debugDockState` in layout JSON/profile files.

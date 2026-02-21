@@ -7,7 +7,7 @@
 #include <QRegularExpression>
 #include <QToolButton>
 
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/disassembly/disassemblywidget.h"
 #include "ui/widgets/hexview/hexviewwidget.h"
 #include "ui/theme/materialicons.h"

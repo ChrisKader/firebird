@@ -8,7 +8,7 @@
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/DockWidget.h>
 #else
-    #include "ui/docking/dockwidget.h"
+    #include "ui/docking/widgets/dockwidget.h"
 #endif
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS

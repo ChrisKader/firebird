@@ -9,7 +9,7 @@
 #include <QTimer>
 #include <QUrl>
 
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/widgets/nandbrowser/nandbrowserwidget.h"
 #include "mainwindow/layout_persistence.h"

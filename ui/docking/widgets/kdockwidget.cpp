@@ -1,4 +1,4 @@
-#include "ui/docking/kdockwidget.h"
+#include "ui/docking/widgets/kdockwidget.h"
 
 #include <QAction>
 

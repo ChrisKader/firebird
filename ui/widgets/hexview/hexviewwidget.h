@@ -11,7 +11,7 @@
 #include <QListWidget>
 #include <stdint.h>
 
-#include "ui/docking/dockstate.h"
+#include "ui/docking/state/dockstate.h"
 
 class HexViewWidget : public QAbstractScrollArea, public DockStateSerializable
 {

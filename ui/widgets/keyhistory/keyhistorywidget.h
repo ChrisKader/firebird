@@ -10,7 +10,7 @@
 #include <QElapsedTimer>
 #include <QVector>
 
-#include "ui/docking/dockstate.h"
+#include "ui/docking/state/dockstate.h"
 
 class KeyHistoryWidget : public QWidget, public DockStateSerializable
 {

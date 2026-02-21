@@ -80,8 +80,8 @@
 #include "core/mem.h"
 #include "core/usblink_queue.h"
 
-#include "ui/docking/dockwidget.h"
-#include "ui/docking/kdockwidget.h"
+#include "ui/docking/widgets/dockwidget.h"
+#include "ui/docking/widgets/kdockwidget.h"
 #include "mainwindow.h"
 #include "mainwindow/layout_persistence.h"
 #include "ui/theme/widgettheme.h"
@@ -92,7 +92,7 @@
 #include "mainwindow/docks/baselinelayout.h"
 #include "ui/screen/framebuffer.h"
 #include "ui/input/keypadbridge.h"
-#include "ui/docking/dockmanager.h"
+#include "ui/docking/manager/dockmanager.h"
 
 #include "ui/widgets/disassembly/disassemblywidget.h"
 #include "ui/widgets/hexview/hexviewwidget.h"
