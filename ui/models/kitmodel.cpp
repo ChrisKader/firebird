@@ -1,7 +1,7 @@
 #include <QDataStream>
 #include <QDebug>
 
-#include "core/memory/flash.h"
+#include "core/storage/flash.h"
 #include "core/os/os.h"
 
 #include "kitmodel.h"

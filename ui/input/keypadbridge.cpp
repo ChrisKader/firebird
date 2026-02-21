@@ -2,7 +2,7 @@
 
 #include <cassert>
 #include "keymap.h"
-#include "core/keypad.h"
+#include "core/peripherals/keypad.h"
 #include "core/emu.h"
 #include "app/qmlbridge.h"
 #include <QHash>

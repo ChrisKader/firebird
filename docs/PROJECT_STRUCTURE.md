@@ -58,16 +58,17 @@ they should be moved into subsystem folders instead of adding new top-level
     - Each debug widget module may expose a local `dockregistration.cpp` for dock metadata/factory registration.
 - `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
-  - Current active folders:
-    - `core/power/`: power-path override control helpers used by UI and debugger.
+  - Active module folders:
+    - `core/cpu/`: CPU/interpreter/JIT translation and coprocessor logic.
+    - `core/debug/`: debugger command handling, API, remote debug transport, GDB glue.
+    - `core/memory/`: RAM/MMU/address-translation and memory-map dispatch.
+    - `core/storage/`: persistent storage models (flash image + NAND filesystem helpers).
+    - `core/peripherals/`: non-USB device models (interrupt, keypad, LCD, link, serial, misc peripherals, CX2 peripheral map helpers).
+    - `core/usb/`: USB device/host emulation and usblink transport.
+    - `core/power/`: host-side power-path override/control helpers used by UI/debug flows.
     - `core/os/`: OS-platform shims and target-specific OS glue.
     - `core/tests/`: core-focused tests.
-  - Phase 5 target layout (applied incrementally while refactoring):
-    - `core/debug/`: debugger command handling, API, remote debug transport, GDB glue.
-    - `core/usb/`: USB device/host emulation and usblink transport.
-    - `core/memory/`: MMU/memory map, flash, NAND/FS, memory helpers.
-    - `core/cpu/`: CPU/interpreter/JIT translation and coprocessor logic.
-    - `core/peripherals/`: non-USB peripheral models (LCD, timers, PMU, keypad, serial, interrupt).
+  - Remaining files in `core/` root are legacy/shared units that still need module placement during Phase 5.
 - `transfer/`: USB file transfer UI/components.
 - `docs/`: Architecture and behavior specifications.
 - `tools/`: Dev and CI support scripts.

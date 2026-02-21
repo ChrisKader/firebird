@@ -9,7 +9,7 @@
 
 extern "C" {
 #include "core/emu.h"
-#include "core/misc.h"
+#include "core/peripherals/misc.h"
 }
 
 #include "core/debug/debug_api.h"

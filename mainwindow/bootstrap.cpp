@@ -37,9 +37,9 @@
 
 #include "app/qmlbridge.h"
 #include "core/debug/debug.h"
-#include "core/memory/flash.h"
+#include "core/storage/flash.h"
 #include "core/memory/mem.h"
-#include "core/misc.h"
+#include "core/peripherals/misc.h"
 #include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "transfer/usblinktreewidget.h"

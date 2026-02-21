@@ -6,7 +6,7 @@
 
 #include "core/cx2.h"
 #include "core/emu.h"
-#include "core/misc.h"
+#include "core/peripherals/misc.h"
 
 namespace {
 constexpr int kCx2BrightnessMinStep = -6;

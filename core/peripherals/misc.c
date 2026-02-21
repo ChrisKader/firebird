@@ -2,11 +2,11 @@
 #include <string.h>
 #include <time.h>
 #include "emu.h"
-#include "interrupt.h"
+#include "peripherals/interrupt.h"
 #include "schedule.h"
-#include "misc.h"
-#include "keypad.h"
-#include "memory/flash.h"
+#include "peripherals/misc.h"
+#include "peripherals/keypad.h"
+#include "storage/flash.h"
 #include "memory/mem.h"
 #include "cx2.h"
 #include "usb/usblink.h"

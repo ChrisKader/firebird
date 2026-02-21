@@ -6,8 +6,8 @@
 #include <QUrl>
 
 #include "app/emuthread.h"
-#include "core/memory/flash.h"
-#include "core/keypad.h"
+#include "core/storage/flash.h"
+#include "core/peripherals/keypad.h"
 #include "core/os/os.h"
 #include "core/usb/usblink_queue.h"
 #include "ui/input/keypadbridge.h"

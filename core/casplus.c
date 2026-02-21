@@ -4,11 +4,11 @@
 #include <stdint.h>
 #include "casplus.h"
 #include "schedule.h"
-#include "keypad.h"
+#include "peripherals/keypad.h"
 #include "cpu/cpu.h"
-#include "memory/flash.h"
+#include "storage/flash.h"
 #include "emu.h"
-#include "misc.h"
+#include "peripherals/misc.h"
 #include "memory/mem.h"
 
 static uint16_t lcd_framebuffer[2];

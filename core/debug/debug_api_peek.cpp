@@ -6,8 +6,8 @@
 #include "memory/mem.h"
 #include "memory/mmu.h"
 #include "debug.h"
-#include "lcd.h"
-#include "misc.h"
+#include "peripherals/lcd.h"
+#include "peripherals/misc.h"
 
 /* Read peripheral registers directly from state structs.
  * This bypasses the MMIO dispatch machinery entirely, so it's safe to call

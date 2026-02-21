@@ -4,9 +4,9 @@ This document describes the power-path logic as it is currently implemented in c
 
 Primary implementation files:
 
-- `/Users/ck/dev/firebird/core/misc.c` (rail model, charger state, ADC synthesis)
+- `/Users/ck/dev/firebird/core/peripherals/misc.c` (rail model, charger state, ADC synthesis)
 - `/Users/ck/dev/firebird/core/cx2.cpp` (PMU/PMIC register projection)
-- `/Users/ck/dev/firebird/core/usb_cx2.cpp` (USB physical attach gating)
+- `/Users/ck/dev/firebird/core/usb/usb_cx2.cpp` (USB physical attach gating)
 - `/Users/ck/dev/firebird/core/power/powercontrol.cpp` (UI/runtime override behavior)
 - `/Users/ck/dev/firebird/mainwindow.cpp` and `/Users/ck/dev/firebird/ui/widgets/hwconfig/hwconfigwidget.cpp` (override initialization/reset)
 
@@ -85,7 +85,7 @@ Default is disconnected.
 
 ## 3. Qualification and Source Selection
 
-From `/Users/ck/dev/firebird/core/misc.c`:
+From `/Users/ck/dev/firebird/core/peripherals/misc.c`:
 
 - `usb_ok = usb_attached && !usb_otg && vbus_mv >= 4500`
 - `dock_ok = dock_attached && vsled_mv >= 4500`
@@ -118,7 +118,7 @@ Final:
 
 ## 5. Charger State Logic
 
-Charger state is computed in `/Users/ck/dev/firebird/core/misc.c` and now has a hard external-power gate:
+Charger state is computed in `/Users/ck/dev/firebird/core/peripherals/misc.c` and now has a hard external-power gate:
 
 1. If no valid external rail (`!usb_ok && !dock_ok`) -> `CHARGER_DISCONNECTED`
 2. Else if explicit charger override set -> use it
@@ -184,7 +184,7 @@ This keeps the charge icon and PMU status path aligned with physical rails.
 
 ### 8.1 GPIO detect lines
 
-From `/Users/ck/dev/firebird/core/misc.c`:
+From `/Users/ck/dev/firebird/core/peripherals/misc.c`:
 
 - CX II detect lines are modeled on port2 bits:
   - bit3: cradle detect
@@ -196,7 +196,7 @@ From `/Users/ck/dev/firebird/core/misc.c`:
 
 ### 8.2 USB controller attach events
 
-From `/Users/ck/dev/firebird/core/usb_cx2.cpp`:
+From `/Users/ck/dev/firebird/core/usb/usb_cx2.cpp`:
 
 - reset and IRQ paths are gated by `usb_cx2_physical_vbus_present()`
 - if disconnected, attach/enable style IRQs are suppressed

@@ -25,17 +25,17 @@ Runtime trace used:
 
 ## 1) Emulator Address Map (authoritative)
 
-`/Users/ck/dev/firebird/core/mem.c` maps CX II power-related MMIO as:
+`/Users/ck/dev/firebird/core/memory/mem.c` maps CX II power-related MMIO as:
 
-- `0x900B0000` (`apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word)`) -> FTADCC010 model in `/Users/ck/dev/firebird/core/misc.c`
+- `0x900B0000` (`apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word)`) -> FTADCC010 model in `/Users/ck/dev/firebird/core/peripherals/misc.c`
 - `0x90100000` (`apb_set_map(0x10, tg2989_pmic_read, tg2989_pmic_write)`) -> PMIC ID/status model in `/Users/ck/dev/firebird/core/cx2.cpp`
 - `0x90140000` (`apb_set_map(0x14, aladdin_pmu_read, aladdin_pmu_write)`) -> Aladdin PMU model in `/Users/ck/dev/firebird/core/cx2.cpp`
-- `0x90020000` (`apb_set_map(0x02, serial_cx_read, serial_cx_write)`) -> UART1 path in `/Users/ck/dev/firebird/core/serial.c`
-- `0x90070000` (`apb_set_map(0x07, serial_cx2_read, serial_cx2_write)`) -> UART2 path in `/Users/ck/dev/firebird/core/serial.c`
+- `0x90020000` (`apb_set_map(0x02, serial_cx_read, serial_cx_write)`) -> UART1 path in `/Users/ck/dev/firebird/core/peripherals/serial.c`
+- `0x90070000` (`apb_set_map(0x07, serial_cx2_read, serial_cx2_write)`) -> UART2 path in `/Users/ck/dev/firebird/core/peripherals/serial.c`
 
 ## 2) Emulator Power/ADC/Charge Code Paths
 
-### 2.1 FTADCC010 (`0x900Bxxxx`) in `/Users/ck/dev/firebird/core/misc.c`
+### 2.1 FTADCC010 (`0x900Bxxxx`) in `/Users/ck/dev/firebird/core/peripherals/misc.c`
 
 Explicitly handled control/sample offsets:
 
@@ -99,7 +99,7 @@ A concrete logic bug was present: `charger_state_override` defaulted to `CHARGER
 Fix applied:
 
 - Added `CHARGER_AUTO = -1` in `/Users/ck/dev/firebird/core/emu.h`
-- Default changed to `CHARGER_AUTO` in `/Users/ck/dev/firebird/core/misc.c`
+- Default changed to `CHARGER_AUTO` in `/Users/ck/dev/firebird/core/peripherals/misc.c`
 - UI "override off" now restores `CHARGER_AUTO` in `/Users/ck/dev/firebird/ui/widgets/hwconfig/hwconfigwidget.cpp`
 
 Effect:

@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
-#include "memory/flash.h"
+#include "storage/flash.h"
 
 struct NandFsNode {
     uint32_t inode_num;

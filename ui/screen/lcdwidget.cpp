@@ -1,5 +1,5 @@
 #include "lcdwidget.h"
-#include "core/keypad.h"
+#include "core/peripherals/keypad.h"
 #include "ui/input/keypadbridge.h"
 #include "app/qmlbridge.h"
 #include "ui/screen/framebuffer.h"

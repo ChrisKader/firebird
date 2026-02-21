@@ -2,10 +2,10 @@
 
 #include "memory/mem.h"
 #include "cx2.h"
-#include "misc.h"
+#include "peripherals/misc.h"
 #include "schedule.h"
-#include "interrupt.h"
-#include "keypad.h"
+#include "peripherals/interrupt.h"
+#include "peripherals/keypad.h"
 
 /* 90140000 */
 struct aladdin_pmu_state aladdin_pmu;

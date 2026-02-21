@@ -64,21 +64,21 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/disasm.c core/disasm.h
     core/emu.cpp core/emu.h
     core/fieldparser.cpp core/fieldparser.h
-    core/memory/flash.cpp core/memory/flash.h
-    core/memory/nand_fs.cpp core/memory/nand_fs.h
+    core/storage/flash.cpp core/storage/flash.h
+    core/storage/nand_fs.cpp core/storage/nand_fs.h
     core/debug/gdbstub.c core/debug/gdbstub.h
     core/gif.cpp core/gif.h
-    core/interrupt.c core/interrupt.h
-    core/keypad.cpp core/keypad.h
-    core/lcd.c core/lcd.h
-    core/link.c core/link.h
+    core/peripherals/interrupt.c core/peripherals/interrupt.h
+    core/peripherals/keypad.cpp core/peripherals/keypad.h
+    core/peripherals/lcd.c core/peripherals/lcd.h
+    core/peripherals/link.c core/peripherals/link.h
     core/memory/mem.c core/memory/mem.h
-    core/misc.c core/misc.h
+    core/peripherals/misc.c core/peripherals/misc.h
     core/memory/mmu.c core/memory/mmu.h
     core/debug/nspire_log_hook.cpp core/debug/nspire_log_hook.h
     core/os/os.h
     core/schedule.c core/schedule.h
-    core/serial.c
+    core/peripherals/serial.c
     core/sha256.c core/sha256.h
     core/cpu/thumb_interpreter.cpp
     core/cpu/translate.h

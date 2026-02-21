@@ -17,9 +17,9 @@
 #include <cstring>
 
 #include "app/qmlbridge.h"
-#include "core/memory/flash.h"
+#include "core/storage/flash.h"
 #include "core/memory/mem.h"
-#include "core/misc.h"
+#include "core/peripherals/misc.h"
 #include "transfer/usblinktreewidget.h"
 #include "ui/theme/materialicons.h"
 #include "ui_mainwindow.h"

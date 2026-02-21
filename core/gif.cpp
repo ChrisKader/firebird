@@ -4,7 +4,7 @@
 
 #include "emu.h"
 #include "gif.h"
-#include "lcd.h"
+#include "peripherals/lcd.h"
 
 // We can't modify giflib.h ourselves, so #include that here.
 #include "os/os.h"

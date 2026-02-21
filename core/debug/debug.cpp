@@ -9,7 +9,7 @@
 
 #include "armsnippets.h"
 #include "debug.h"
-#include "interrupt.h"
+#include "peripherals/interrupt.h"
 #include "emu.h"
 #include "cpu/cpu.h"
 #include "memory/mem.h"

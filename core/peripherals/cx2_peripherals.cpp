@@ -2,7 +2,7 @@
 
 #include "memory/mem.h"
 #include "cx2.h"
-#include "misc.h"
+#include "peripherals/misc.h"
 
 static int cx2_peripheral_clamp_int(int value, int min, int max)
 {

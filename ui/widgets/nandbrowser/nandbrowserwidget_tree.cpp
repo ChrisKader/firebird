@@ -6,8 +6,8 @@
 
 #include <algorithm>
 
-#include "core/memory/flash.h"
-#include "core/memory/nand_fs.h"
+#include "core/storage/flash.h"
+#include "core/storage/nand_fs.h"
 void NandBrowserWidget::populatePartitions()
 {
     m_tree->clear();

@@ -6,7 +6,7 @@
 #include "usb/usb.h"
 #include "usb/usb_cx2.h"
 #include "usb/usblink_cx2.h"
-#include "interrupt.h"
+#include "peripherals/interrupt.h"
 
 usb_cx2_state usb_cx2;
 

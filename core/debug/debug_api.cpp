@@ -10,8 +10,8 @@
 #include "disasm.h"
 #include "cpu/translate.h"
 #include "debug.h"
-#include "lcd.h"
-#include "misc.h"
+#include "peripherals/lcd.h"
+#include "peripherals/misc.h"
 
 /* -- Breakpoint metadata side-table ---------------------------- */
 

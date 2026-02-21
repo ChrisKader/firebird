@@ -1,6 +1,6 @@
 #include <string.h>
 #include "emu.h"
-#include "interrupt.h"
+#include "peripherals/interrupt.h"
 #include "cpu/cpu.h"
 #include "memory/mem.h"
 

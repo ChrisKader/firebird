@@ -12,18 +12,18 @@ endif
 ifeq "$(TRANSLATION_ENABLED)" "TRUE"
     ifneq "$(filter i%86,$(TOOLCHAIN_ARCH))" ""
         ASMSOURCES += ../core/asmcode_x86.S
-        CSOURCES += ../core/translation_x86.c
+        CSOURCES += ../core/cpu/translate_x86.c
     else ifeq "$(TOOLCHAIN_ARCH)" "x86_64"
         ASMSOURCES += ../core/asmcode_x86_64.S
-        CSOURCES += ../core/asmcode.c ../core/translate_x86_64.c
+        CSOURCES += ../core/asmcode.c ../core/cpu/translate_x86_64.c
     else ifneq "$(filter arm%,$(TOOLCHAIN_ARCH))" ""
         ASMSOURCES += ../core/asmcode_arm.S
         CSOURCES += ../core/asmcode.c
-        CPPSOURCES += ../core/translate_arm.cpp
+        CPPSOURCES += ../core/cpu/translate_arm.cpp
     else ifneq "$(filter aarch64 arm64,$(TOOLCHAIN_ARCH))" ""
         ASMSOURCES += ../core/asmcode_aarch64.S
         CSOURCES += ../core/asmcode.c
-        CPPSOURCES += ../core/translate_aarch64.cpp
+        CPPSOURCES += ../core/cpu/translate_aarch64.cpp
     else
         $(error Unknown architecture $(TOOLCHAIN_ARCH))
     endif
@@ -41,14 +41,14 @@ CXXFLAGS += -std=c++11 $(FLAGS)
 LFLAGS +=
 LIBS := -lz
 
-CSOURCES   += ../core/armsnippets_loader.c ../core/casplus.c ../core/des.c ../core/disasm.c ../core/gdbstub.c \
-              ../core/interrupt.c ../core/lcd.c ../core/link.c ../core/mem.c ../core/misc.c \
-              ../core/mmu.c ../core/schedule.c ../core/serial.c ../core/sha256.c ../core/usb.c ../core/usblink.c \
+CSOURCES   += ../core/armsnippets_loader.c ../core/casplus.c ../core/des.c ../core/disasm.c ../core/debug/gdbstub.c \
+              ../core/peripherals/interrupt.c ../core/peripherals/lcd.c ../core/peripherals/link.c ../core/memory/mem.c ../core/peripherals/misc.c \
+              ../core/memory/mmu.c ../core/schedule.c ../core/peripherals/serial.c ../core/sha256.c ../core/usb/usb.c ../core/usb/usblink.c \
               ../core/os/os-linux.c
 
-CPPSOURCES += ../core/arm_interpreter.cpp ../core/coproc.cpp ../core/cpu.cpp ../core/debug.cpp ../core/emu.cpp \
-              ../core/flash.cpp ../core/gif.cpp ../core/thumb_interpreter.cpp ../core/usblink_queue.cpp main.cpp \
-              ../core/keypad.cpp ../core/cx2.cpp ../core/usb_cx2.cpp ../core/usblink_cx2.cpp ../core/fieldparser.cpp
+CPPSOURCES += ../core/cpu/arm_interpreter.cpp ../core/cpu/coproc.cpp ../core/cpu/cpu.cpp ../core/debug/debug.cpp ../core/emu.cpp \
+              ../core/storage/flash.cpp ../core/gif.cpp ../core/cpu/thumb_interpreter.cpp ../core/usb/usblink_queue.cpp main.cpp \
+              ../core/peripherals/keypad.cpp ../core/cx2.cpp ../core/usb/usb_cx2.cpp ../core/usb/usblink_cx2.cpp ../core/fieldparser.cpp
 
 OBJS = $(patsubst %.S, %.o, $(ASMSOURCES))
 OBJS += $(patsubst %.c, %.o, $(CSOURCES))

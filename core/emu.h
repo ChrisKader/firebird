@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "memory/flash.h"
+#include "storage/flash.h"
 
 #ifdef __cplusplus
 #include <string>

@@ -135,7 +135,7 @@ Use this quick validation after battery/PMU changes:
 
 ## 8) Relevant emulator implementation files
 
-- `core/misc.c` (CX II ADC sample generation, battery code mapping)
+- `core/peripherals/misc.c` (CX II ADC sample generation, battery code mapping)
 - `core/cx2.cpp` (Aladdin PMU register model, `0x90140060` composition)
 - `ui/widgets/hwconfig/hwconfigwidget.cpp` (battery/charger override UI wiring)
 
@@ -230,7 +230,7 @@ Use MMIO tracing when validating ADC/PMU changes:
 
 Trace notes:
 
-- MMIO trace is capped (see `core/mem.c`), so capture from cold boot for most value.
+- MMIO trace is capped (see `core/memory/mem.c`), so capture from cold boot for most value.
 - Always report override settings (mV + charger state + USB link state) with logs.
 
 ## 13) CX II Sleep/Wake Mechanism

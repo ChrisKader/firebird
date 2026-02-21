@@ -168,35 +168,35 @@ SOURCES += $$ASMCODE_IMPL \
     emuthread.cpp \
     qmlbridge.cpp \
     qtkeypadbridge.cpp \
-    core/arm_interpreter.cpp \
-    core/coproc.cpp \
-    core/cpu.cpp \
-    core/thumb_interpreter.cpp \
-    core/usblink_queue.cpp \
+    core/cpu/arm_interpreter.cpp \
+    core/cpu/coproc.cpp \
+    core/cpu/cpu.cpp \
+    core/cpu/thumb_interpreter.cpp \
+    core/usb/usblink_queue.cpp \
     core/armsnippets_loader.c \
     core/casplus.c \
     core/des.c \
     core/disasm.c \
-    core/gdbstub.c \
+    core/debug/gdbstub.c \
     core/gif.cpp \
-    core/interrupt.c \
-    core/keypad.cpp \
-    core/lcd.c \
-    core/link.c \
-    core/mem.c \
-    core/misc.c \
-    core/mmu.c \
-    core/nspire_log_hook.cpp \
+    core/peripherals/interrupt.c \
+    core/peripherals/keypad.cpp \
+    core/peripherals/lcd.c \
+    core/peripherals/link.c \
+    core/memory/mem.c \
+    core/peripherals/misc.c \
+    core/memory/mmu.c \
+    core/debug/nspire_log_hook.cpp \
     core/schedule.c \
-    core/serial.c \
+    core/peripherals/serial.c \
     core/sha256.c \
-    core/usb.c \
-    core/usb_cx2.cpp \
-    core/usblink.c \
-    core/usblink_cx2.cpp \
+    core/usb/usb.c \
+    core/usb/usb_cx2.cpp \
+    core/usb/usblink.c \
+    core/usb/usblink_cx2.cpp \
     qtframebuffer.cpp \
-    core/debug.cpp \
-    core/flash.cpp \
+    core/debug/debug.cpp \
+    core/storage/flash.cpp \
     core/emu.cpp \
     usblinktreewidget.cpp \
     kitmodel.cpp \
@@ -231,15 +231,15 @@ HEADERS += \
     core/des.h \
     core/disasm.h \
     core/emu.h \
-    core/memory/flash.h \
+    core/storage/flash.h \
     core/debug/gdbstub.h \
     core/gif.h \
-    core/interrupt.h \
-    core/keypad.h \
-    core/lcd.h \
-    core/link.h \
+    core/peripherals/interrupt.h \
+    core/peripherals/keypad.h \
+    core/peripherals/lcd.h \
+    core/peripherals/link.h \
     core/memory/mem.h \
-    core/misc.h \
+    core/peripherals/misc.h \
     core/memory/mmu.h \
     core/debug/nspire_log_hook.h \
     core/schedule.h \
@@ -292,10 +292,10 @@ SOURCES += core/asmcode_arm.S \
     core/asmcode_x86_64.S \
     core/asmcode.c \
     core/os/os-emscripten.c \
-    core/translate_arm.cpp \
-    core/translate_aarch64.cpp \
-    core/translate_x86.c \
-    core/translate_x86_64.c \
+    core/cpu/translate_arm.cpp \
+    core/cpu/translate_aarch64.cpp \
+    core/cpu/translate_x86.c \
+    core/cpu/translate_x86_64.c \
     headless/main.cpp \
     emscripten/main.cpp
 }

@@ -12,7 +12,7 @@
 
 #include "core/emu.h"
 #include "core/os/os.h"
-#include "core/keypad.h"
+#include "core/peripherals/keypad.h"
 #include "core/usb/usblink_queue.h"
 #include "ui/screen/framebuffer.h"
 #include "ui/input/keypadbridge.h"

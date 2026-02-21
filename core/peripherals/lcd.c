@@ -4,10 +4,10 @@
 
 #include "emu.h"
 #include "gif.h"
-#include "interrupt.h"
+#include "peripherals/interrupt.h"
 #include "schedule.h"
 #include "memory/mem.h"
-#include "lcd.h"
+#include "peripherals/lcd.h"
 
 lcd_state lcd;
 

@@ -11,8 +11,8 @@
 
 #include "core/debug/debug.h"
 #include "core/emu.h"
-#include "core/lcd.h"
-#include "core/misc.h"
+#include "core/peripherals/lcd.h"
+#include "core/peripherals/misc.h"
 
 #include "ui/input/keypadbridge.h"
 #include "ui/theme/widgettheme.h"

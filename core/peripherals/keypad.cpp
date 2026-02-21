@@ -5,10 +5,10 @@
 
 #include "emu.h"
 #include "cpu/cpu.h"
-#include "misc.h"
-#include "keypad.h"
+#include "peripherals/misc.h"
+#include "peripherals/keypad.h"
 #include "schedule.h"
-#include "interrupt.h"
+#include "peripherals/interrupt.h"
 #include "memory/mem.h"
 #include "cx2.h"
 

@@ -8,7 +8,7 @@
 #include <QFile>
 
 #include "core/emu.h"
-#include "core/memory/flash.h"
+#include "core/storage/flash.h"
 
 NandFileEditor::NandFileEditor(const NandFilesystem &fs, const NandFsNode &node,
                                const std::vector<uint8_t> &content, QWidget *parent)
