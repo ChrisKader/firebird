@@ -1,7 +1,10 @@
 /* Declarations for schedule.c */
 
-#ifndef _H_SCHEDULE
-#define _H_SCHEDULE
+#ifndef FIREBIRD_CORE_TIMING_SCHEDULE_H
+#define FIREBIRD_CORE_TIMING_SCHEDULE_H
+
+#include <stdbool.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
