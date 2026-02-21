@@ -54,7 +54,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/cpu.cpp core/cpu.h
     core/cpudefs.h
     core/cx2.cpp core/cx2.h
-    core/cx2_peripherals.cpp
+    core/peripherals/cx2_peripherals.cpp
     core/debug.cpp core/debug.h
     core/debug/debug_cli.cpp
     core/debug/debug_remote.cpp
