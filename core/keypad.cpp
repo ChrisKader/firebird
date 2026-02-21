@@ -4,13 +4,13 @@
 #include <mutex>
 
 #include "emu.h"
+#include "cpu.h"
 #include "misc.h"
 #include "keypad.h"
 #include "schedule.h"
 #include "interrupt.h"
 #include "mem.h"
 #include "cx2.h"
-#include "cpu.h"
 
 /* 900E0000: Keypad controller */
 keypad_state keypad;
@@ -38,11 +38,8 @@ void keypad_release_all_keys(void)
 }
 
 void keypad_on_pressed() {
-    bool sleeping = (cpu_events & EVENT_SLEEP) != 0;
-
     if(emulate_cx2) {
-        if (sleeping) {
-            /* Route wake through PMU state so OS wake FSM sees a PMU cause. */
+        if (cpu_events & EVENT_SLEEP) {
             aladdin_pmu_on_key_wakeup();
         } else {
             // CX II: Register 0x901400C4 bit 0 enables the ON key interrupt.
@@ -55,12 +52,10 @@ void keypad_on_pressed() {
             int_set(INT_POWER, true);
     }
 
-    if(sleeping) {
-        assert(emulate_cx2);
+    if(cpu_events & EVENT_SLEEP) {
         cpu_events &= ~EVENT_SLEEP;
-        timer_cx_wake();
-        /* Ensure emulation loop re-enters CPU execution immediately. */
-        cycle_count_delta = -1;
+        timer_cx_reset();
+        cpu_reset();
     }
 }
 

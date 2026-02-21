@@ -175,6 +175,21 @@ static bool gpio_cx2_cradle_power_present(void)
     return false;
 }
 
+static bool gpio_cx2_wlan_module_attached(void)
+{
+    /* CX II uses logical GPIO index 5 as the WLAN module detect line.
+     * Disassembly of command 0x3EF shows it reads GPIO +0x18 through a
+     * logical->physical pin map; on CX II this path resolves into the 0x2x
+     * GPIO bank for WLAN/cradle detect probes.
+     *
+     * Detect polarity is active-low:
+     *   0 => module attached
+     *   1 => module absent
+     * Firebird does not emulate a physical WLAN sled/module, so keep this
+     * line deasserted (high) unless explicit module emulation is added. */
+    return false;
+}
+
 static void gpio_sync_cx2_detect_inputs(void)
 {
     if (!emulate_cx2)
@@ -200,16 +215,11 @@ static void gpio_sync_cx2_detect_inputs(void)
     else
         gpio.input.b[2] &= (uint8_t)~0x40u;
 
-    /* TI-Nspire.bin cradle init checks logical GPIO IDs 7 and 3 via the GPIO
-     * service command path (0x3EF). Across observed table variants these can
-     * resolve either to GPIO19/20 (section2) or legacy alias slots. Keep
-     * alias bits low on all banks unless explicitly driven by modeled sources
-     * so disconnected boot does not report cradle-power-high. */
-    if (!gpio_cx2_cradle_attached() && !gpio_cx2_cradle_power_present()) {
-        int i;
-        for (i = 0; i < 8; i++)
-            gpio.input.b[i] &= (uint8_t)~0x88u;
-    }
+    /* WLAN module detect (GPIO 0x25 => section2 bit5), active-low. */
+    if (gpio_cx2_wlan_module_attached())
+        gpio.input.b[2] &= (uint8_t)~0x20u;
+    else
+        gpio.input.b[2] |= 0x20u;
 }
 
 static uint8_t gpio_effective_input_byte(int port)
@@ -228,15 +238,30 @@ static uint8_t gpio_data_byte(int port)
     return (uint8_t)((input & direction) | (gpio.output.b[port] & ~direction));
 }
 
+static uint8_t gpio_cx2_forced_input_mask(int port)
+{
+    if (!emulate_cx2)
+        return 0;
+
+    /* CX II detect lines are physical inputs and must not be software-driven:
+     *   section2 bit3: cradle detect
+     *   section2 bit4: USB plug present
+     *   section2 bit5: WLAN module detect (active-low, 0=attached)
+     *   section2 bit6: cradle power detect */
+    if (port == 2)
+        return 0x78u;
+    return 0;
+}
+
 void gpio_reset() {
     memset(&gpio, 0, sizeof gpio);
     gpio.direction.w = 0xFFFFFFFFFFFFFFFF;
     gpio.output.w    = 0x0000000000000000;
 
-    /* CX II boot must not report pre-attached cradle/sled/USB unless the user
-     * explicitly overrides those rails. Start all CX II GPIO inputs low and
-     * let gpio_sync_cx2_detect_inputs() drive only modeled detect pins. */
-    gpio.input.w = emulate_cx2 ? 0x0000000000000000ULL : 0x00000000071F001FULL;
+    /* CX II unmodeled digital inputs are typically pull-up biased.
+     * Start high to avoid false "present/attached" on unknown mappings,
+     * then drive known detect pins to modeled values below. */
+    gpio.input.w = emulate_cx2 ? 0xFFFFFFFFFFFFFFFFULL : 0x00000000071F001FULL;
     gpio_sync_cx2_detect_inputs();
     gpio.prev_input.w = gpio.input.w;
     touchpad_gpio_reset();
@@ -277,18 +302,28 @@ void gpio_write(uint32_t addr, uint32_t value) {
             gpio.int_edge.b[port] = value;
             return;
         case 0x10:
-            change = (gpio.direction.b[port] ^ value) << (8*port);
-            gpio.direction.b[port] = value;
+        {
+            uint8_t value8 = (uint8_t)value;
+            value8 |= gpio_cx2_forced_input_mask(port);
+            change = (gpio.direction.b[port] ^ value8) << (8*port);
+            gpio.direction.b[port] = value8;
             if (change & 0xA)
                 touchpad_gpio_change();
             return;
+        }
         case 0x00: /* Data register write alias */
         case 0x14:
-            change = (gpio.output.b[port] ^ value) << (8*port);
-            gpio.output.b[port] = value;
+        {
+            uint8_t value8 = (uint8_t)value;
+            const uint8_t forced_inputs = gpio_cx2_forced_input_mask(port);
+            value8 = (uint8_t)((value8 & (uint8_t)~forced_inputs)
+                            | (gpio.output.b[port] & forced_inputs));
+            change = (gpio.output.b[port] ^ value8) << (8*port);
+            gpio.output.b[port] = value8;
             if (change & 0xA)
                 touchpad_gpio_change();
             return;
+        }
         case 0x1C: gpio.invert.b[port] = value; return;
         case 0x20: gpio.sticky.b[port] = value; return;
         case 0x24: gpio.unknown_24.b[port] = value; return;
@@ -1609,11 +1644,21 @@ enum {
     CX2_VSLED_MV_MAX = 5500,
     CX2_VBUS_VALID_MV_MIN = 4500,
     CX2_VSLED_VALID_MV_MIN = 4500,
-    CX2_VSYS_EXT_TARGET_MV = 3600,
+    CX2_VSYS_EXT_TARGET_MV = 5500,
     CX2_VSYS_PGOOD_MV_MIN = 3200,
-    CX2_USB_PATH_DROP_MV = 100,
-    CX2_DOCK_PATH_DROP_MV = 100,
-    CX2_BAT_PATH_DROP_MV = 50,
+    CX2_USB_PATH_DROP_MV = 200,
+    CX2_DOCK_PATH_DROP_MV = 200,
+    CX2_BAT_PATH_OFFSET_MV = 50,
+    /* Real-device ADC calibration check:
+     *   Low_Cal  = 663 at 3000mV
+     *   High_Cal = 885 at 4000mV */
+    CX2_BAT_CAL_LOW_MV = 3000,
+    CX2_BAT_CAL_HIGH_MV = 4000,
+    CX2_BAT_CAL_LOW_CODE = 663,
+    CX2_BAT_CAL_HIGH_CODE = 885,
+    /* DIAGS ADC test data (real CX II) for VSYS/VBUS/VSLED follows an
+     * approximately 6.66mV/LSB slope (~6.82V full-scale). */
+    CX2_AUX_ADC_FULL_SCALE_MV = 6820,
     /* Test mode: emulate a direct 10-bit battery ADC domain. */
     CX2_ADC_CODE_MIN = 0x0000,
     CX2_ADC_CODE_MAX = 0x03FF,
@@ -1740,36 +1785,34 @@ static int cx2_effective_vsled_mv(void)
 
 static uint16_t cx2_adc_code_from_mv(int mv)
 {
-    /* Normal polarity: higher mV -> higher code.
-     *
-     * The firmware uses a scale of ~4.57 mV per ADC count (confirmed by
-     * bootloader UART output: code 370 -> 1691 mV).
-     *   4200 mV -> code 919,  3000 mV -> code 657
-     * VREF is 704, so battery codes exceed VREF at normal levels;
-     * this is expected -- the firmware's conversion math handles it. */
-    const int code_at_3000 = 0x291;  /* 657 @ 3.0V */
-    const int code_at_4200 = 0x397;  /* 919 @ 4.2V */
+    /* TI-Nspire batt-stats conversion path (3EA family) maps battery channels
+     * through a code domain that is closer to:
+     *   code ~704 -> ~3010mV
+     *   code ~939 -> ~4000mV
+     * Use this guest-facing domain so the UI battery-mV override tracks the
+     * OS/BattInfo mV readout instead of under-reporting (e.g. 4000 -> 3782). */
     int clamped_mv = clamp_int(mv, CX2_BATTERY_MV_MIN, CX2_BATTERY_MV_MAX);
-    int span_mv = CX2_BATTERY_MV_MAX - CX2_BATTERY_MV_MIN;
-    int pos_mv = clamped_mv - CX2_BATTERY_MV_MIN;
-    int code = code_at_3000 + (pos_mv * (code_at_4200 - code_at_3000) + span_mv / 2) / span_mv;
+    int code = (clamped_mv * 704 + 1500) / 3000;
     return (uint16_t)clamp_int(code, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
 }
 
 static uint16_t cx2_adc_code_from_vbus_mv(int mv)
 {
-    /* Physical rail to ADC code mapping:
-     * 0mV -> 0x000, 5000mV -> 0x330.
-     * This avoids reporting "present-ish" voltage when the rail is truly 0mV. */
-    int clamped_mv = clamp_int(mv, 0, 5000);
-    int code = (clamped_mv * 0x330 + 2500) / 5000;
+    /* Match real DIAGS scaling seen on CX II:
+     *   ~4.921V -> code ~739
+     *   ~0.153V -> code ~23
+     * i.e. ~6.66mV/LSB over a ~6.82V full-scale domain. */
+    int clamped_mv = clamp_int(mv, 0, CX2_AUX_ADC_FULL_SCALE_MV);
+    int code = (clamped_mv * 0x3FF + CX2_AUX_ADC_FULL_SCALE_MV / 2)
+        / CX2_AUX_ADC_FULL_SCALE_MV;
     return (uint16_t)clamp_int(code, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
 }
 
 static uint16_t cx2_adc_code_from_vsys_mv(int mv)
 {
-    int clamped_mv = clamp_int(mv, 0, CX2_BATTERY_MV_MAX);
-    int code = (clamped_mv * 0x397 + CX2_BATTERY_MV_MAX / 2) / CX2_BATTERY_MV_MAX;
+    int clamped_mv = clamp_int(mv, 0, CX2_AUX_ADC_FULL_SCALE_MV);
+    int code = (clamped_mv * 0x3FF + CX2_AUX_ADC_FULL_SCALE_MV / 2)
+        / CX2_AUX_ADC_FULL_SCALE_MV;
     return (uint16_t)clamp_int(code, CX2_ADC_CODE_MIN, CX2_ADC_CODE_MAX);
 }
 
@@ -1803,9 +1846,9 @@ static void cx2_build_power_model(cx2_power_model_state_t *state)
     int vdock_path = state->dock_ok
         ? clamp_int(state->vsled_mv - CX2_DOCK_PATH_DROP_MV, 0, CX2_VSYS_EXT_TARGET_MV)
         : 0;
-    int vbat_path = state->battery_present ? state->battery_mv - CX2_BAT_PATH_DROP_MV : 0;
-    if (vbat_path < 0)
-        vbat_path = 0;
+    int vbat_path = state->battery_present ? (state->battery_mv + CX2_BAT_PATH_OFFSET_MV) : 0;
+    if (vbat_path > CX2_VSYS_EXT_TARGET_MV)
+        vbat_path = CX2_VSYS_EXT_TARGET_MV;
 
     int vext_sel = 0;
     if (state->source == CX2_SOURCE_USB)
@@ -1816,11 +1859,15 @@ static void cx2_build_power_model(cx2_power_model_state_t *state)
     state->vsys_mv = (vext_sel > vbat_path) ? vext_sel : vbat_path;
     state->power_good = state->vsys_mv >= CX2_VSYS_PGOOD_MV_MIN;
 
+    const bool external_power_present = state->usb_ok || state->dock_ok;
     const charger_state_t charger_override = hw_override_get_charger_state();
-    if (charger_override >= CHARGER_DISCONNECTED && charger_override <= CHARGER_CHARGING) {
-        state->charger_state = charger_override;
-    } else if (!state->usb_ok && !state->dock_ok) {
+    /* Never report charging when no valid external rail is present.
+     * This prevents stale override/event state from keeping the guest in
+     * "charging" mode while physically disconnected. */
+    if (!external_power_present) {
         state->charger_state = CHARGER_DISCONNECTED;
+    } else if (charger_override >= CHARGER_DISCONNECTED && charger_override <= CHARGER_CHARGING) {
+        state->charger_state = charger_override;
     } else if (!state->battery_present || state->usb_otg) {
         state->charger_state = CHARGER_CONNECTED_NOT_CHARGING;
     } else if (state->battery_precharge || state->battery_mv < (CX2_BATTERY_MV_MAX - 20)) {
@@ -1881,6 +1928,26 @@ charger_state_t cx2_effective_charger_state(void)
     return state.charger_state;
 }
 
+bool cx2_external_power_present(void)
+{
+    cx2_power_model_state_t state;
+    cx2_build_power_model(&state);
+    return state.usb_ok || state.dock_ok;
+}
+
+int cx2_external_source_mv(void)
+{
+    cx2_power_model_state_t state;
+    cx2_build_power_model(&state);
+
+    int src_mv = 0;
+    if (state.usb_ok)
+        src_mv = state.vbus_mv;
+    if (state.dock_ok && state.vsled_mv > src_mv)
+        src_mv = state.vsled_mv;
+    return src_mv;
+}
+
 static int cx2_adc_code_to_mv(uint32_t code, uint32_t vref_code, uint32_t full_scale_mv)
 {
     if (vref_code == 0u)
@@ -1921,33 +1988,20 @@ static void cx2_adc_refresh_samples(void)
     cx2_build_power_model(&state);
 
     uint32_t batt = state.battery_code;
-    uint32_t vref = state.vref_code;
-    uint32_t vref_aux = state.vref_aux_code;
-    /* Slot 0x18: compound format read back by firmware.
-     * Upper bits = channel control (programmed by firmware, default 0x2A00),
-     * bits [17:16] = charger state, bits [9:0] = VBUS ADC code. */
-    uint32_t slot18 = adc_cx2.slot18_programmed_valid
-        ? adc_cx2.slot18_programmed_ctrl : 0x00002A00u;
-    slot18 &= ~(0x00030000u | CX2_ADC_CODE_MAX);
-    switch (state.charger_state) {
-    case CHARGER_CONNECTED_NOT_CHARGING: slot18 |= 0x00010000u; break;
-    case CHARGER_CHARGING:               slot18 |= 0x00020000u; break;
-    default: break;
-    }
-    slot18 |= state.vbus_code & CX2_ADC_CODE_MAX;
-
-    /* 0x900B0000..0x900B001C: 8-entry sample bank.
-     * All battery slots use the same normal-polarity code (higher mV =
-     * higher code).  Battery codes exceed VREF at normal charge levels;
-     * the firmware's conversion formula (batt * 3225 / vref) handles this. */
+    /* 0x900B0000..0x900B001C: CX II DIAGS consumes slots [1..7] as:
+     *   ADC1 LBAT, ADC2 VDD3.3, ADC3 VSYS, ADC4 VDD1.8,
+     *   ADC5 VDD1.2, ADC6 VBUS, ADC7 VSLED.
+     *
+     * Keep +0x18 data-only (10-bit VBUS code). Returning control bits here
+     * causes DIAGS to report 10240 instead of a real ADC value. */
     adc_cx2.reg[0x00u >> 2] = batt;
-    adc_cx2.reg[0x04u >> 2] = vref;
-    adc_cx2.reg[0x08u >> 2] = vref_aux;
-    adc_cx2.reg[0x0Cu >> 2] = batt;
-    adc_cx2.reg[0x10u >> 2] = vref;
-    adc_cx2.reg[0x14u >> 2] = vref_aux;
-    adc_cx2.reg[0x18u >> 2] = slot18;
-    adc_cx2.reg[0x1Cu >> 2] = batt;
+    adc_cx2.reg[0x04u >> 2] = batt;             /* ADC1 LBAT */
+    adc_cx2.reg[0x08u >> 2] = 655u;             /* ADC2 VDD3.3 */
+    adc_cx2.reg[0x0Cu >> 2] = state.vsys_code;  /* ADC3 VSYS */
+    adc_cx2.reg[0x10u >> 2] = 725u;             /* ADC4 VDD1.8 */
+    adc_cx2.reg[0x14u >> 2] = 476u;             /* ADC5 VDD1.2 */
+    adc_cx2.reg[0x18u >> 2] = state.vbus_code & CX2_ADC_CODE_MAX;  /* ADC6 VBUS */
+    adc_cx2.reg[0x1Cu >> 2] = state.vsled_code; /* ADC7 VSLED */
 
     /* Channel-window result registers (+0x10 in each 0x20-byte channel block)
      * are consumed by firmware conversion paths. Keep them coherent with the
@@ -1956,13 +2010,13 @@ static void cx2_adc_refresh_samples(void)
         uint32_t base = (0x100u + chan * 0x20u) >> 2;
         uint32_t code = batt;
         switch (chan) {
-        case 0: code = batt; break;
-        case 1: code = batt; break;
-        case 2: code = state.vsys_code; break;
-        case 3: code = state.vsys_code; break;
-        case 4: code = vref; break;
-        case 5: code = state.vsled_code; break;
-        case 6: code = state.vbus_code; break;
+        case 0: code = batt; break;            /* ADC1: LBAT */
+        case 1: code = 655u; break;            /* ADC2: VDD3.3 */
+        case 2: code = state.vsys_code; break; /* ADC3: VSYS */
+        case 3: code = 725u; break;            /* ADC4: VDD1.8 */
+        case 4: code = 476u; break;            /* ADC5: VDD1.2 */
+        case 5: code = state.vbus_code; break; /* ADC6: VBUS */
+        case 6: code = state.vsled_code; break;/* ADC7: VSLED */
         default: break;
         }
         adc_cx2.reg[base + (0x10u >> 2)] = code & CX2_ADC_CODE_MAX;
@@ -2233,7 +2287,7 @@ uint32_t adc_cx2_read_word(uint32_t addr)
     if (offset <= 0x1Cu)
         cx2_adc_refresh_samples();
     uint32_t reg = adc_cx2.reg[index];
-    if (offset <= 0x1Cu && offset != 0x18u)
+    if (offset <= 0x1Cu)
         reg &= CX2_ADC_CODE_MAX;
     adc_trace("RD", addr, offset, reg);
     return reg;

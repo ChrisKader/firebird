@@ -233,6 +233,8 @@ void adc_write_word(uint32_t addr, uint32_t value);
 bool cx2_battery_override_active(void);
 bool cx2_effective_battery_present(void);
 charger_state_t cx2_effective_charger_state(void);
+bool cx2_external_power_present(void);
+int cx2_external_source_mv(void);
 typedef struct cx2_power_rails {
     bool battery_present;
     charger_state_t charger_state;

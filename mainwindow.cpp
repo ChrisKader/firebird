@@ -266,6 +266,29 @@ static void writeHwOverridesToSettings(QSettings *settings, const HwOverrides &o
         settings->setValue(QString::fromLatin1(entry.first), entry.second);
 }
 
+static bool likelyCx2StartupKit(QMLBridge *bridge)
+{
+    if (!bridge)
+        return false;
+
+    KitModel *model = bridge->getKitModel();
+    if (!model || model->rowCount() <= 0)
+        return false;
+
+    int kitId = bridge->getCurrentKitId();
+    if (kitId < 0)
+        kitId = static_cast<int>(bridge->getDefaultKit());
+
+    int row = bridge->kitIndexForID(static_cast<unsigned int>(kitId));
+    if (row < 0)
+        row = 0;
+
+    const QString type = model->getDataRow(row, KitModel::TypeRole).toString();
+    return type.contains(QStringLiteral("CX II"), Qt::CaseInsensitive)
+        || type.contains(QStringLiteral("CX2"), Qt::CaseInsensitive)
+        || type.contains(QStringLiteral("CX 2"), Qt::CaseInsensitive);
+}
+
 #ifndef FIREBIRD_USE_KDDOCKWIDGETS
 static QString dockAreaToString(Qt::DockWidgetArea area)
 {
@@ -2509,7 +2532,7 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
             return -1;
         return value ? 1 : 0;
     };
-    const bool forceCx2SafeBaseline = emulate_cx2;
+    const bool forceCx2SafeBaseline = emulate_cx2 || likelyCx2StartupKit(qmlBridge());
     const int8_t batteryPresent = forceCx2SafeBaseline ? 1 : clampTriState(hw.batteryPresent);
     const int8_t usbCable = forceCx2SafeBaseline ? 0 : clampTriState(hw.usbCableConnected);
     const int8_t usbOtg = forceCx2SafeBaseline ? 0 : clampTriState(hw.usbOtgCable);
@@ -3826,6 +3849,19 @@ bool MainWindow::resume()
     /* If there's no kit set, use the default kit */
     if (qmlBridge()->getCurrentKitId() == -1)
         qmlBridge()->useDefaultKit();
+
+    if (likelyCx2StartupKit(qmlBridge())) {
+        /* CX II should start with no external accessories unless the user
+         * actively toggles them after boot. Clear stale persisted rails/state
+         * right before launching emulation. */
+        hw_override_set_usb_otg_cable(0);
+        hw_override_set_usb_cable_connected(0);
+        hw_override_set_vbus_mv(0);
+        hw_override_set_dock_attached(0);
+        hw_override_set_vsled_mv(0);
+        PowerControl::refreshPowerState();
+        usblinkChanged(false);
+    }
 
     applyQMLBridgeSettings();
 

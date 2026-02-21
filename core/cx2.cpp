@@ -48,9 +48,7 @@ static uint32_t tg2989_pmic_id_status_value(void)
 
 static bool tg2989_external_power_present(void)
 {
-	cx2_power_rails_t rails = {};
-	cx2_get_power_rails(&rails);
-	return rails.vbus_mv >= 4500 || rails.vsled_mv >= 4500;
+	return cx2_external_power_present();
 }
 
 static void tg2989_pmic_refresh_power_status(void)
@@ -80,8 +78,13 @@ static void tg2989_pmic_refresh_power_status(void)
 	}
 }
 
-// Wakeup reason at PMU+0x00. Value 0x040000 = wakeupOnKey.
+/* PMU+0x00 is not read-only wakeup state: TI-Nspire uses it as a live
+ * bitfield in command handlers (for example 0x3EF/0x3F0 paths). Keep an
+ * initial wakeup-on-key value, but allow firmware read/write ownership.
+ */
 static uint32_t wakeup_reason = 0x040000;
+/* PMU+0x04 is written by PMU helper paths (mirror/status scratch). */
+static uint32_t aladdin_pmu_reg_04 = 0;
 // PMU+0x08: firmware performs ~100 R/W cycles; preserve writes.
 // Not in the snapshot struct to avoid breaking snapshot compatibility.
 static uint32_t aladdin_pmu_ctrl_08 = 0x2000;
@@ -150,6 +153,7 @@ void aladdin_pmu_reset(void) {
 	memset(&aladdin_pmu, 0, sizeof(aladdin_pmu));
 	aladdin_pmu.clocks = 0x21020303;
 	wakeup_reason = 0x040000;
+	aladdin_pmu_reg_04 = 0;
 	aladdin_pmu_ctrl_08 = 0x2000;
 	aladdin_pmu.disable[0] = 0;
 	aladdin_pmu.noidea[0] = 0x1A;
@@ -253,7 +257,9 @@ static uint32_t aladdin_pmu_status_80c_read_value(void)
 static uint32_t aladdin_pmu_status_810_read_value(void)
 {
 	uint32_t value = aladdin_pmu.noidea[4];
-	/* Keep mandatory status bits stable while exposing ON-key state at bit8. */
+	/* Keep mandatory status bits stable while exposing physical ON-key state at
+	 * bit8. Firmware wake paths can wait for ON release, so do not force this
+	 * bit low from latched wake-cause state alone. */
 	value |= 0x11u;
 	if (keypad.key_map[0] & (1 << 9))
 		value &= ~0x100u;
@@ -265,27 +271,48 @@ static uint32_t aladdin_pmu_status_810_read_value(void)
 
 static uint32_t aladdin_pmu_disable2_read_value()
 {
-	/* Keep this register synthesized from rail state instead of pass-through
-	 * firmware scratch bits. Guest power code treats this as an ADC-like value;
-	 * leaking arbitrary upper bits can produce absurd source voltages
-	 * (for example 917698mV) and force incorrect charge states. */
-	uint32_t value = aladdin_pmu.disable[2] & 0x3Fu;
+	/* TI-Nspire/OSLoader/DIAGS all contain helpers that set/clear control bits
+	 * in the HIGH halfword of 0x90140050/0x90140060. Keep those firmware-owned
+	 * bits intact and only synthesize the low battery/charger fields. */
+	uint32_t value = aladdin_pmu.disable[2];
 
-	/* CX II power code consumes this as a wider battery-code field.
-	 * Keep it in bits [17:6] (12-bit) using the firmware's observed scale
-	 * (~3300mV at code 1008) to avoid the stuck ~3010mV floor and bogus
-	 * over-range source readings when high bits are reused for non-ADC data. */
 	cx2_power_rails_t rails = {};
 	cx2_get_power_rails(&rails);
-	uint32_t batt_code = 0;
+
+	/* PMU battery field consumed by TI-OS stats is a different code domain than
+	 * the DIAGS raw ADC channel. Keep DIAGS LBAT raw in misc.c and synthesize
+	 * PMU code separately so BattInfo tracks the configured battery voltage.
+	 *
+	 * Empirical guest path:
+	 *   code ~704 -> ~3010mV, code ~885 -> ~3782mV.
+	 * Invert that scale so a 4000mV override maps near the expected guest value.
+	 */
+	uint32_t batt_code = 0u;
 	if (rails.battery_present) {
 		int mv = cx2_clamp_int(rails.battery_mv, 0, 5500);
-		batt_code = (uint32_t)((mv * 1008 + 1650) / 3300);
-		if (batt_code > 0x0FFFu)
-			batt_code = 0x0FFFu;
+		int code = (mv * 704 + 1500) / 3000;
+		batt_code = (uint32_t)cx2_clamp_int(code, 0, 0x3FF);
 	}
-	value &= ~0x0003FFC0u;
-	value |= (batt_code & 0x0FFFu) << 6;
+
+	/* Charger state is explicitly encoded in [17:16]:
+	 *   00 = disconnected, 01 = connected/not charging, 11 = charging. */
+	uint32_t charger_bits = 0u;
+	switch (rails.charger_state) {
+	case CHARGER_CHARGING:
+		charger_bits = 0x3u;
+		break;
+	case CHARGER_CONNECTED_NOT_CHARGING:
+		charger_bits = 0x1u;
+		break;
+	case CHARGER_DISCONNECTED:
+	default:
+		charger_bits = 0x0u;
+		break;
+	}
+
+	value &= ~((0x3FFu << 6) | (0x3u << 16));
+	value |= batt_code << 6;
+	value |= charger_bits << 16;
 	return value;
 }
 
@@ -296,14 +323,7 @@ static uint32_t aladdin_pmu_disable1_read_value()
 	 * into absurd source readings (e.g. 917698mV). */
 	uint32_t value = aladdin_pmu.disable[1] & 0x3Fu;
 
-	cx2_power_rails_t rails = {};
-	cx2_get_power_rails(&rails);
-
-	int src_mv = rails.vbus_mv;
-	if (rails.vsled_mv > src_mv)
-		src_mv = rails.vsled_mv;
-	if (src_mv < 0)
-		src_mv = 0;
+	int src_mv = cx2_external_source_mv();
 
 	uint32_t src_code = (uint32_t)((src_mv * 1008 + 1650) / 3300);
 	if (src_code > 0x0FFFu)
@@ -323,7 +343,7 @@ static uint32_t aladdin_pmu_disable0_read_value()
 		value |= 0x00000400u;
 	else
 		value &= ~0x00000400u;
-	if (cx2_effective_charger_state() != CHARGER_DISCONNECTED)
+	if (cx2_external_power_present())
 		value |= 0x00000100u;
 	else
 		value &= ~0x00000100u;
@@ -337,7 +357,7 @@ static uint32_t aladdin_pmu_usb_phy_status_read_value()
 	 *   USB attached:   0xE
 	 */
 	uint32_t value = 0x2u;
-	if (cx2_effective_charger_state() != CHARGER_DISCONNECTED
+	if (cx2_external_power_present()
 			&& (aladdin_pmu.disable[0] & 0x400))
 		value |= 0xCu;
 	return value;
@@ -351,7 +371,7 @@ uint32_t aladdin_pmu_read(uint32_t addr)
 		switch (addr & 0xFF)
 		{
 		case 0x00: return wakeup_reason;
-		case 0x04: return 0;
+		case 0x04: return aladdin_pmu_reg_04;
 		case 0x08: return aladdin_pmu_ctrl_08;
 		case 0x20: return aladdin_pmu_disable0_read_value();
 		case 0x24: return aladdin_pmu.int_state;
@@ -399,18 +419,25 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 	{
 		switch (offset & 0xFF)
 		{
-		case 0x00: return;
-		case 0x04: return; // No idea
+		case 0x00:
+			/* Live firmware bitfield (also carries wakeup reason at boot). */
+			wakeup_reason = value;
+			return;
+		case 0x04:
+			aladdin_pmu_reg_04 = value;
+			return;
 		case 0x08: aladdin_pmu_ctrl_08 = value; return;
-			case 0x20:
-				aladdin_pmu.disable[0] = value;
-				if(value & 2) {
-					/* Sleep transition should leave only ON-key wake path active. */
-					keypad_release_all_keys();
-					/* Enter sleep. Keep PMU state/registers intact across sleep. */
-					cpu_events |= EVENT_SLEEP;
-					event_clear(SCHED_TIMERS);
+		case 0x20:
+			if(value & 2) {
+				/* Sleep transition should leave only ON-key wake path active. */
+				keypad_release_all_keys();
+				cpu_events |= EVENT_SLEEP;
+				event_clear(SCHED_TIMERS);
 				event_clear(SCHED_TIMER_FAST);
+				/* Reset PMU so bootrom sees correct clock/PMU state on wake. */
+				aladdin_pmu_reset();
+			} else {
+				aladdin_pmu.disable[0] = value;
 			}
 			return;
 		case 0x24:
@@ -454,17 +481,17 @@ void aladdin_pmu_write(uint32_t addr, uint32_t value)
 			aladdin_pmu.noidea[4] = value;
 			return;
 		}
-		if (offset == 0x850) {
-			aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX] = value;
-			aladdin_pmu_update_int();
-			return;
-		}
-		if (offset == 0x854) {
-			/* W1C: writing 1 clears corresponding pending bits. */
-			aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] &= ~value;
-			aladdin_pmu_update_int();
-			return;
-		}
+			if (offset == 0x850) {
+				aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX] = value;
+				aladdin_pmu_update_int();
+				return;
+			}
+			if (offset == 0x854) {
+				/* W1C: writing 1 clears corresponding pending bits. */
+				aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX] &= ~value;
+				aladdin_pmu_update_int();
+				return;
+			}
 		aladdin_pmu.noidea[(offset & 0xFF) >> 2] = value;
 		return;
 	}

@@ -191,6 +191,7 @@ OS stage:
 
 - `0x400`: battery-present (kept asserted so status screen can compute `%`)
 - `0x100`: external source/USB present (set only when charger state is not disconnected)
+- bit 1 (`0x2`): sleep trigger (write-only behavior; see section 16)
 
 ## 11) Known historical failure signatures and causes
 
@@ -232,7 +233,57 @@ Trace notes:
 - MMIO trace is capped (see `core/mem.c`), so capture from cold boot for most value.
 - Always report override settings (mV + charger state + USB link state) with logs.
 
-## 13) Current assumptions and open work
+## 13) CX II Sleep/Wake Mechanism
+
+The CX II deep sleep and wake path works as follows on real hardware:
+
+### Sleep Entry
+
+Firmware writes bit 1 (`0x2`) to PMU+0x20, which triggers deep sleep. The emulator
+responds by:
+
+1. Releasing all held keys (`keypad_release_all_keys()`)
+2. Setting `EVENT_SLEEP` to park the CPU loop
+3. Clearing timer scheduler events (`SCHED_TIMERS`, `SCHED_TIMER_FAST`)
+4. Calling `aladdin_pmu_reset()` so the bootrom sees correct clock/PMU state on wake
+
+The PMU reset is critical: without it, the bootrom clock configuration reads stale
+values and fails to bring the system back up correctly.
+
+Non-sleep writes to PMU+0x20 (without bit 1) are stored normally as `disable[0]`.
+
+### Wake via ON Key
+
+When the ON key is pressed during sleep:
+
+1. `aladdin_pmu_on_key_wakeup()` latches wake cause:
+   - Sets `wakeup_reason = 0x040000` (ON key wake)
+   - Latches `int_state |= PMU_INT_WAKE_BIT` (PMU+0x24 bit 1)
+   - Latches `PMU_IRQ_ONKEY_BIT` in pending bitmap (PMU+0x854)
+   - Suppresses `INT_POWER` during wake to avoid vectoring into uninitialized handlers
+2. CPU is woken by a **full reset** through the bootrom/fastboot path:
+   - `EVENT_SLEEP` is cleared
+   - `timer_cx_reset()` fully resets timer state
+   - `cpu_reset()` triggers a soft reset starting from the reset vector (address 0)
+3. The bootrom reads PMU+0x00 (`wakeup_reason`), finds the ON key wake signature
+   (`0x040000`), locates fastboot data saved by the OS before sleep (at `0x90030000`),
+   validates it, and jumps back to OS code in SDRAM
+
+This is a full CPU reset, not an in-place resume from WFI. The OS saves enough
+state before sleep that the bootrom fastboot path can restore execution seamlessly.
+
+### Important Notes
+
+- Do not attempt to wake by resuming CPU execution in-place (e.g. restarting timers
+  and setting `cycle_count_delta`). Timer interrupts may not be enabled during deep
+  sleep, and the firmware expects to go through the bootrom wake path.
+- `aladdin_pmu_reset()` must be called during sleep entry, not during wake. The
+  bootrom needs clean PMU state to configure clocks correctly.
+- `INT_POWER` must be suppressed during deep sleep wake to prevent the interrupt
+  from firing into default/uninitialized handlers before the bootrom has set up
+  the system.
+
+## 14) Current assumptions and open work
 
 What is modeled now:
 
@@ -245,7 +296,7 @@ What remains partially reverse-engineered:
 - Exact calibration table lifetime/source used by all firmware variants.
 - Product-image differences between bootloader, osloader, DIAGS, and OS battery UI code paths.
 
-## 14) Offset coverage snapshot (documented live)
+## 15) Offset coverage snapshot (documented live)
 
 This section is a running capture of what firmware actually touches, so changes
 are guided by complete coverage instead of single-register guesses.
@@ -273,7 +324,7 @@ MMIO-observed hot offsets (from `/private/tmp/mmio.log`):
 - `0x90140060`: 840 accesses
 - `0x900B0000..0x900B001C`: 679-776 accesses per sampled slot
 
-### 14.1) `0x90140020` observed patterns
+### 16.1) `0x90140020` observed patterns
 
 Read values:
 
@@ -294,7 +345,7 @@ Interpretation:
 - Any synthesized read must preserve firmware-owned high bits while fixing
   battery/source presence bits used by UI.
 
-### 14.2) `0x90140060` observed patterns
+### 16.2) `0x90140060` observed patterns
 
 Read values (top):
 
@@ -319,7 +370,7 @@ Interpretation:
 - Emulator must preserve firmware-controlled non-battery bits and only override
   explicitly modeled fields (battery/charger) deterministically.
 
-### 14.3) `0x900B0018` observed patterns
+### 16.3) `0x900B0018` observed patterns
 
 Read values:
 
@@ -338,7 +389,7 @@ Interpretation:
   - charger-state bits (`[17:16]`) vary (`00`, `01`, `11`);
   - firmware control bits around `0x2A00` are retained.
 
-### 14.4) PMU IRQ / USB status path
+### 16.4) PMU IRQ / USB status path
 
 - `0x90140850` written with `0xFFFFFFFF` repeatedly (IRQ mask setup).
 - `0x90140854` written with `0xFFFFFFFF` then `0x00000000` (pending clear flow).
@@ -348,7 +399,7 @@ Interpretation:
 This path is critical for avoiding false ADC timeout behavior and for coherent
 charger/USB icon updates.
 
-### 14.5) ADC control-window handshake (`0x900B0100` family)
+### 16.5) ADC control-window handshake (`0x900B0100` family)
 
 Observed recurring pattern from MMIO:
 
@@ -371,12 +422,12 @@ Modeling implications:
 - Do not force bit1 high at reset/completion globally; that regressed some
   runs to stall at `Driver initialization complete.`.
 
-### 14.6) PMU extended defaults used by firmware probes
+### 16.6) PMU extended defaults used by firmware probes
 
 - `0x9014080C` is read as `0x00100000` in current traces and should default to
   that value at reset for stable probe behavior.
 
-### 14.7) Latest stuck-at-init trace snapshot
+### 16.7) Latest stuck-at-init trace snapshot
 
 From the latest `/private/tmp/mmio.log` capture while stalled at
 `Driver initialization complete.`:
@@ -391,3 +442,119 @@ From the latest `/private/tmp/mmio.log` capture while stalled at
 
 This confirms the stall run is mostly an ADC status handshake loop with limited
 sample-bank depth and no USB/PHY polling path.
+
+## 16) Live Disassembly Addendum (2026-02-20)
+
+Disassembler: `arm-none-eabi-objdump -D -b binary -m arm`
+
+### 16.1 Cross-stage PMU init sequence (TI-Nspire/OSLoader/DIAGS)
+
+Confirmed blocks:
+- `TI-Nspire.bin` near `0x1408`
+- `osloader.bin` near `0xE018`
+- `diags.bin` near `0xD8C4`
+
+Behavior:
+- `0x90140850 <- 0xFFFFFFFF`
+- `0x90140854 <- 0xFFFFFFFF`
+- `0x90140854 &= ~0x08000000`
+- `0x90140020 |= 0x400`
+
+### 16.2 Shared selector for PMU pair `0x90140050/0x90140060`
+
+Literal pairs found in all three binaries:
+- TI-Nspire: `0x14ac/0x14b0`, `0x1560/0x1564`
+- OSLoader: `0xE0B4/0xE0B8`, `0xE14C/0xE150`
+- DIAGS: `0xD960/0xD964`, `0xD9F8/0xD9FC`
+
+Selector logic tests bit7 of a lookup byte and chooses one base.
+
+### 16.3 Confirmed high-halfword bit mutators on PMU words
+
+Shared helper code:
+- reads `[base + 0x50]`
+- gets bit index from `[base + key + 0x1d]`
+- clear path: drops low 16 then `bic (1 << idx)`
+- set path: ORs `(1 << idx)` then keeps high-halfword domain
+
+Representative TI-Nspire instructions:
+- `ldr r3, [r0, #0x50]`
+- `ldrb ip, [r2, #0x1d]`
+- `lsr/lsl #16` normalization
+- `bic/orr ... , 1<<idx`
+
+### 16.4 `0x90140020` literal pool usage in TI-Nspire
+
+Confirmed at literal pools around:
+- `0x009b8a7c`
+- `0x009b8d00`
+
+Both pools include:
+- `0x9014080c`
+- `0x90140020`
+
+### 16.5 TI-Nspire table entry writing `0x900b0018`
+
+At `0x0042c938`:
+- literal address `0x900b0018`
+- paired value `0x08002a4d`
+
+This is direct evidence of table-driven writes into ADC slot `+0x18`.
+
+### 16.6 Read-side PMU status query helper (`0x3EB` command path)
+
+Dispatcher block (`0x1BB4..0x1BE4`) compares command ID with `0x3EB` and calls helper `0x0B70`.
+
+Helper `0x0B70` semantics:
+- `sel = *(table_base + index)`
+- `sel == 0xFF` => returns `1`
+- `sel & 0x80 == 0` => read `0x90140060`, test bit `sel`, return inverted boolean
+- `sel & 0x80 != 0` => read `0x90140050`, test bit `(sel & 0x7F)`, return inverted boolean
+
+So these status bits are consumed as active-low booleans by the TI-OS command layer.
+
+### 16.7 Read-side helper checks on `0x90140858` / `0x90140810`
+
+Confirmed helper reads:
+- `0x0BC8`: `(REG_0x90140858 & 0x0C) == 0x0C`
+- `0x0BE8`: `(REG_0x90140858 & 0x30) == 0x30`
+- `0x0C90`: `(REG_0x90140810 & 0x100) >> 8`
+
+These are read consumers and are more relevant to runtime power/charge reporting than init-time all-ones writes.
+
+### 16.8 Command handlers that use `0x90140000` as runtime state
+
+TI-Nspire command dispatcher region (`0x17cc..0x1ba4`) includes:
+
+- `0x3EF` path -> helper `0x0C14`:
+  - loads `REG_0x90140000`
+  - walks selector bytes from `(table + 0x1d + i)`
+  - tests `1 << idx` against that register and returns a derived index/status
+- `0x3F0` path -> helper `0x15D4`:
+  - reads selector byte `(table + index + 0x1d)`
+  - sets `1 << idx` into `REG_0x90140000`
+
+Implication for emulation:
+
+- `0x90140000` must be modeled as read/write live state.
+- Treating it as read-only wakeup reason breaks these command paths and can feed incorrect module/attach status into later logic.
+
+### 16.9 Batt-stats command wrapper path
+
+TI-Nspire batt-stats producer (`0x10347c..0x10353c`) fills `BattInfo` fields by command helpers:
+
+- source mV: `0x105054` / `0x105088` (mode-dependent)
+- ADC mV: `0x105020`
+- RCB mV: `0x1028a8`
+
+Command wrapper table:
+
+- `0x3AB8` wraps command `0x3EA` (selector arg written at stack `+0x0C`)
+  - called with selectors `1`, `6`, `7` in batt-stats path
+- `0x3A80` wraps `0x3EB`
+- `0x3A5C` wraps `0x3EC`
+- `0x39FC` wraps `0x3EF`
+
+Implication:
+
+- BattInfo mV values are service-command results and can diverge from raw DIAGS ADC slot values unless PMU command-domain codes are modeled separately.

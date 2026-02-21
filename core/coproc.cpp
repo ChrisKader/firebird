@@ -147,4 +147,3 @@ void do_cp15_instruction(Instruction i)
     else
         return do_cp15_mcr(insn);
 }
-
