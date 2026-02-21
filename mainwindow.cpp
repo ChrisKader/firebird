@@ -88,7 +88,7 @@
 #include "ui/materialicons.h"
 #include "ui_mainwindow.h"
 #include "app/qmlbridge.h"
-#include "app/powercontrol.h"
+#include "core/power/powercontrol.h"
 #include "mainwindow/docks/baselinelayout.h"
 #include "ui/framebuffer.h"
 #include "ui/keypadbridge.h"

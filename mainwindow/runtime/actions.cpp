@@ -15,7 +15,7 @@
 #include <QProcess>
 #include <QStandardPaths>
 
-#include "app/powercontrol.h"
+#include "core/power/powercontrol.h"
 #include "core/debug.h"
 #include "core/debug_api.h"
 #include "core/emu.h"

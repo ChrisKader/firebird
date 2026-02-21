@@ -85,7 +85,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/usblink_queue.cpp core/usblink_queue.h
     # Application infrastructure
     app/emuthread.cpp app/emuthread.h
-    app/powercontrol.cpp app/powercontrol.h
+    core/power/powercontrol.cpp core/power/powercontrol.h
     app/qmlbridge.cpp app/qmlbridge.h
     app/qmlbridge/settings.cpp
     app/qmlbridge/runtime.cpp

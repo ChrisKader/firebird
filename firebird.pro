@@ -163,7 +163,7 @@ SOURCES += $$ASMCODE_IMPL \
     lcdwidget.cpp \
     mainwindow.cpp \
     main.cpp \
-    app/powercontrol.cpp \
+    core/power/powercontrol.cpp \
     emuthread.cpp \
     qmlbridge.cpp \
     qtkeypadbridge.cpp \
@@ -216,7 +216,7 @@ HEADERS += \
     mainwindow.h \
     keymap.h \
     qmlbridge.h \
-    app/powercontrol.h \
+    core/power/powercontrol.h \
     qtkeypadbridge.h \
     core/os/os.h \
     core/armcode_bin.h \

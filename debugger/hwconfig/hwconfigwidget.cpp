@@ -8,7 +8,7 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 
-#include "app/powercontrol.h"
+#include "core/power/powercontrol.h"
 #include "core/cx2.h"
 #include "core/emu.h"
 #include "core/misc.h"

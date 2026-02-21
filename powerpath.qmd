@@ -7,7 +7,7 @@ Primary implementation files:
 - `/Users/ck/dev/firebird/core/misc.c` (rail model, charger state, ADC synthesis)
 - `/Users/ck/dev/firebird/core/cx2.cpp` (PMU/PMIC register projection)
 - `/Users/ck/dev/firebird/core/usb_cx2.cpp` (USB physical attach gating)
-- `/Users/ck/dev/firebird/app/powercontrol.cpp` (UI/runtime override behavior)
+- `/Users/ck/dev/firebird/core/power/powercontrol.cpp` (UI/runtime override behavior)
 - `/Users/ck/dev/firebird/mainwindow.cpp` and `/Users/ck/dev/firebird/debugger/hwconfig/hwconfigwidget.cpp` (override initialization/reset)
 
 ## 1. Top-Level Data Flow
@@ -205,7 +205,7 @@ This reduces false guest USB attach sequences that can otherwise drive power/cha
 
 ## 9. Runtime Override Behavior
 
-From `/Users/ck/dev/firebird/app/powercontrol.cpp` and UI wiring:
+From `/Users/ck/dev/firebird/core/power/powercontrol.cpp` and UI wiring:
 
 - `Disconnected` USB mode forces:
   - `usb_cable_connected = 0`
