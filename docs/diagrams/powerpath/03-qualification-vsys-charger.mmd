@@ -1,0 +1,70 @@
+flowchart TB
+  subgraph QUAL["Rail Qualification"]
+    direction TB
+    Q1{"usb_ok?<br/>usb_attached && !usb_otg && vbus_mv>=4500"}
+    Q2{"dock_ok?<br/>dock_attached && vsled_mv>=4500"}
+    Q3["external_power_present = usb_ok || dock_ok"]
+  end
+
+  subgraph VSYS["Source Selection + VSYS Model"]
+    direction TB
+    S1["source select priority:<br/>USB > Dock > Battery > None"]
+    S2["Vusb_path = usb_ok ? clamp(vbus_mv-200,0..5500) : 0"]
+    S3["Vdock_path = dock_ok ? clamp(vsled_mv-200,0..5500) : 0"]
+    S4["Vbat_path = battery_present ? min(battery_mv+50,5500) : 0"]
+    S5["selected_external =<br/>USB -> Vusb_path<br/>Dock -> Vdock_path<br/>else 0"]
+    S6["vsys_mv = max(selected_external, Vbat_path)"]
+    S7["power_good = (vsys_mv >= 3200)"]
+  end
+
+  subgraph CHG["Charger-State Computation"]
+    direction TB
+    H1{"external_power_present?"}
+    H2{"explicit charger override<br/>(0/1/2)?"}
+    H3{"battery absent OR usb_otg?"}
+    H4{"battery_precharge OR battery_mv &lt; 4180?"}
+    H5["charger_state = DISCONNECTED"]
+    H6["charger_state = override"]
+    H7["charger_state = CONNECTED_NOT_CHARGING"]
+    H8["charger_state = CHARGING"]
+    H9["charger_state = CONNECTED_NOT_CHARGING"]
+  end
+
+  E3["usb_attached"] --> Q1
+  E4["usb_otg"] --> Q1
+  E5["vbus_mv"] --> Q1
+  E6["dock_attached"] --> Q2
+  E7["vsled_mv"] --> Q2
+  Q1 --> Q3
+  Q2 --> Q3
+
+  Q1 --> S1
+  Q2 --> S1
+  E1["battery_present"] --> S1
+  Q1 --> S2
+  E5 --> S2
+  Q2 --> S3
+  E7 --> S3
+  E1 --> S4
+  E2["battery_mv"] --> S4
+  S1 --> S5
+  S2 --> S5
+  S3 --> S5
+  S5 --> S6
+  S4 --> S6
+  S6 --> S7
+
+  Q3 --> H1
+  O8["charger_override"] --> H2
+  E1 --> H3
+  E4 --> H3
+  E8["battery_precharge"] --> H4
+  E2 --> H4
+  H1 -->|no| H5
+  H1 -->|yes| H2
+  H2 -->|yes| H6
+  H2 -->|no| H3
+  H3 -->|yes| H7
+  H3 -->|no| H4
+  H4 -->|yes| H8
+  H4 -->|no| H9

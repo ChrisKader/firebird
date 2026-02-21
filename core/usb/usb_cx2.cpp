@@ -286,6 +286,28 @@ void usb_cx2_bus_reset_off()
     //gui_debug_printf("usb reset off\n");
 }
 
+void usb_cx2_signal_power_change(bool attached)
+{
+    /* Firmware distinguishes "USB PC" vs "USB WALL" using OTG/power transition
+     * paths, not only charger bits. Emit an OTG power transition without
+     * synthesizing a data-enumeration connect. */
+    const bool vbus_present = attached && usb_cx2_physical_vbus_present();
+    usb_cx2.otgcs = usb_cx2_otgcs_idle_value();
+
+    // Signal OTG/VBUS state change and keep endpoint/device-I/O idle.
+    usb_cx2.otgisr |= (1u << 9) | (1u << 8);
+    usb_cx2.gisr[2] &= ~(1u << 9);
+
+    // Keep bus detached in wall/disconnect paths (no host data session).
+    usb_cx2.portsc &= ~(0x0C000101u);
+    usb_cx2.usbsts &= ~4u;
+
+    if (vbus_present)
+        usb_cx2.otgcs |= 0x00200000u;
+
+    usb_cx2_int_check();
+}
+
 void usb_cx2_receive_setup_packet(const usb_setup *packet)
 {
     // Copy data into DMA buffer

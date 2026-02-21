@@ -183,6 +183,7 @@ private:
     // and EmuThread configured appropriately.
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
+    void updateUsbIndicator();
     void applyWidgetTheme();
     void applyButtonUxDefaults(QWidget *root);
     void applyStandardDockFeatures(DockWidget *dw, bool closable = true) const;
@@ -287,6 +288,10 @@ private:
     bool focus_pause_enabled = false;
     bool focus_auto_paused = false;
     bool m_usbUiConnected = false;
+    bool m_usbButtonMouseOverride = false;
+    QTimer *m_usbPulseTimer = nullptr;
+    qreal m_usbPulseLevel = 1.0;
+    bool m_usbPulseRising = false;
 
     // Utility docks converted from legacy tabs
     DockWidget *m_dock_files = nullptr;

@@ -60,18 +60,28 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     m_usbSourceCombo->addItem(tr("Computer (data)"), static_cast<int>(PowerControl::UsbPowerSource::Computer));
     m_usbSourceCombo->addItem(tr("Charger (power only)"), static_cast<int>(PowerControl::UsbPowerSource::Charger));
     m_usbSourceCombo->addItem(tr("OTG cable (host-id)"), static_cast<int>(PowerControl::UsbPowerSource::OtgCable));
-    m_batteryPresentCheck = new QCheckBox(tr("Battery inserted"), powerGroup);
+    m_batteryPresentCheck = new QCheckBox(powerGroup);
+    m_batteryPresentCheck->setToolTip(tr("Inserted"));
     m_batteryPresentCheck->setChecked(true);
-    m_dockPresentCheck = new QCheckBox(tr("Dock attached"), powerGroup);
+    m_dockPresentCheck = new QCheckBox(powerGroup);
+    m_dockPresentCheck->setToolTip(tr("attached"));
     m_dockPresentCheck->setChecked(false);
     m_vbusSlider = new QSlider(Qt::Horizontal, powerGroup);
     m_vbusSlider->setRange(kRailMvMin, kRailMvMax);
     m_vbusSlider->setValue(5000);
+    m_vbusSlider->setToolTip(tr("VBUS"));
     m_vbusInputLabel = new QLabel(QStringLiteral("5000 mV"), powerGroup);
     m_vbusInputLabel->setMinimumWidth(72);
+    m_batterySlider = new QSlider(Qt::Horizontal, powerGroup);
+    m_batterySlider->setRange(kBatteryMvMin, kBatteryMvMax);
+    m_batterySlider->setValue(4000);
+    m_batterySlider->setToolTip(tr("VBATT"));
+    m_batteryLabel = new QLabel(QStringLiteral("4000 mV"), powerGroup);
+    m_batteryLabel->setMinimumWidth(72);
     m_vsledSlider = new QSlider(Qt::Horizontal, powerGroup);
     m_vsledSlider->setRange(kRailMvMin, kRailMvMax);
     m_vsledSlider->setValue(0);
+    m_vsledSlider->setToolTip(tr("VSLED"));
     m_vsledInputLabel = new QLabel(QStringLiteral("0 mV"), powerGroup);
     m_vsledInputLabel->setMinimumWidth(72);
     m_backResetButton = new QPushButton(tr("Press Back Reset"), powerGroup);
@@ -82,21 +92,21 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     m_vrefRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
     m_vrefAuxRailLabel = new QLabel(QStringLiteral("--"), powerGroup);
     m_chargeStateLabel = new QLabel(QStringLiteral("--"), powerGroup);
-    powerLayout->addRow(tr("USB source:"), m_usbSourceCombo);
-    powerLayout->addRow(m_batteryPresentCheck);
-    powerLayout->addRow(m_dockPresentCheck);
-    {
-        auto *row = new QHBoxLayout;
-        row->addWidget(m_vbusSlider, 1);
-        row->addWidget(m_vbusInputLabel);
-        powerLayout->addRow(tr("VBUS input:"), row);
-    }
-    {
-        auto *row = new QHBoxLayout;
-        row->addWidget(m_vsledSlider, 1);
-        row->addWidget(m_vsledInputLabel);
-        powerLayout->addRow(tr("VSLED input:"), row);
-    }
+
+    auto makePowerRow = [powerGroup](QWidget *leadingControl, QSlider *slider, QLabel *valueLabel) {
+        auto *container = new QWidget(powerGroup);
+        auto *row = new QHBoxLayout(container);
+        row->setContentsMargins(0, 0, 0, 0);
+        row->setSpacing(6);
+        row->addWidget(leadingControl);
+        row->addWidget(slider, 1);
+        row->addWidget(valueLabel);
+        return container;
+    };
+
+    powerLayout->addRow(tr("USB:"), makePowerRow(m_usbSourceCombo, m_vbusSlider, m_vbusInputLabel));
+    powerLayout->addRow(tr("Battery:"), makePowerRow(m_batteryPresentCheck, m_batterySlider, m_batteryLabel));
+    powerLayout->addRow(tr("Dock:"), makePowerRow(m_dockPresentCheck, m_vsledSlider, m_vsledInputLabel));
     powerLayout->addRow(m_backResetButton);
     powerLayout->addRow(tr("Charge state:"), m_chargeStateLabel);
     powerLayout->addRow(tr("VBAT:"), m_batteryRailLabel);
@@ -118,7 +128,7 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
             m_vbusSlider->setValue(0);
             m_vbusSlider->blockSignals(false);
             m_vbusInputLabel->setText(QStringLiteral("0 mV"));
-        } else if (m_vbusSlider->value() < 4500) {
+        } else {
             m_vbusSlider->blockSignals(true);
             m_vbusSlider->setValue(5000);
             m_vbusSlider->blockSignals(false);
@@ -129,8 +139,13 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     });
     connect(m_batteryPresentCheck, &QCheckBox::toggled, this, [this](bool on) {
         PowerControl::setBatteryPresent(on);
-        m_batteryOverride->setEnabled(on);
-        m_batterySlider->setEnabled(on && m_batteryOverride->isChecked());
+        m_batterySlider->setEnabled(on);
+        if (on) {
+            m_batterySlider->blockSignals(true);
+            m_batterySlider->setValue(4000);
+            m_batterySlider->blockSignals(false);
+            m_batteryLabel->setText(QStringLiteral("4000 mV"));
+        }
         applyBatteryOverride();
         updatePowerRailsReadout();
     });
@@ -141,7 +156,7 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
             m_vsledSlider->setValue(0);
             m_vsledSlider->blockSignals(false);
             m_vsledInputLabel->setText(QStringLiteral("0 mV"));
-        } else if (m_vsledSlider->value() < 4500) {
+        } else {
             m_vsledSlider->blockSignals(true);
             m_vsledSlider->setValue(5000);
             m_vsledSlider->blockSignals(false);
@@ -155,6 +170,11 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
         applyExternalRailOverrides();
         updatePowerRailsReadout();
     });
+    connect(m_batterySlider, &QSlider::valueChanged, this, [this](int v) {
+        m_batteryLabel->setText(QStringLiteral("%1 mV").arg(v));
+        applyBatteryOverride();
+        updatePowerRailsReadout();
+    });
     connect(m_vsledSlider, &QSlider::valueChanged, this, [this](int v) {
         m_vsledInputLabel->setText(QStringLiteral("%1 mV").arg(v));
         applyExternalRailOverrides();
@@ -162,36 +182,6 @@ HwConfigWidget::HwConfigWidget(QWidget *parent)
     });
     connect(m_backResetButton, &QPushButton::clicked, this, []() {
         PowerControl::pressBackResetButton();
-    });
-
-    /* -- Battery -------------------------------------------- */
-    auto *batteryGroup = new QGroupBox(tr("Battery"), this);
-    auto *batteryLayout = new QVBoxLayout(batteryGroup);
-
-    m_batteryOverride = new QCheckBox(tr("Override"), batteryGroup);
-    batteryLayout->addWidget(m_batteryOverride);
-
-    auto *batteryRow = new QHBoxLayout;
-    m_batterySlider = new QSlider(Qt::Horizontal, batteryGroup);
-    m_batterySlider->setRange(kBatteryMvMin, kBatteryMvMax);
-    m_batterySlider->setValue(4000);
-    m_batterySlider->setEnabled(false);
-    m_batteryLabel = new QLabel(QStringLiteral("4000 mV"), batteryGroup);
-    m_batteryLabel->setMinimumWidth(72);
-    batteryRow->addWidget(m_batterySlider, 1);
-    batteryRow->addWidget(m_batteryLabel);
-    batteryLayout->addLayout(batteryRow);
-
-    layout->addWidget(batteryGroup);
-
-    connect(m_batteryOverride, &QCheckBox::toggled, this, [this](bool on) {
-        const bool batteryPresent = PowerControl::isBatteryPresent();
-        m_batterySlider->setEnabled(on && batteryPresent);
-        applyBatteryOverride();
-    });
-    connect(m_batterySlider, &QSlider::valueChanged, this, [this](int v) {
-        m_batteryLabel->setText(QStringLiteral("%1 mV").arg(v));
-        applyBatteryOverride();
     });
     /* -- Display Contrast ----------------------------------- */
     auto *displayGroup = new QGroupBox(tr("Display Contrast"), this);
@@ -288,6 +278,8 @@ void HwConfigWidget::refresh()
     m_batteryPresentCheck->blockSignals(true);
     m_batteryPresentCheck->setChecked(PowerControl::isBatteryPresent());
     m_batteryPresentCheck->blockSignals(false);
+    m_batterySlider->setEnabled(m_batteryPresentCheck->isChecked());
+    m_batteryLabel->setText(QStringLiteral("%1 mV").arg(m_batterySlider->value()));
     m_dockPresentCheck->blockSignals(true);
     m_dockPresentCheck->setChecked(PowerControl::isDockAttached());
     m_dockPresentCheck->blockSignals(false);
@@ -354,14 +346,7 @@ void HwConfigWidget::syncOverridesFromGlobals()
     m_batterySlider->setValue(savedBatteryMv);
     m_batterySlider->blockSignals(false);
     m_batteryLabel->setText(QStringLiteral("%1 mV").arg(savedBatteryMv));
-
-    bool batteryOn = (savedBatteryMvOverride >= 0)
-        || (!emulate_cx2 && savedBatteryRaw >= 0);
-    m_batteryOverride->blockSignals(true);
-    m_batteryOverride->setChecked(batteryOn);
-    m_batteryOverride->blockSignals(false);
-    m_batteryOverride->setEnabled(batteryPresent);
-    m_batterySlider->setEnabled(batteryOn && batteryPresent);
+    m_batterySlider->setEnabled(batteryPresent);
     applyBatteryOverride();
     applyExternalRailOverrides();
     updatePowerRailsReadout();
@@ -414,14 +399,9 @@ void HwConfigWidget::applyBatteryOverride()
         return;
     }
 
-    if (m_batteryOverride->isChecked()) {
-        int mv = m_batterySlider->value();
-        hw_override_set_battery_mv(mv);
-        hw_override_set_adc_battery_level((int16_t)legacy_raw_from_battery_mv(mv));
-    } else {
-        hw_override_set_battery_mv(-1);
-        hw_override_set_adc_battery_level(-1);
-    }
+    const int mv = m_batterySlider->value();
+    hw_override_set_battery_mv(mv);
+    hw_override_set_adc_battery_level((int16_t)legacy_raw_from_battery_mv(mv));
     hw_override_set_adc_charging(-1);
     hw_override_set_charger_state(CHARGER_AUTO);
     const int sourceData = static_cast<int>(PowerControl::usbPowerSource());

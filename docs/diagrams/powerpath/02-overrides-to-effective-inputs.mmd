@@ -1,0 +1,46 @@
+flowchart TB
+  subgraph CFG["Override Sources / Startup Normalization"]
+    direction LR
+    C1["Persisted settings"]
+    C2["MainWindow CX II safe baseline<br/>battery_present=1, usb=0, otg=0, dock=0,<br/>vbus=0, vsled=0, charger=AUTO"]
+    C3["PowerControl UI actions<br/>Disconnected / Computer / Charger / OTG"]
+    C4["Direct hw_override_set_* calls"]
+    C1 --> C2
+    C2 --> C4
+    C3 --> C4
+  end
+
+  subgraph OVR["Raw Overrides (core/emu.h accessors)"]
+    direction LR
+    O1["battery_present_override (-1/0/1)"]
+    O2["battery_mv_override (-1 or mV)"]
+    O3["usb_cable_connected_override (-1/0/1)"]
+    O4["usb_otg_cable_override (-1/0/1)"]
+    O5["vbus_mv_override (-1 or mV)"]
+    O6["dock_attached_override (-1/0/1)"]
+    O7["vsled_mv_override (-1 or mV)"]
+    O8["charger_state_override<br/>AUTO / DISCONNECTED / CONNECTED / CHARGING"]
+  end
+
+  subgraph EFF["Effective Inputs (cx2_build_power_model)"]
+    direction TB
+    E1["battery_present = override ? override : true"]
+    E2["battery_mv = battery_present ? clamp(override_or_default, 3000..4200) : 0"]
+    E3["usb_attached:<br/>if cable override=1, require vbus>=4500<br/>if cable override=0, false<br/>else vbus override>=4500"]
+    E4["usb_otg = (otg_override > 0)"]
+    E5["vbus_mv = clamp(override_or_default0, 0..5500)"]
+    E6["dock_attached = override ? override : false"]
+    E7["vsled_mv = dock_attached ? clamp(override_or_default0, 0..5500) : 0"]
+    E8["battery_run_ok = battery_present && battery_mv>=3300<br/>battery_precharge = battery_present && battery_mv &lt; 3000"]
+  end
+
+  CFG --> OVR
+  O1 --> E1
+  O2 --> E2
+  O3 --> E3
+  O4 --> E4
+  O5 --> E3
+  O5 --> E5
+  O6 --> E6
+  O7 --> E7
+  O8 -.->|"used in charger stage"| EFF

@@ -1,13 +1,17 @@
 #include "powercontrol.h"
 
 #include <algorithm>
+#include <atomic>
 
+#include "core/emu.h"
+#include "core/usb/usb_cx2.h"
 #include "core/usb/usblink.h"
 #include "core/usb/usblink_queue.h"
 
 namespace PowerControl {
 
 static constexpr int kMinExternalRailMvForPower = 4500;
+static std::atomic<int> g_usb_source_state{static_cast<int>(UsbPowerSource::Disconnected)};
 
 int usbBusMillivolts();
 bool isDockAttached();
@@ -23,19 +27,32 @@ void refreshPowerState()
 
 UsbPowerSource usbPowerSource()
 {
+    auto remember = [](UsbPowerSource source) {
+        g_usb_source_state.store(static_cast<int>(source), std::memory_order_relaxed);
+        return source;
+    };
+
     if (hw_override_get_usb_otg_cable() > 0)
-        return UsbPowerSource::OtgCable;
+        return remember(UsbPowerSource::OtgCable);
     if (hw_override_get_usb_cable_connected() <= 0)
-        return UsbPowerSource::Disconnected;
+        return remember(UsbPowerSource::Disconnected);
     if (hw_override_get_vbus_mv() < kMinExternalRailMvForPower)
-        return UsbPowerSource::Disconnected;
-    if (usblink_connected || usblink_state != 0)
+        return remember(UsbPowerSource::Disconnected);
+
+    const int remembered = g_usb_source_state.load(std::memory_order_relaxed);
+    if (remembered == static_cast<int>(UsbPowerSource::Computer))
         return UsbPowerSource::Computer;
-    return UsbPowerSource::Charger;
+    if (remembered == static_cast<int>(UsbPowerSource::Charger))
+        return UsbPowerSource::Charger;
+
+    if (usblink_connected || usblink_state != 0)
+        return remember(UsbPowerSource::Computer);
+    return remember(UsbPowerSource::Charger);
 }
 
 void setUsbPowerSource(UsbPowerSource source)
 {
+    g_usb_source_state.store(static_cast<int>(source), std::memory_order_relaxed);
     switch (source) {
     case UsbPowerSource::Disconnected:
         hw_override_set_usb_otg_cable(0);
@@ -43,6 +60,8 @@ void setUsbPowerSource(UsbPowerSource source)
         hw_override_set_vbus_mv(0);
         usblink_queue_reset();
         usblink_reset();
+        if (emulate_cx2)
+            usb_cx2_signal_power_change(false);
         break;
     case UsbPowerSource::Computer:
         hw_override_set_usb_otg_cable(0);
@@ -51,11 +70,18 @@ void setUsbPowerSource(UsbPowerSource source)
         usblink_connect();
         break;
     case UsbPowerSource::Charger:
+        // Force a clean detach first so we don't keep stale "USB PC" state.
+        hw_override_set_usb_otg_cable(0);
+        hw_override_set_usb_cable_connected(0);
+        hw_override_set_vbus_mv(0);
+        usblink_queue_reset();
+        usblink_reset();
+
         hw_override_set_usb_otg_cable(0);
         hw_override_set_usb_cable_connected(1);
         hw_override_set_vbus_mv(5000);
-        usblink_queue_reset();
-        usblink_reset();
+        if (emulate_cx2)
+            usb_cx2_signal_power_change(true);
         break;
     case UsbPowerSource::OtgCable:
         hw_override_set_usb_otg_cable(1);

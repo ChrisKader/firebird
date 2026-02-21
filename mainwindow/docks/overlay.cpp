@@ -1,15 +1,19 @@
 #include "mainwindow.h"
 
 #include <QEvent>
+#include <QMouseEvent>
 #include <QPainterPath>
 #include <QRegion>
 #include <QResizeEvent>
 #include <QTimer>
 #include <QToolButton>
 
+#include "core/power/powercontrol.h"
+#include "core/usb/usblink.h"
 #include "ui/docking/backend/dockbackend.h"
 #include "ui/docking/widgets/dockwidget.h"
 #include "ui/theme/materialicons.h"
+#include "ui_mainwindow.h"
 
 void MainWindow::scheduleCoreDockConnectOverlayRefresh()
 {
@@ -136,6 +140,51 @@ void MainWindow::refreshCoreDockConnectOverlay()
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event)
 {
+    if (ui && watched == ui->buttonUSB && event) {
+        switch (event->type()) {
+        case QEvent::MouseButtonPress: {
+            auto *mouseEvent = static_cast<QMouseEvent *>(event);
+            if (mouseEvent->button() == Qt::RightButton) {
+                PowerControl::setUsbPowerSource(PowerControl::UsbPowerSource::Disconnected);
+                usblinkChanged(usblink_connected || usblink_state != 0);
+                m_usbButtonMouseOverride = true;
+                return true;
+            }
+            if (mouseEvent->button() == Qt::LeftButton
+                && (mouseEvent->modifiers() & Qt::ShiftModifier)) {
+                const auto source = PowerControl::usbPowerSource();
+                PowerControl::UsbPowerSource next = PowerControl::UsbPowerSource::Computer;
+                if (source == PowerControl::UsbPowerSource::Computer)
+                    next = PowerControl::UsbPowerSource::Charger;
+                else if (source == PowerControl::UsbPowerSource::Charger)
+                    next = PowerControl::UsbPowerSource::OtgCable;
+                else if (source == PowerControl::UsbPowerSource::OtgCable)
+                    next = PowerControl::UsbPowerSource::Computer;
+                PowerControl::setUsbPowerSource(next);
+                usblinkChanged(usblink_connected || usblink_state != 0);
+                m_usbButtonMouseOverride = true;
+                return true;
+            }
+            m_usbButtonMouseOverride = false;
+            break;
+        }
+        case QEvent::MouseButtonRelease: {
+            if (m_usbButtonMouseOverride) {
+                auto *mouseEvent = static_cast<QMouseEvent *>(event);
+                if (mouseEvent->button() == Qt::RightButton || mouseEvent->button() == Qt::LeftButton) {
+                    m_usbButtonMouseOverride = false;
+                    return true;
+                }
+            }
+            break;
+        }
+        case QEvent::ContextMenu:
+            return true;
+        default:
+            break;
+        }
+    }
+
     DockWidget *dock = qobject_cast<DockWidget *>(watched);
     if (!dock)
         dock = m_coreDockWatchTargets.value(watched);

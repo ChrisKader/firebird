@@ -276,4 +276,6 @@ void MainWindow::applyWidgetTheme()
         m_dockManager->disassembly()->viewport()->update();
     if (m_dockManager && m_dockManager->hexView())
         m_dockManager->hexView()->viewport()->update();
+
+    updateUsbIndicator();
 }

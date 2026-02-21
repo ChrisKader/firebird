@@ -1,0 +1,69 @@
+flowchart TB
+  subgraph OUT_ADC["ADC register surface (0x900B0000)"]
+    direction LR
+    OA1["+0x00/+0x04 batt"]
+    OA2["+0x0C vsys"]
+    OA3["+0x18 vbus"]
+    OA4["+0x1C vsled"]
+    OA5["channel windows:<br/>0x100 + chan*0x20 + 0x10"]
+  end
+
+  subgraph OUT_PMU["PMU register surface (0x90140000)"]
+    direction LR
+    OP1["+0x20 disable0:<br/>0x400 batt_present, 0x100 ext_present"]
+    OP2["+0x50 disable1:<br/>src_code bits[17:6] from external source mV"]
+    OP3["+0x60 disable2:<br/>batt_code bits[15:6], charger bits[17:16]"]
+    OP4["+0x858 usb phy status:<br/>0x2 base, 0xE when ext+battery"]
+  end
+
+  subgraph OUT_TG["TG2989 PMIC (0x90100000)"]
+    direction LR
+    OT1["+0x08/+0x30/+0x48 power status/mode/flags"]
+    OT2["battery profile or external-power profile"]
+  end
+
+  subgraph OUT_GPIO["GPIO detect lines (port2)"]
+    direction LR
+    OG1["bit3 dock detect"]
+    OG2["bit4 usb plug present"]
+    OG3["bit6 dock power detect"]
+    OG4["forced-input mask 0x78"]
+  end
+
+  subgraph OUT_USB["USB core attach gating (usb_cx2.cpp)"]
+    direction LR
+    OU1["usb_cx2_physical_vbus_present()<br/>same physical rules as qualified USB path"]
+    OU2["suppress attach/reset IRQ behavior when physically disconnected"]
+  end
+
+  A2["battery_code"] --> OA1
+  A5["vsys_code"] --> OA2
+  A3["vbus_code"] --> OA3
+  A4["vsled_code"] --> OA4
+  A2 --> OA5
+  A3 --> OA5
+  A4 --> OA5
+  A5 --> OA5
+
+  E1["battery_present"] --> OP1
+  Q3["external_power_present"] --> OP1
+  SRC["external source mV (max valid USB/Dock)"] --> OP2
+  A2 --> OP3
+  CHG["charger_state"] --> OP3
+  Q3 --> OP4
+  E1 --> OP4
+
+  Q3 --> OT2
+  OT2 --> OT1
+
+  E6["dock_attached"] --> OG1
+  E3["usb_attached"] --> OG2
+  E7["vsled_mv"] --> OG3
+  OG1 --> OG4
+  OG2 --> OG4
+  OG3 --> OG4
+
+  E3 --> OU1
+  E4["usb_otg"] --> OU1
+  E5["vbus_mv"] --> OU1
+  OU1 --> OU2

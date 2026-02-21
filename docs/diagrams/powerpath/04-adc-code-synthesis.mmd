@@ -1,0 +1,6 @@
+flowchart LR
+  B1["battery_present + battery_mv"] --> A2["battery_code = battery_present ? clamp((battery_mv*704+1500)/3000,0..1023) : 0"]
+  B2["vbus_mv"] --> A3["vbus_code = clamp((vbus_mv*1023+3410)/6820,0..1023)"]
+  B3["vsled_mv"] --> A4["vsled_code = clamp((vsled_mv*1023+3410)/6820,0..1023)"]
+  B4["vsys_mv"] --> A5["vsys_code = clamp((vsys_mv*1023+3410)/6820,0..1023)"]
+  A1["vref_code=704<br/>vref_aux_code=696"] --> A2

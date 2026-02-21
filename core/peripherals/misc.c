@@ -1860,6 +1860,8 @@ static void cx2_build_power_model(cx2_power_model_state_t *state)
     state->power_good = state->vsys_mv >= CX2_VSYS_PGOOD_MV_MIN;
 
     const bool external_power_present = state->usb_ok || state->dock_ok;
+    const bool usb_data_link_active = usblink_connected || (usblink_state != 0);
+    const bool usb_power_only_mode = state->usb_ok && !state->usb_otg && !usb_data_link_active;
     const charger_state_t charger_override = hw_override_get_charger_state();
     /* Never report charging when no valid external rail is present.
      * This prevents stale override/event state from keeping the guest in
@@ -1870,6 +1872,10 @@ static void cx2_build_power_model(cx2_power_model_state_t *state)
         state->charger_state = charger_override;
     } else if (!state->battery_present || state->usb_otg) {
         state->charger_state = CHARGER_CONNECTED_NOT_CHARGING;
+    } else if (usb_power_only_mode) {
+        /* Charger/power-only mode should always report charging while an
+         * external USB rail is present, regardless of battery voltage. */
+        state->charger_state = CHARGER_CHARGING;
     } else if (state->battery_precharge || state->battery_mv < (CX2_BATTERY_MV_MAX - 20)) {
         state->charger_state = CHARGER_CHARGING;
     } else {

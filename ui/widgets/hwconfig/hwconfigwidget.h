@@ -45,7 +45,6 @@ private:
     /* Battery section */
     QSlider *m_batterySlider;
     QLabel *m_batteryLabel;
-    QCheckBox *m_batteryOverride;
 
     /* Display section */
     QSlider *m_contrastSlider;

@@ -13,6 +13,7 @@
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QProcess>
+#include <QTimer>
 #include <QStandardPaths>
 
 #include "core/power/powercontrol.h"
@@ -22,7 +23,9 @@
 #include "core/storage/flash.h"
 #include "core/gif.h"
 #include "core/peripherals/misc.h"
+#include "core/usb/usblink.h"
 #include "ui/docking/manager/dockmanager.h"
+#include "ui/theme/materialicons.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/screen/framebuffer.h"
 #include "ui_mainwindow.h"
@@ -178,9 +181,87 @@ void MainWindow::launchIdaInstantDebugging()
 
 void MainWindow::connectUSB()
 {
-    const bool cableConnected = PowerControl::isUsbCableConnected();
-    PowerControl::setUsbCableConnected(!cableConnected);
-    usblinkChanged(PowerControl::isUsbCableConnected());
+    const auto source = PowerControl::usbPowerSource();
+    const bool dataMode = source == PowerControl::UsbPowerSource::Computer;
+    PowerControl::setUsbPowerSource(dataMode
+        ? PowerControl::UsbPowerSource::Disconnected
+        : PowerControl::UsbPowerSource::Computer);
+    usblinkChanged(usblink_connected || usblink_state != 0);
+}
+
+void MainWindow::updateUsbIndicator()
+{
+    if (!ui || !ui->buttonUSB)
+        return;
+
+    if (!m_usbPulseTimer) {
+        m_usbPulseTimer = new QTimer(this);
+        m_usbPulseTimer->setInterval(90);
+        connect(m_usbPulseTimer, &QTimer::timeout, this, [this]() {
+            constexpr qreal kPulseStep = 0.06;
+            if (m_usbPulseRising)
+                m_usbPulseLevel += kPulseStep;
+            else
+                m_usbPulseLevel -= kPulseStep;
+
+            if (m_usbPulseLevel >= 1.0) {
+                m_usbPulseLevel = 1.0;
+                m_usbPulseRising = false;
+            } else if (m_usbPulseLevel <= 0.0) {
+                m_usbPulseLevel = 0.0;
+                m_usbPulseRising = true;
+            }
+            updateUsbIndicator();
+        });
+    }
+
+    const auto source = PowerControl::usbPowerSource();
+    QColor color = palette().color(QPalette::ButtonText);
+    bool pulse = false;
+    if (source == PowerControl::UsbPowerSource::Computer) {
+        color = QColor(QStringLiteral("#2ECC71"));
+    } else if (source == PowerControl::UsbPowerSource::OtgCable) {
+        color = QColor(QStringLiteral("#4DA3FF"));
+    } else if (source == PowerControl::UsbPowerSource::Charger) {
+        color = QColor(QStringLiteral("#E0B100"));
+        if (emulate_cx2) {
+            cx2_power_rails_t rails{};
+            cx2_get_power_rails(&rails);
+            if (rails.charger_state == CHARGER_CHARGING) {
+                pulse = true;
+                const QColor bright(QStringLiteral("#FFD95A"));
+                const QColor dark(QStringLiteral("#CC9A00"));
+                const qreal t = m_usbPulseLevel * m_usbPulseLevel * (3.0 - 2.0 * m_usbPulseLevel);
+                const auto mix = [t](int a, int b) {
+                    return qRound(a + (b - a) * t);
+                };
+                color = QColor(mix(dark.red(), bright.red()),
+                               mix(dark.green(), bright.green()),
+                               mix(dark.blue(), bright.blue()));
+            }
+        }
+    }
+
+    if (pulse) {
+        if (!m_usbPulseTimer->isActive()) {
+            m_usbPulseLevel = 1.0;
+            m_usbPulseRising = false;
+            m_usbPulseTimer->start();
+            color = QColor(QStringLiteral("#FFD95A"));
+        }
+    } else {
+        if (m_usbPulseTimer->isActive())
+            m_usbPulseTimer->stop();
+        m_usbPulseLevel = 1.0;
+        m_usbPulseRising = false;
+    }
+
+    ui->buttonUSB->setStyleSheet(QStringLiteral("color: %1;").arg(color.name(QColor::HexRgb)));
+
+    if (ui->actionConnect && !material_icon_font.family().isEmpty()) {
+        using namespace MaterialIcons;
+        ui->actionConnect->setIcon(fromCodepoint(material_icon_font, CP::USB, color));
+    }
 }
 
 void MainWindow::usblinkChanged(bool state)
@@ -188,14 +269,17 @@ void MainWindow::usblinkChanged(bool state)
     const bool was_connected = m_usbUiConnected;
     m_usbUiConnected = state;
 
-    ui->actionConnect->setText(state ? tr("Disconnect USB") : tr("Connect USB"));
-    ui->actionConnect->setChecked(state);
-    ui->buttonUSB->setToolTip(state ? tr("Disconnect USB") : tr("Connect USB"));
-    ui->buttonUSB->setChecked(state);
+    const bool dataMode = PowerControl::usbPowerSource() == PowerControl::UsbPowerSource::Computer;
+    ui->actionConnect->setText(dataMode ? tr("Disconnect USB") : tr("Connect USB"));
+    ui->actionConnect->setChecked(dataMode);
+    ui->buttonUSB->setToolTip(dataMode ? tr("Disconnect USB") : tr("Connect USB"));
+    ui->buttonUSB->setChecked(dataMode);
 
     // Auto-refresh file browser once when USB data link transitions to connected.
-    if(state && !was_connected && ui->usblinkTree)
+    if(state && !was_connected && dataMode && ui->usblinkTree)
         ui->usblinkTree->wantToReload();
+
+    updateUsbIndicator();
 }
 
 void MainWindow::setExtLCD(bool state)
@@ -347,6 +431,7 @@ void MainWindow::started(bool success)
     if (success) {
         showStatusMsg(tr("Emulation started"));
         if (m_hwConfig) m_hwConfig->refresh();
+        updateUsbIndicator();
     } else {
         QMessageBox::warning(this, tr("Could not start the emulation"), tr("Starting the emulation failed.\nAre the paths to boot1 and flash correct?"));
     }
@@ -360,6 +445,7 @@ void MainWindow::resumed(bool success)
     if (success) {
         showStatusMsg(tr("Emulation resumed from snapshot"));
         if (m_hwConfig) m_hwConfig->refresh();
+        updateUsbIndicator();
     } else {
         QMessageBox::warning(this, tr("Could not resume"), tr("Resuming failed.\nTry to fix the issue and try again."));
     }
@@ -386,6 +472,7 @@ void MainWindow::stopped()
     debug_invalidate_cpu_snapshot();
     updateUIActionState(false);
     showStatusMsg(tr("Emulation stopped"));
+    updateUsbIndicator();
 }
 
 void MainWindow::showStatusMsg(QString str)

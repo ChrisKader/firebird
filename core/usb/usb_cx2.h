@@ -77,6 +77,7 @@ void usb_cx2_write_word(uint32_t addr, uint32_t value);
 
 void usb_cx2_bus_reset_on();
 void usb_cx2_bus_reset_off();
+void usb_cx2_signal_power_change(bool attached);
 void usb_cx2_receive_setup_packet(const struct usb_setup *packet);
 bool usb_cx2_packet_to_calc(uint8_t ep, const uint8_t *packet, size_t size);
 

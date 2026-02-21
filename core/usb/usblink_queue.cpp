@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "usb/usblink_queue.h"
+#include "core/power/powercontrol.h"
 
 struct usblink_queue_action {
     enum {
@@ -182,12 +183,20 @@ void usblink_queue_reset()
 
 void usblink_queue_add(usblink_queue_action &action)
 {
+    if (PowerControl::usbPowerSource() != PowerControl::UsbPowerSource::Computer) {
+        if (action.dirlist_callback)
+            action.dirlist_callback(nullptr, true, action.user_data);
+        else if (action.progress_callback)
+            action.progress_callback(-1, action.user_data);
+        return;
+    }
+
     {
         std::lock_guard<std::mutex> lg(usblink_queue_mut);
         usblink_queue.push(action);
     }
 
-    if(!usblink_connected)
+    if(!usblink_connected && usblink_state == 0)
         usblink_connect();
 }
 

@@ -97,6 +97,7 @@ void MainWindow::setupActionAndMenuWiring()
     connect(ui->actionRecord_GIF, &QAction::triggered, this, &MainWindow::recordGIF);
     connect(ui->actionConnect, &QAction::triggered, this, &MainWindow::connectUSB);
     connect(ui->buttonUSB, &QToolButton::clicked, this, &MainWindow::connectUSB);
+    ui->buttonUSB->installEventFilter(this);
     connect(ui->actionLCD_Window, &QAction::triggered, this, &MainWindow::setExtLCD);
     connect(ui->actionXModem, &QAction::triggered, this, &MainWindow::xmodemSend);
     connect(ui->actionSwitch_to_Mobile_UI, &QAction::triggered, this, &MainWindow::switchToMobileUI);
