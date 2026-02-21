@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-#include "core/nand_fs.h"
+#include "core/memory/nand_fs.h"
 
 class NandFileEditor : public QDialog
 {

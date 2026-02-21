@@ -19,7 +19,7 @@
 #include "core/debug/debug.h"
 #include "core/debug/debug_api.h"
 #include "core/emu.h"
-#include "core/flash.h"
+#include "core/memory/flash.h"
 #include "core/gif.h"
 #include "core/misc.h"
 #include "ui/docking/manager/dockmanager.h"

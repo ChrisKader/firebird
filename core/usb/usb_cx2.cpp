@@ -2,7 +2,7 @@
 #include <queue>
 
 #include "emu.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "usb.h"
 #include "usb_cx2.h"
 #include "usblink_cx2.h"

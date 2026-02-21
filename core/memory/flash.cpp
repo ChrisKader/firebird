@@ -8,8 +8,8 @@
 
 #include "emu.h"
 #include "fieldparser.h"
-#include "flash.h"
-#include "mem.h"
+#include "memory/flash.h"
+#include "memory/mem.h"
 #include "cpu.h"
 #include "os/os.h"
 

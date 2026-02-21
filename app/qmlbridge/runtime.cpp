@@ -6,7 +6,7 @@
 #include <QUrl>
 
 #include "app/emuthread.h"
-#include "core/flash.h"
+#include "core/memory/flash.h"
 #include "core/keypad.h"
 #include "core/os/os.h"
 #include "core/usblink_queue.h"

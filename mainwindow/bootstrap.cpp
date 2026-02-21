@@ -37,8 +37,8 @@
 
 #include "app/qmlbridge.h"
 #include "core/debug/debug.h"
-#include "core/flash.h"
-#include "core/mem.h"
+#include "core/memory/flash.h"
+#include "core/memory/mem.h"
 #include "core/misc.h"
 #include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"

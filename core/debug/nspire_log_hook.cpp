@@ -16,7 +16,7 @@
 #include "cpu.h"
 #include "debug.h"
 #include "emu.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "translate.h"
 
 namespace {

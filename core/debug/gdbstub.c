@@ -34,7 +34,7 @@
 
 #include "emu.h"
 #include "debug.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "cpu.h"
 #include "armsnippets.h"
 #include "gdbstub.h"

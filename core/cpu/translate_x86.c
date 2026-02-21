@@ -3,7 +3,7 @@
 
 #include "os/os.h"
 #include "emu.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "cpu.h"
 #include "asmcode.h"
 #include "translate.h"

@@ -3,7 +3,7 @@
 #include "emu.h"
 #include "cpu.h"
 #include "armsnippets.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "translate.h"
 #include "armsnippets.h"
 #include "debug.h"

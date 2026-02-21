@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "core/flash.h"
+#include "core/memory/flash.h"
 void NandBrowserWidget::showPartitionPages(int partIndex)
 {
     if (partIndex < 0 || partIndex >= (int)m_partitions.size())

@@ -15,8 +15,8 @@
 #include "debug.h"
 #include "debug_api.h"
 #include "emu.h"
-#include "mem.h"
-#include "mmu.h"
+#include "memory/mem.h"
+#include "memory/mmu.h"
 #include "nspire_log_hook.h"
 #include "translate.h"
 

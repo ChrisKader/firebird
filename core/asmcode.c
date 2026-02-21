@@ -1,7 +1,7 @@
 #include "asmcode.h"
 #include "debug.h"
-#include "mmu.h"
-#include "mem.h"
+#include "memory/mmu.h"
+#include "memory/mem.h"
 
 //TODO: Read breakpoints, alignment checks
 

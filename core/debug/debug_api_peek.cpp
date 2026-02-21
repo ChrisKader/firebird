@@ -3,8 +3,8 @@
 #include "debug_api.h"
 
 #include "emu.h"
-#include "mem.h"
-#include "mmu.h"
+#include "memory/mem.h"
+#include "memory/mmu.h"
 #include "debug.h"
 #include "lcd.h"
 #include "misc.h"

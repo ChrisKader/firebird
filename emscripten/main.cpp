@@ -2,7 +2,7 @@
 
 #include <emscripten.h>
 
-#include "core/mmu.h"
+#include "core/memory/mmu.h"
 #include "core/debug/debug.h"
 #include "core/emu.h"
 

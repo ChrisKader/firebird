@@ -3,8 +3,8 @@
 #include "debug.h"
 #include "debug_api.h"
 #include "emu.h"
-#include "mem.h"
-#include "mmu.h"
+#include "memory/mem.h"
+#include "memory/mmu.h"
 
 static uint32_t shift(int type, uint32_t res, uint32_t count, int setcc) {
     if (count == 0) {

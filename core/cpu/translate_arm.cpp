@@ -26,8 +26,8 @@
 #include "cpu.h"
 #include "cpudefs.h"
 #include "disasm.h"
-#include "mem.h"
-#include "mmu.h"
+#include "memory/mem.h"
+#include "memory/mmu.h"
 #include "translate.h"
 #include "os/os.h"
 

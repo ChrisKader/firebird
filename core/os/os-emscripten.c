@@ -6,7 +6,7 @@
 
 #include <emscripten.h>
 
-#include "core/mmu.h"
+#include "core/memory/mmu.h"
 #include "os.h"
 
 FILE *fopen_utf8(const char *filename, const char *mode)

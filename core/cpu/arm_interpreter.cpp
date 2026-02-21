@@ -4,7 +4,7 @@
 #include "cpu.h"
 #include "cpudefs.h"
 #include "debug.h"
-#include "mmu.h"
+#include "memory/mmu.h"
 
 // Detect overflow after an addition or subtraction
 #define ADD_OVERFLOW(left, right, sum) ((int32_t)(((left) ^ (sum)) & ((right) ^ (sum))) < 0)

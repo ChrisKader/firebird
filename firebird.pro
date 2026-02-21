@@ -231,16 +231,16 @@ HEADERS += \
     core/des.h \
     core/disasm.h \
     core/emu.h \
-    core/flash.h \
+    core/memory/flash.h \
     core/debug/gdbstub.h \
     core/gif.h \
     core/interrupt.h \
     core/keypad.h \
     core/lcd.h \
     core/link.h \
-    core/mem.h \
+    core/memory/mem.h \
     core/misc.h \
-    core/mmu.h \
+    core/memory/mmu.h \
     core/debug/nspire_log_hook.h \
     core/schedule.h \
     core/sha256.h \

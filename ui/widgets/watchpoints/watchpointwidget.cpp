@@ -14,7 +14,7 @@
 #include <QMessageBox>
 
 #include "core/debug/debug_api.h"
-#include "core/mem.h"
+#include "core/memory/mem.h"
 
 /* Column indices */
 enum { COL_ENABLED = 0, COL_ADDR, COL_SIZE, COL_READ, COL_WRITE, COL_VALUE };

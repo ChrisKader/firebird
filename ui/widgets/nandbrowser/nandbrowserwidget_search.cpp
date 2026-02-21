@@ -4,7 +4,7 @@
 #include <cstring>
 
 #include "app/emuthread.h"
-#include "core/flash.h"
+#include "core/memory/flash.h"
 void NandBrowserWidget::onSearchTriggered()
 {
     QString query = m_searchEdit->text();

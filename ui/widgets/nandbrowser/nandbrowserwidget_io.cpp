@@ -6,8 +6,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
-#include "core/flash.h"
-#include "core/nand_fs.h"
+#include "core/memory/flash.h"
+#include "core/memory/nand_fs.h"
 void NandBrowserWidget::exportPartition(int partIndex)
 {
     if (partIndex < 0 || partIndex >= (int)m_partitions.size())

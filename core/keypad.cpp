@@ -9,7 +9,7 @@
 #include "keypad.h"
 #include "schedule.h"
 #include "interrupt.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "cx2.h"
 
 /* 900E0000: Keypad controller */

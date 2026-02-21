@@ -74,10 +74,10 @@
 #include "core/debug/debug.h"
 #include "core/debug/debug_api.h"
 #include "core/emu.h"
-#include "core/flash.h"
+#include "core/memory/flash.h"
 #include "core/gif.h"
 #include "core/misc.h"
-#include "core/mem.h"
+#include "core/memory/mem.h"
 #include "core/usblink_queue.h"
 
 #include "ui/docking/widgets/dockwidget.h"

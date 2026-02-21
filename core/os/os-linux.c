@@ -21,7 +21,7 @@
 
 #include "os.h"
 #include "../debug/debug.h"
-#include "../mmu.h"
+#include "../memory/mmu.h"
 
 #ifdef IS_IOS_BUILD
 

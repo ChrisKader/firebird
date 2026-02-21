@@ -1,6 +1,6 @@
 #include "cpu.h"
 #include "cpudefs.h"
-#include "mmu.h"
+#include "memory/mmu.h"
 
 void do_cp15_mrc(uint32_t insn)
 {

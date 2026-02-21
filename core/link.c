@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "emu.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "os/os.h"
 
 /* Emulation of the TI-84 Plus I/O link port */

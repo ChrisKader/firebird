@@ -10,8 +10,8 @@
 #include <QSplitter>
 
 extern "C" {
-#include "core/mem.h"
-#include "core/mmu.h"
+#include "core/memory/mem.h"
+#include "core/memory/mmu.h"
 }
 
 #include "core/debug/debug_api.h"

@@ -6,7 +6,7 @@
 #include "gif.h"
 #include "interrupt.h"
 #include "schedule.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "lcd.h"
 
 lcd_state lcd;

@@ -13,14 +13,14 @@
 #include "translate.h"
 #include "debug.h"
 #include "debug_api.h"
-#include "mmu.h"
+#include "memory/mmu.h"
 #include "gdbstub.h"
 #include "nspire_log_hook.h"
 #include "usblink_queue.h"
 #include "os/os.h"
 #include "schedule.h"
 #include "misc.h"
-#include "mem.h"
+#include "memory/mem.h"
 
 /* cycle_count_delta is a (usually negative) number telling what the time is relative
  * to the next scheduled event. See sched.c */

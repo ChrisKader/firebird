@@ -5,7 +5,7 @@
 #include "debug.h"
 #include "emu.h"
 #include "disasm.h"
-#include "mmu.h"
+#include "memory/mmu.h"
 
 void backtrace(uint32_t fp) {
     uint32_t *frame;

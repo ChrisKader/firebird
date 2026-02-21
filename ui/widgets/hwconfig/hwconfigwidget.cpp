@@ -8,7 +8,7 @@
 #include "core/cx2.h"
 #include "core/emu.h"
 #include "core/misc.h"
-#include "core/mem.h"
+#include "core/memory/mem.h"
 
 namespace {
 constexpr int kBatteryMvMin = 3000;

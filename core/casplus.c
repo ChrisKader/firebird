@@ -6,10 +6,10 @@
 #include "schedule.h"
 #include "keypad.h"
 #include "cpu.h"
-#include "flash.h"
+#include "memory/flash.h"
 #include "emu.h"
 #include "misc.h"
-#include "mem.h"
+#include "memory/mem.h"
 
 static uint16_t lcd_framebuffer[2];
 static uint32_t lcd_control;

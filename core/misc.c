@@ -6,8 +6,8 @@
 #include "schedule.h"
 #include "misc.h"
 #include "keypad.h"
-#include "flash.h"
-#include "mem.h"
+#include "memory/flash.h"
+#include "memory/mem.h"
 #include "cx2.h"
 #include "usblink.h"
 

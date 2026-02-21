@@ -3,7 +3,7 @@
 
 #include "des.h"
 #include "emu.h"
-#include "mem.h"
+#include "memory/mem.h"
 
 static des_state des;
 

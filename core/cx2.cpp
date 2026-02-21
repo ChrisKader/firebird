@@ -1,6 +1,6 @@
 #include "emu.h"
 
-#include "mem.h"
+#include "memory/mem.h"
 #include "cx2.h"
 #include "misc.h"
 #include "schedule.h"

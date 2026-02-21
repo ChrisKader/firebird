@@ -3,7 +3,7 @@
 #include "emu.h"
 #include "interrupt.h"
 #include "misc.h"
-#include "mem.h"
+#include "memory/mem.h"
 #include "casplus.h"
 #include "os/os.h"
 

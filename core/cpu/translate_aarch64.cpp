@@ -26,8 +26,8 @@
 #include "cpudefs.h"
 #include "emu.h"
 #include "translate.h"
-#include "mem.h"
-#include "mmu.h"
+#include "memory/mem.h"
+#include "memory/mmu.h"
 #include "os/os.h"
 
 #ifdef IS_IOS_BUILD

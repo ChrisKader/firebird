@@ -2,8 +2,8 @@
 
 #include "core/debug/debug.h"
 #include "core/emu.h"
-#include "core/mem.h"
-#include "core/mmu.h"
+#include "core/memory/mem.h"
+#include "core/memory/mmu.h"
 #include "core/usblink_queue.h"
 
 void gui_do_stuff(bool wait)

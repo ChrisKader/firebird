@@ -17,8 +17,8 @@
 
 #include "app/emuthread.h"
 #include "core/emu.h"
-#include "core/flash.h"
-#include "core/nand_fs.h"
+#include "core/memory/flash.h"
+#include "core/memory/nand_fs.h"
 
 // -------------------- Construction --------------------
 
