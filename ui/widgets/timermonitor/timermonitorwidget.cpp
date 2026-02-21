@@ -11,7 +11,7 @@ extern "C" {
 #include "core/emu.h"
 }
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "ui/theme/widgettheme.h"
 
 TimerMonitorWidget::TimerMonitorWidget(QWidget *parent)

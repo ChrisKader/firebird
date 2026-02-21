@@ -13,7 +13,7 @@
 #include <QFontDatabase>
 #include <QMessageBox>
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "core/mem.h"
 
 /* Column indices */

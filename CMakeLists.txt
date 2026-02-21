@@ -55,10 +55,10 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/cpudefs.h
     core/cx2.cpp core/cx2.h
     core/peripherals/cx2_peripherals.cpp
-    core/debug/debug.cpp core/debug.h
+    core/debug/debug.cpp core/debug/debug.h
     core/debug/debug_cli.cpp
     core/debug/debug_remote.cpp
-    core/debug/debug_api.cpp core/debug_api.h
+    core/debug/debug_api.cpp core/debug/debug_api.h
     core/debug/debug_api_peek.cpp
     core/des.c core/des.h
     core/disasm.c core/disasm.h
@@ -66,7 +66,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/fieldparser.cpp core/fieldparser.h
     core/memory/flash.cpp core/flash.h
     core/memory/nand_fs.cpp core/nand_fs.h
-    core/debug/gdbstub.c core/gdbstub.h
+    core/debug/gdbstub.c core/debug/gdbstub.h
     core/gif.cpp core/gif.h
     core/interrupt.c core/interrupt.h
     core/keypad.cpp core/keypad.h
@@ -75,7 +75,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/memory/mem.c core/mem.h
     core/misc.c core/misc.h
     core/memory/mmu.c core/mmu.h
-    core/debug/nspire_log_hook.cpp core/nspire_log_hook.h
+    core/debug/nspire_log_hook.cpp core/debug/nspire_log_hook.h
     core/os/os.h
     core/schedule.c core/schedule.h
     core/serial.c
@@ -240,6 +240,7 @@ qt_add_qml_module(firebird-emu
 target_include_directories(firebird-emu PRIVATE
     ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/core
+    ${CMAKE_SOURCE_DIR}/core/debug
 )
 
 target_compile_definitions(firebird-emu PRIVATE

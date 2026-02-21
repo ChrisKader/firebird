@@ -71,8 +71,8 @@
     #include <kddockwidgets/core/View.h>
 #endif
 
-#include "core/debug.h"
-#include "core/debug_api.h"
+#include "core/debug/debug.h"
+#include "core/debug/debug_api.h"
 #include "core/emu.h"
 #include "core/flash.h"
 #include "core/gif.h"

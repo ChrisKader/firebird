@@ -16,8 +16,8 @@
 #include <QStandardPaths>
 
 #include "core/power/powercontrol.h"
-#include "core/debug.h"
-#include "core/debug_api.h"
+#include "core/debug/debug.h"
+#include "core/debug/debug_api.h"
 #include "core/emu.h"
 #include "core/flash.h"
 #include "core/gif.h"

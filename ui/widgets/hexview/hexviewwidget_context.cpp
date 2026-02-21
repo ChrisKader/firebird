@@ -13,7 +13,7 @@
 #include <QMenu>
 #include <QMessageBox>
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 
 void HexViewWidget::contextMenuEvent(QContextMenuEvent *event)
 {

@@ -14,7 +14,7 @@ extern "C" {
 #include "core/mmu.h"
 }
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "ui/theme/widgettheme.h"
 
 MMUViewerWidget::MMUViewerWidget(QWidget *parent)

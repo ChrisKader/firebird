@@ -12,7 +12,7 @@ extern "C" {
 #include "core/misc.h"
 }
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "ui/theme/widgettheme.h"
 
 LCDStateWidget::LCDStateWidget(QWidget *parent)

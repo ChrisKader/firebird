@@ -14,8 +14,8 @@
     #include <windows.h>
 #endif
 
-#include "core/debug.h"
-#include "core/gdbstub.h"
+#include "core/debug/debug.h"
+#include "core/debug/gdbstub.h"
 #include "core/emu.h"
 #include "core/usblink_queue.h"
 

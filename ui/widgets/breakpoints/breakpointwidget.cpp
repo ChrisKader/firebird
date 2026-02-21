@@ -13,7 +13,7 @@
 #include <QMenu>
 #include <QMessageBox>
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 
 /* Column indices */
 enum { COL_ENABLED = 0, COL_ADDR, COL_EXEC, COL_READ, COL_WRITE, COL_HITS, COL_CONDITION };

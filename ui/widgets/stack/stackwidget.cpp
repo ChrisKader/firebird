@@ -9,7 +9,7 @@
 #include <QClipboard>
 #include <QApplication>
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "ui/theme/widgettheme.h"
 
 StackWidget::StackWidget(QWidget *parent)

@@ -36,7 +36,7 @@
 #endif
 
 #include "app/qmlbridge.h"
-#include "core/debug.h"
+#include "core/debug/debug.h"
 #include "core/flash.h"
 #include "core/mem.h"
 #include "core/misc.h"

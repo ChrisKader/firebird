@@ -1,6 +1,6 @@
 #include <errno.h>
 
-#include "core/debug.h"
+#include "core/debug/debug.h"
 #include "core/emu.h"
 #include "core/mem.h"
 #include "core/mmu.h"

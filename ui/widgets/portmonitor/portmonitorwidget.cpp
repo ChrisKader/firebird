@@ -14,7 +14,7 @@
 #include <QTextStream>
 #include <QLabel>
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "core/emu.h"
 #include "ui/theme/widgettheme.h"
 

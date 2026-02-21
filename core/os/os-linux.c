@@ -20,7 +20,7 @@
 #endif
 
 #include "os.h"
-#include "../debug.h"
+#include "../debug/debug.h"
 #include "../mmu.h"
 
 #ifdef IS_IOS_BUILD

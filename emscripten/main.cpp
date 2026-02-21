@@ -3,7 +3,7 @@
 #include <emscripten.h>
 
 #include "core/mmu.h"
-#include "core/debug.h"
+#include "core/debug/debug.h"
 #include "core/emu.h"
 
 void gui_do_stuff(bool wait)

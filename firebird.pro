@@ -48,6 +48,7 @@ QT_QML_GENERATE_QMLLS_INI = ON
 
 QMAKE_CFLAGS += -g -std=gnu11 -Wall -Wextra
 QMAKE_CXXFLAGS += -g -Wall -Wextra -D QT_NO_CAST_FROM_ASCII
+INCLUDEPATH += core/debug
 LIBS += -lz
 
 # Override bad default options to enable better optimizations
@@ -226,12 +227,12 @@ HEADERS += \
     core/casplus.h \
     core/cpu.h \
     core/cpudefs.h \
-    core/debug.h \
+    core/debug/debug.h \
     core/des.h \
     core/disasm.h \
     core/emu.h \
     core/flash.h \
-    core/gdbstub.h \
+    core/debug/gdbstub.h \
     core/gif.h \
     core/interrupt.h \
     core/keypad.h \
@@ -240,7 +241,7 @@ HEADERS += \
     core/mem.h \
     core/misc.h \
     core/mmu.h \
-    core/nspire_log_hook.h \
+    core/debug/nspire_log_hook.h \
     core/schedule.h \
     core/sha256.h \
     core/translate.h \

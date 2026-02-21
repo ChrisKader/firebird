@@ -9,7 +9,7 @@
 #include <QLineEdit>
 #include <QToolBar>
 
-#include "core/debug_api.h"
+#include "core/debug/debug_api.h"
 #include "ui/docking/state/dockstate.h"
 
 class DisassemblyWidget : public QAbstractScrollArea, public DockStateSerializable
