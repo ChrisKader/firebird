@@ -78,7 +78,7 @@
 #include "core/gif.h"
 #include "core/misc.h"
 #include "core/memory/mem.h"
-#include "core/usblink_queue.h"
+#include "core/usb/usblink_queue.h"
 
 #include "ui/docking/widgets/dockwidget.h"
 #include "ui/docking/widgets/kdockwidget.h"

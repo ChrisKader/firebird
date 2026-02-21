@@ -1,6 +1,6 @@
 #include "emu.h"
 #include "memory/mem.h"
-#include "usb_cx2.h"
+#include "usb/usb_cx2.h"
 
 uint8_t usb_cx2_read_byte(uint32_t addr)
 {

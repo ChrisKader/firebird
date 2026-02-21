@@ -9,7 +9,7 @@
 #include "core/memory/flash.h"
 #include "core/keypad.h"
 #include "core/os/os.h"
-#include "core/usblink_queue.h"
+#include "core/usb/usblink_queue.h"
 #include "ui/input/keypadbridge.h"
 
 #ifndef MOBILE_UI

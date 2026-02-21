@@ -9,7 +9,7 @@
 #include "memory/flash.h"
 #include "memory/mem.h"
 #include "cx2.h"
-#include "usblink.h"
+#include "usb/usblink.h"
 
 // Miscellaneous hardware modules deemed too trivial to get their own files
 

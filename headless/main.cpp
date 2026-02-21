@@ -4,7 +4,7 @@
 #include "core/emu.h"
 #include "core/memory/mem.h"
 #include "core/memory/mmu.h"
-#include "core/usblink_queue.h"
+#include "core/usb/usblink_queue.h"
 
 void gui_do_stuff(bool wait)
 {

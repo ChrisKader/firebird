@@ -7,7 +7,7 @@
 
 #include <string>
 
-#include "usblink.h"
+#include "usb/usblink.h"
 
 // Enqueue those actions, equivalent to the functions in usblink.h
 void usblink_queue_delete(std::string path, bool is_dir, usblink_progress_cb callback, void *user_data);

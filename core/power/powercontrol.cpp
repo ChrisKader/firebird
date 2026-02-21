@@ -2,8 +2,8 @@
 
 #include <algorithm>
 
-#include "core/usblink.h"
-#include "core/usblink_queue.h"
+#include "core/usb/usblink.h"
+#include "core/usb/usblink_queue.h"
 
 namespace PowerControl {
 

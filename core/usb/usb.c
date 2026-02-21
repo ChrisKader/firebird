@@ -2,8 +2,8 @@
 #include <string.h>
 #include <stdint.h>
 #include "emu.h"
-#include "usb.h"
-#include "usblink.h"
+#include "usb/usb.h"
+#include "usb/usblink.h"
 #include "interrupt.h"
 #include "memory/mem.h"
 

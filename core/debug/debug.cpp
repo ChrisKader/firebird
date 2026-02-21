@@ -16,7 +16,7 @@
 #include "disasm.h"
 #include "memory/mmu.h"
 #include "translate.h"
-#include "usblink_queue.h"
+#include "usb/usblink_queue.h"
 #include "gdbstub.h"
 #include "debug_api.h"
 #include "nspire_log_hook.h"

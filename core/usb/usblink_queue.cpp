@@ -5,7 +5,7 @@
 #include <chrono>
 #include <thread>
 
-#include "usblink_queue.h"
+#include "usb/usblink_queue.h"
 
 struct usblink_queue_action {
     enum {

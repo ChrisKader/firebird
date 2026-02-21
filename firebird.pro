@@ -210,8 +210,8 @@ FORMS += \
 
 HEADERS += \
     core/fieldparser.h \
-    core/usb_cx2.h \
-    core/usblink_cx2.h \
+    core/usb/usb_cx2.h \
+    core/usb/usblink_cx2.h \
     emuthread.h \
     ui/screen/lcdwidget.h \
     mainwindow.h \
@@ -245,9 +245,9 @@ HEADERS += \
     core/schedule.h \
     core/sha256.h \
     core/translate.h \
-    core/usb.h \
-    core/usblink.h \
-    core/usblink_queue.h \
+    core/usb/usb.h \
+    core/usb/usblink.h \
+    core/usb/usblink_queue.h \
     qtframebuffer.h \
     usblinktreewidget.h \
     kitmodel.h \

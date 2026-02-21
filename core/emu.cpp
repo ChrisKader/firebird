@@ -16,7 +16,7 @@
 #include "memory/mmu.h"
 #include "gdbstub.h"
 #include "nspire_log_hook.h"
-#include "usblink_queue.h"
+#include "usb/usblink_queue.h"
 #include "os/os.h"
 #include "schedule.h"
 #include "misc.h"

@@ -12,9 +12,9 @@
 #endif
 
 #include "emu.h"
-#include "usblink.h"
-#include "usblink_cx2.h"
-#include "usb_cx2.h"
+#include "usb/usblink.h"
+#include "usb/usblink_cx2.h"
+#include "usb/usb_cx2.h"
 
 // #define DEBUG
 

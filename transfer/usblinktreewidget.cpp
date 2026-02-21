@@ -7,7 +7,7 @@
 
 #include "usblinktreewidget.h"
 
-#include "core/usblink_queue.h"
+#include "core/usb/usblink_queue.h"
 
 static USBLinkTreeWidget *usblink_tree = nullptr;
 

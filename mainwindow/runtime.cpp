@@ -26,7 +26,7 @@
 #include "core/memory/flash.h"
 #include "core/gif.h"
 #include "core/misc.h"
-#include "core/usblink_queue.h"
+#include "core/usb/usblink_queue.h"
 #include "ui/widgets/console/consolewidget.h"
 #include "ui/docking/manager/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"

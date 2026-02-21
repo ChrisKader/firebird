@@ -82,12 +82,12 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/sha256.c core/sha256.h
     core/cpu/thumb_interpreter.cpp
     core/translate.h
-    core/usb/usb.c core/usb.h
-    core/usb/usb_cx2.cpp core/usb_cx2.h
+    core/usb/usb.c core/usb/usb.h
+    core/usb/usb_cx2.cpp core/usb/usb_cx2.h
     core/usb/usb_cx2_state.cpp
-    core/usb/usblink.c core/usblink.h
-    core/usb/usblink_cx2.cpp core/usblink_cx2.h
-    core/usb/usblink_queue.cpp core/usblink_queue.h
+    core/usb/usblink.c core/usb/usblink.h
+    core/usb/usblink_cx2.cpp core/usb/usblink_cx2.h
+    core/usb/usblink_queue.cpp core/usb/usblink_queue.h
     # Application infrastructure
     app/emuthread.cpp app/emuthread.h
     core/power/powercontrol.cpp core/power/powercontrol.h

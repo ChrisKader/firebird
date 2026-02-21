@@ -17,7 +17,7 @@
 #include "core/debug/debug.h"
 #include "core/debug/gdbstub.h"
 #include "core/emu.h"
-#include "core/usblink_queue.h"
+#include "core/usb/usblink_queue.h"
 
 namespace {
 
