@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QPointer>
+#include <QVector>
 #include <QtQml>
 
 #include "kitmodel.h"
@@ -197,6 +198,7 @@ private:
     QSettings settings;
     bool is_active = false;
     EmuThread *m_emuThread = nullptr;
+    QVector<QMetaObject::Connection> m_activeEmuConnections;
 #ifndef MOBILE_UI
     QPointer<MainWindow> m_mainWindow;
 #endif

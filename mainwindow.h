@@ -9,6 +9,7 @@
 #include <QStringList>
 #include <QHash>
 #include <QSet>
+#include <QVector>
 #include <QJsonObject>
 #include <functional>
 #include <memory>
@@ -307,6 +308,8 @@ private:
     QList<QByteArray> m_layoutUndoHistory;
     QList<QByteArray> m_layoutRedoHistory;
     bool m_layoutHistoryApplying = false;
+    bool m_persistentUiStateSaved = false;
+    QVector<QMetaObject::Connection> m_activeEmuConnections;
     QTimer *m_coreDockOverlayTimer = nullptr;
     QHash<QString, QPointer<QToolButton>> m_coreDockOverlayButtons;
     QHash<QObject *, QPointer<DockWidget>> m_coreDockWatchTargets;

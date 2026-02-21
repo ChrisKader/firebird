@@ -2,6 +2,10 @@
 
 This document describes the current threading model used by Firebird's desktop UI and emulation core.
 
+See also:
+- `docs/PROJECT_STRUCTURE.md` for thread-boundary coding rules.
+- `docs/REFERENCE_MAP.md` for source-backed rule mapping.
+
 ## Threads
 
 - GUI thread: owns `MainWindow`, all Qt widgets, and all dock/console rendering.

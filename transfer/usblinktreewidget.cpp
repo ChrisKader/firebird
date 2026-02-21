@@ -14,12 +14,14 @@ static USBLinkTreeWidget *usblink_tree = nullptr;
 USBLinkTreeWidget::USBLinkTreeWidget(QWidget *parent)
     : QTreeWidget(parent)
 {
-    connect(this, SIGNAL(customContextMenuRequested(QPoint)), this,  SLOT(customContextMenuRequested(QPoint)));
-    connect(this, SIGNAL(itemChanged(QTreeWidgetItem*, int)), this, SLOT(dataChangedHandler(QTreeWidgetItem*,int)));
-    connect(this, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(directoryExpanded(QTreeWidgetItem*)));
-    connect(this, SIGNAL(wantToAddTreeItem(QTreeWidgetItem*,QTreeWidgetItem*)), this, SLOT(addTreeItem(QTreeWidgetItem*,QTreeWidgetItem*)), Qt::QueuedConnection);
-    connect(this, SIGNAL(wantToFinalizeDirectory(QTreeWidgetItem*,bool)), this, SLOT(finalizeDirectory(QTreeWidgetItem*,bool)), Qt::QueuedConnection);
-    connect(this, SIGNAL(wantToReload()), this, SLOT(reloadFilebrowser()), Qt::QueuedConnection);
+    connect(this, &QWidget::customContextMenuRequested, this, [this](const QPoint &pos) {
+        customContextMenuRequested(pos);
+    });
+    connect(this, &USBLinkTreeWidget::itemChanged, this, &USBLinkTreeWidget::dataChangedHandler);
+    connect(this, &USBLinkTreeWidget::itemExpanded, this, &USBLinkTreeWidget::directoryExpanded);
+    connect(this, &USBLinkTreeWidget::wantToAddTreeItem, this, &USBLinkTreeWidget::addTreeItem, Qt::QueuedConnection);
+    connect(this, &USBLinkTreeWidget::wantToFinalizeDirectory, this, &USBLinkTreeWidget::finalizeDirectory, Qt::QueuedConnection);
+    connect(this, &USBLinkTreeWidget::wantToReload, this, &USBLinkTreeWidget::reloadFilebrowser, Qt::QueuedConnection);
 
     this->setAcceptDrops(true);
 
@@ -92,9 +94,9 @@ void USBLinkTreeWidget::customContextMenuRequested(QPoint pos)
         line_new_folder->setPlaceholderText(tr("New folder"));
         action_new_folder->setDefaultWidget(line_new_folder);
 
-        connect(line_new_folder, SIGNAL(returnPressed()), this, SLOT(newFolder()));
+        connect(line_new_folder, &QLineEdit::returnPressed, this, &USBLinkTreeWidget::newFolder);
         // FIXME: Can this delete line_new_folder while in use by newFolder?
-        connect(line_new_folder, SIGNAL(returnPressed()), menu, SLOT(close()));
+        connect(line_new_folder, &QLineEdit::returnPressed, menu, &QMenu::close);
 
         menu->addAction(action_new_folder);
 
@@ -108,11 +110,11 @@ void USBLinkTreeWidget::customContextMenuRequested(QPoint pos)
     {
         // Is not a directory
         QAction *action_download = new QAction(tr("Download"), menu);
-        connect(action_download, SIGNAL(triggered()), this, SLOT(downloadEntry()));
+        connect(action_download, &QAction::triggered, this, &USBLinkTreeWidget::downloadEntry);
         menu->addAction(action_download);
     }
 
-    connect(action_delete, SIGNAL(triggered()), this, SLOT(deleteEntry()));
+    connect(action_delete, &QAction::triggered, this, &USBLinkTreeWidget::deleteEntry);
     menu->addAction(action_delete);
 
     menu->popup(this->viewport()->mapToGlobal(pos));

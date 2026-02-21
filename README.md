@@ -15,6 +15,8 @@ Documentation:
 --------------
 
 * [CX II PMIC/ADC reverse-engineering notes](docs/cx2-pmic-register-map.md)
+* [Project structure and engineering guide](docs/PROJECT_STRUCTURE.md)
+* [Rule reference map (source-backed)](docs/REFERENCE_MAP.md)
 
 Screenshots:
 -------------------

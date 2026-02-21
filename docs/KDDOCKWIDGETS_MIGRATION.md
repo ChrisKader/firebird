@@ -2,6 +2,10 @@
 
 This file tracks Phase 1 dependency groundwork for KDDockWidgets migration.
 
+See also:
+- `docs/PROJECT_STRUCTURE.md` for KDD usage/styling standards.
+- `docs/REFERENCE_MAP.md` for source-linked rule coverage.
+
 ## Build Flag
 
 - CMake option: `FIREBIRD_ENABLE_KDDOCKWIDGETS` (default: `ON`)

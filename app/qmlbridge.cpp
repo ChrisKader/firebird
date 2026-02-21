@@ -74,7 +74,7 @@ QMLBridge::QMLBridge(EmuThread *emuThread, QObject *parent) : QObject(parent)
 
     lcd_scale_mode = static_cast<LCDScaleMode>(getLcdScaleMode());
 
-    connect(&kit_model, SIGNAL(anythingChanged()), this, SLOT(saveKits()), Qt::QueuedConnection);
+    connect(&kit_model, &KitModel::anythingChanged, this, &QMLBridge::saveKits, Qt::QueuedConnection);
 
     setActive(true);
 }
@@ -464,15 +464,25 @@ void QMLBridge::setActive(bool b)
 
     if(b)
     {
-        connect(&emuThread(), SIGNAL(speedChanged(double)), this, SLOT(speedChanged(double)), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(turboModeChanged(bool)), this, SIGNAL(turboModeChanged()), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(stopped()), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(started(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(suspended(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(resumed(bool)), this, SIGNAL(isRunningChanged()), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(started(bool)), this, SLOT(started(bool)), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(resumed(bool)), this, SLOT(resumed(bool)), Qt::QueuedConnection);
-        connect(&emuThread(), SIGNAL(suspended(bool)), this, SLOT(suspended(bool)), Qt::QueuedConnection);
+        m_activeEmuConnections.clear();
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::speedChanged, this,
+                                              qOverload<double>(&QMLBridge::speedChanged), Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::turboModeChanged, this,
+                                              [this](bool) { emit turboModeChanged(); }, Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::stopped, this, &QMLBridge::isRunningChanged,
+                                              Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::started, this,
+                                              [this](bool) { emit isRunningChanged(); }, Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::suspended, this,
+                                              [this](bool) { emit isRunningChanged(); }, Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::resumed, this,
+                                              [this](bool) { emit isRunningChanged(); }, Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::started, this,
+                                              qOverload<bool>(&QMLBridge::started), Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::resumed, this,
+                                              qOverload<bool>(&QMLBridge::resumed), Qt::QueuedConnection));
+        m_activeEmuConnections.append(connect(&emuThread(), &EmuThread::suspended, this,
+                                              qOverload<bool>(&QMLBridge::suspended), Qt::QueuedConnection));
 
         // We might have missed some events.
         turboModeChanged();
@@ -481,15 +491,9 @@ void QMLBridge::setActive(bool b)
     }
     else
     {
-        disconnect(&emuThread(), SIGNAL(speedChanged(double)), this, SLOT(speedChanged(double)));
-        disconnect(&emuThread(), SIGNAL(turboModeChanged(bool)), this, SIGNAL(turboModeChanged()));
-        disconnect(&emuThread(), SIGNAL(stopped()), this, SIGNAL(isRunningChanged()));
-        disconnect(&emuThread(), SIGNAL(started(bool)), this, SIGNAL(isRunningChanged()));
-        disconnect(&emuThread(), SIGNAL(suspended(bool)), this, SIGNAL(isRunningChanged()));
-        disconnect(&emuThread(), SIGNAL(resumed(bool)), this, SIGNAL(isRunningChanged()));
-        disconnect(&emuThread(), SIGNAL(started(bool)), this, SLOT(started(bool)));
-        disconnect(&emuThread(), SIGNAL(resumed(bool)), this, SLOT(resumed(bool)));
-        disconnect(&emuThread(), SIGNAL(suspended(bool)), this, SLOT(suspended(bool)));
+        for (const QMetaObject::Connection &connection : m_activeEmuConnections)
+            QObject::disconnect(connection);
+        m_activeEmuConnections.clear();
     }
 
     is_active = b;

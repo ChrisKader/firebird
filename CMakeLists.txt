@@ -126,7 +126,16 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Main window (stays in root for AUTOUIC)
     main.cpp
     mainwindow.cpp mainwindow.h mainwindow.ui
+    mainwindow/theme.cpp
+    mainwindow/runtime.cpp
+    mainwindow/runtime/actions.cpp
 )
+
+# mainwindow.ui stays in the repo root; runtime module sources include the
+# generated ui header but must not trigger local AUTOUIC lookup.
+set_source_files_properties(mainwindow/runtime.cpp PROPERTIES SKIP_AUTOUIC ON)
+set_source_files_properties(mainwindow/runtime/actions.cpp PROPERTIES SKIP_AUTOUIC ON)
+set_source_files_properties(mainwindow/theme.cpp PROPERTIES SKIP_AUTOUIC ON)
 qt_add_qml_module(firebird-emu
     URI firebird_emu
     VERSION ${PROJECT_VERSION}
@@ -525,6 +534,16 @@ if(just_show_up_in_qt_creator)
         core/translate_x86_64.c
         emscripten/main.cpp
         headless/main.cpp
+    )
+endif()
+
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(advisory-file-size
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/dev/check_file_size.py --target 600 --cap 1000
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Advisory file-size policy check (target 600, cap 1000)"
+        VERBATIM
     )
 endif()
 

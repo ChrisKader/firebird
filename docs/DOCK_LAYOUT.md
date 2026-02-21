@@ -2,6 +2,10 @@
 
 This document describes the desktop dock initialization and restore order.
 
+See also:
+- `docs/PROJECT_STRUCTURE.md` for architectural boundaries and coding rules.
+- `docs/REFERENCE_MAP.md` for rule-to-source traceability.
+
 ## Required sequence
 
 `MainWindow` follows a strict order during startup:

@@ -32,11 +32,11 @@ FBAboutDialog::FBAboutDialog(QWidget *parent)
     authors.setTextInteractionFlags(Qt::TextBrowserInteraction);
     authors.setOpenExternalLinks(true);
 
-    connect(&okButton, SIGNAL(clicked(bool)), this, SLOT(close()));
+    connect(&okButton, &QPushButton::clicked, this, &FBAboutDialog::close);
     okButton.setDefault(true);
 
     updateButton.setAutoDefault(false);
-    connect(&updateButton, SIGNAL(clicked(bool)), this, SLOT(checkForUpdate()));
+    connect(&updateButton, &QPushButton::clicked, this, &FBAboutDialog::checkForUpdate);
 
     auto *buttonBox = new QDialogButtonBox(Qt::Horizontal);
     buttonBox->addButton(&okButton, QDialogButtonBox::AcceptRole);
@@ -84,7 +84,7 @@ void FBAboutDialog::retranslateUi()
 
     // If necessary, refresh the status text. Easiest way is to just check again.
     if(isVisible() || checkSuccessful)
-        QTimer::singleShot(0, this, SLOT(checkForUpdate()));
+        QTimer::singleShot(0, this, &FBAboutDialog::checkForUpdate);
 }
 
 void FBAboutDialog::checkForUpdate()
@@ -104,7 +104,7 @@ void FBAboutDialog::checkForUpdate()
 
     reply = nam.get(request);
 
-    connect(reply, SIGNAL(finished()), this, SLOT(requestFinished()));
+    connect(reply, &QNetworkReply::finished, this, &FBAboutDialog::requestFinished);
 }
 
 void FBAboutDialog::requestFinished()
@@ -145,5 +145,5 @@ void FBAboutDialog::setVisible(bool v)
     QDialog::setVisible(v);
 
     if(v && !checkSuccessful)
-        QTimer::singleShot(0, this, SLOT(checkForUpdate()));
+        QTimer::singleShot(0, this, &FBAboutDialog::checkForUpdate);
 }
