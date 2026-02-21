@@ -13,8 +13,12 @@ static int sched_current_index = -1;
 
 static inline uint32_t muldiv(uint32_t a, uint32_t b, uint32_t c) {
 #if defined(__i386__) || defined(__x86_64__)
-    __asm__ ("mull %1; divl %2" : "+a" (a) : "m" (b), "m" (c) : "edx");
-    return a;
+  __asm__("mull %1\n\t"
+          "divl %2"
+          : "+a"(a)
+          : "m"(b), "m"(c)
+          : "edx");
+  return a;
 #else
     uint64_t d = a;
     d *= b;
