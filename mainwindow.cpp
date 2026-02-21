@@ -92,7 +92,7 @@
 #include "mainwindow/docks/baselinelayout.h"
 #include "ui/screen/framebuffer.h"
 #include "ui/input/keypadbridge.h"
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 
 #include "ui/widgets/disassembly/disassemblywidget.h"
 #include "ui/widgets/hexview/hexviewwidget.h"
@@ -211,9 +211,9 @@ void MainWindow::restoreStartupLayoutFromSettings()
      * 3) apply post-restore links/theme behavior.
      * Reordering these steps can silently break layout restoration. */
     convertTabsToDocks();
-    if (m_debugDocks) {
+    if (m_dockManager) {
         const int extraHexDocks = qMax(0, settings->value(QStringLiteral("debugExtraHexDockCount"), 0).toInt());
-        m_debugDocks->ensureExtraHexDocks(extraHexDocks);
+        m_dockManager->ensureExtraHexDocks(extraHexDocks);
     }
     retranslateDocks();
     if (m_dock_ext_lcd)
@@ -255,15 +255,15 @@ void MainWindow::restoreStartupLayoutFromSettings()
         settings->setValue(QString::fromLatin1(kSettingLayoutProfile), appliedStartupProfile);
     }
 
-    if (m_debugDocks) {
+    if (m_dockManager) {
         if (!restoredDebugDockState.isEmpty()) {
-            m_debugDocks->restoreDockStates(restoredDebugDockState);
+            m_dockManager->restoreDockStates(restoredDebugDockState);
         } else if (!usedBuiltInDefaultBaseline) {
             QJsonParseError debugStateErr = {};
             const QString savedDebugState = settings->value(QString::fromLatin1(kSettingDebugDockStateJson)).toString();
             const QJsonDocument debugStateDoc = QJsonDocument::fromJson(savedDebugState.toUtf8(), &debugStateErr);
             if (debugStateErr.error == QJsonParseError::NoError && debugStateDoc.isObject())
-                m_debugDocks->restoreDockStates(debugStateDoc.object());
+                m_dockManager->restoreDockStates(debugStateDoc.object());
         }
     }
 
@@ -286,19 +286,19 @@ void MainWindow::restoreStartupLayoutFromSettings()
                                      &profileError,
                                      &debugDockState,
                                      &coreDockConnections)) {
-                if (m_debugDocks && !debugDockState.isEmpty())
-                    m_debugDocks->restoreDockStates(debugDockState);
+                if (m_dockManager && !debugDockState.isEmpty())
+                    m_dockManager->restoreDockStates(debugDockState);
                 restoreCoreDockConnections(coreDockConnections);
-                if (m_debugDocks)
-                    m_debugDocks->refreshIcons();
+                if (m_dockManager)
+                    m_dockManager->refreshIcons();
                 captureLayoutHistorySnapshot();
                 return;
             }
 
             if (appliedStartupProfile == QLatin1String("default")) {
                 resetDockLayout();
-                if (m_debugDocks)
-                    m_debugDocks->refreshIcons();
+                if (m_dockManager)
+                    m_dockManager->refreshIcons();
                 captureLayoutHistorySnapshot();
                 return;
             }
@@ -426,8 +426,8 @@ void MainWindow::savePersistentUiState()
     QJsonObject layoutJson = makeDockLayoutJson(content_window);
     QJsonObject debugDockState;
     const QJsonObject coreDockConnections = serializeCoreDockConnections();
-    if (m_debugDocks) {
-        debugDockState = m_debugDocks->serializeDockStates();
+    if (m_dockManager) {
+        debugDockState = m_dockManager->serializeDockStates();
         layoutJson.insert(QStringLiteral("debugDockState"), debugDockState);
         settings->setValue(QString::fromLatin1(kSettingDebugDockStateJson),
                            QString::fromUtf8(QJsonDocument(debugDockState).toJson(QJsonDocument::Compact)));
@@ -436,8 +436,8 @@ void MainWindow::savePersistentUiState()
     settings->setValue(QString::fromLatin1(kSettingWindowLayoutJson),
                        QString::fromUtf8(QJsonDocument(layoutJson).toJson(QJsonDocument::Compact)));
     settings->setValue(QStringLiteral("windowGeometry"), saveGeometry());
-    if (m_debugDocks)
-        settings->setValue(QStringLiteral("debugExtraHexDockCount"), m_debugDocks->extraHexDockCount());
+    if (m_dockManager)
+        settings->setValue(QStringLiteral("debugExtraHexDockCount"), m_dockManager->extraHexDockCount());
     QString activeProfile = settings->value(QString::fromLatin1(kSettingLayoutProfile)).toString().trimmed();
     if (activeProfile.isEmpty())
         activeProfile = QStringLiteral("default");
@@ -525,8 +525,8 @@ void MainWindow::undoLayoutChange()
 
     if (restored) {
         m_layoutRedoHistory.append(current);
-        if (m_debugDocks)
-            m_debugDocks->refreshIcons();
+        if (m_dockManager)
+            m_dockManager->refreshIcons();
     } else {
         m_layoutUndoHistory.append(current);
     }
@@ -548,8 +548,8 @@ void MainWindow::redoLayoutChange()
         m_layoutUndoHistory.append(target);
         while (m_layoutUndoHistory.size() > kMaxLayoutHistoryEntries)
             m_layoutUndoHistory.removeFirst();
-        if (m_debugDocks)
-            m_debugDocks->refreshIcons();
+        if (m_dockManager)
+            m_dockManager->refreshIcons();
     } else {
         m_layoutRedoHistory.append(target);
     }

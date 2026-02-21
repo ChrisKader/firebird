@@ -1,4 +1,4 @@
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 
 #include <QMainWindow>
 #include <QMenu>
@@ -80,43 +80,57 @@ void applyStandardDockFeatures(DockWidget *dw, bool closable = true)
 
 } // namespace
 
-DebugDockManager::DebugDockManager(QMainWindow *host, const QFont &iconFont,
-                                   QObject *parent)
+DockManager::DockManager(QMainWindow *host, const QFont &iconFont,
+                         QObject *parent)
     : QObject(parent), m_host(host), m_iconFont(iconFont)
 {
 }
 
-DisassemblyWidget *DebugDockManager::disassembly() const
+DisassemblyWidget *DockManager::disassembly() const
 {
     return m_disasmWidget.data();
 }
 
-HexViewWidget *DebugDockManager::hexView() const
+HexViewWidget *DockManager::hexView() const
 {
     return m_hexWidget.data();
 }
 
-ConsoleWidget *DebugDockManager::console() const
+ConsoleWidget *DockManager::console() const
 {
     return m_consoleWidget.data();
 }
 
-DockWidget *DebugDockManager::consoleDock() const
+DockWidget *DockManager::consoleDock() const
 {
     return m_consoleDock.data();
 }
 
-WatchpointWidget *DebugDockManager::watchpoints() const
+WatchpointWidget *DockManager::watchpoints() const
 {
     return m_watchpointWidget.data();
 }
 
-void DebugDockManager::setDockFocusPolicy(DockFocusPolicy policy)
+void DockManager::setDockFocusPolicy(DockFocusPolicy policy)
 {
     m_dockFocusPolicy = policy;
 }
 
-void DebugDockManager::showDock(DockWidget *dock, bool explicitUserAction)
+void DockManager::registerMainDock(MainDockId id, DockWidget *dock)
+{
+    if (!dock) {
+        m_mainDocks.remove(static_cast<int>(id));
+        return;
+    }
+    m_mainDocks.insert(static_cast<int>(id), dock);
+}
+
+DockWidget *DockManager::mainDock(MainDockId id) const
+{
+    return m_mainDocks.value(static_cast<int>(id));
+}
+
+void DockManager::showDock(DockWidget *dock, bool explicitUserAction)
 {
     if (!dock)
         return;
@@ -129,7 +143,7 @@ void DebugDockManager::showDock(DockWidget *dock, bool explicitUserAction)
         dock->raise();
 }
 
-void DebugDockManager::createDocks(QMenu *docksMenu)
+void DockManager::createDocks(QMenu *docksMenu)
 {
     auto makeDock = [&](const QString &title, QWidget *widget, DebugDockId id,
                         Qt::DockWidgetArea area, bool coreDock) -> DockWidget * {
@@ -226,7 +240,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
 
     /* Disassembly -> debugger commands */
     connect(m_disasmWidget, &DisassemblyWidget::debugCommand,
-            this, &DebugDockManager::debugCommand);
+            this, &DockManager::debugCommand);
 
     /* Disassembly breakpoint toggle -> refresh breakpoint/watchpoint lists */
     connect(m_disasmWidget, &DisassemblyWidget::breakpointToggled,
@@ -296,7 +310,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
 
     /* Console -> debugger commands */
     connect(m_consoleWidget, &ConsoleWidget::commandSubmitted,
-            this, &DebugDockManager::debugCommand);
+            this, &DockManager::debugCommand);
 
     /* Key history: feed keypresses from QtKeypadBridge */
     connect(&qt_keypad_bridge, &QtKeypadBridge::keyStateChanged,
@@ -306,7 +320,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     m_docksMenu = docksMenu;
     docksMenu->addSeparator();
     QAction *newMemAction = docksMenu->addAction(tr("New Memory View"));
-    connect(newMemAction, &QAction::triggered, this, &DebugDockManager::addHexViewDock);
+    connect(newMemAction, &QAction::triggered, this, &DockManager::addHexViewDock);
 
     /* Ctrl+G: Go To Address dialog */
     auto *gotoShortcut = new QShortcut(QKeySequence(tr("Ctrl+G")), m_host);
@@ -325,7 +339,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     });
 }
 
-void DebugDockManager::addHexViewDock()
+void DockManager::addHexViewDock()
 {
     m_hexViewCount++;
     auto *widget = new HexViewWidget(m_host);
@@ -351,7 +365,7 @@ void DebugDockManager::addHexViewDock()
     m_extraHexDocks.append(dw);
 }
 
-void DebugDockManager::resetLayout()
+void DockManager::resetLayout()
 {
     /* Re-arrange debug docks with a core-visible default set. */
     DockWidget *debugDocks[] = {

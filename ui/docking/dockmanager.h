@@ -1,10 +1,11 @@
-#ifndef DEBUGDOCKMANAGER_H
-#define DEBUGDOCKMANAGER_H
+#ifndef DOCKMANAGER_H
+#define DOCKMANAGER_H
 
 #include <QObject>
 #include <QFont>
 #include <QSet>
 #include <QList>
+#include <QHash>
 #include <QJsonObject>
 #include <QPointer>
 #include <cstdint>
@@ -28,18 +29,28 @@ class TimerMonitorWidget;
 class LCDStateWidget;
 class MMUViewerWidget;
 
-class DebugDockManager : public QObject
+class DockManager : public QObject
 {
     Q_OBJECT
 public:
+    enum class MainDockId {
+        Files = 0,
+        Keypad = 1,
+        NandBrowser = 2,
+        HardwareConfig = 3,
+        Screen = 4,
+        Controls = 5,
+        ExternalScreen = 6,
+    };
+
     enum class DockFocusPolicy {
         Always = 0,
         ExplicitOnly = 1,
         Never = 2,
     };
 
-    explicit DebugDockManager(QMainWindow *host, const QFont &iconFont,
-                              QObject *parent = nullptr);
+    explicit DockManager(QMainWindow *host, const QFont &iconFont,
+                         QObject *parent = nullptr);
 
     void createDocks(QMenu *docksMenu);
     void addHexViewDock();
@@ -57,6 +68,8 @@ public:
     void restoreDockStates(const QJsonObject &stateRoot);
     void setDockFocusPolicy(DockFocusPolicy policy);
     DockFocusPolicy dockFocusPolicy() const { return m_dockFocusPolicy; }
+    void registerMainDock(MainDockId id, DockWidget *dock);
+    DockWidget *mainDock(MainDockId id) const;
 
     DisassemblyWidget *disassembly() const;
     HexViewWidget *hexView() const;
@@ -119,8 +132,9 @@ private:
     int m_hexViewCount = 1;
     uint32_t m_dirtyFlags = DIRTY_ALL;
     DockFocusPolicy m_dockFocusPolicy = DockFocusPolicy::Always;
+    QHash<int, QPointer<DockWidget>> m_mainDocks;
 
     void showDock(DockWidget *dock, bool explicitUserAction);
 };
 
-#endif // DEBUGDOCKMANAGER_H
+#endif // DOCKMANAGER_H

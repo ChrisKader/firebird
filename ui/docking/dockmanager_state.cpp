@@ -1,4 +1,4 @@
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 
 #include <QJsonArray>
 #include <QMainWindow>
@@ -20,7 +20,7 @@
 #include "ui/widgets/lcdstate/lcdstatewidget.h"
 #include "ui/widgets/mmuviewer/mmuviewerwidget.h"
 
-void DebugDockManager::ensureExtraHexDocks(int count)
+void DockManager::ensureExtraHexDocks(int count)
 {
     if (count <= 0)
         return;
@@ -28,7 +28,7 @@ void DebugDockManager::ensureExtraHexDocks(int count)
         addHexViewDock();
 }
 
-QJsonObject DebugDockManager::serializeDockStates() const
+QJsonObject DockManager::serializeDockStates() const
 {
     QJsonObject root;
     root.insert(QStringLiteral("schema"), QStringLiteral("firebird.debug.dockstate.v1"));
@@ -67,7 +67,7 @@ QJsonObject DebugDockManager::serializeDockStates() const
     return root;
 }
 
-void DebugDockManager::restoreDockStates(const QJsonObject &stateRoot)
+void DockManager::restoreDockStates(const QJsonObject &stateRoot)
 {
     auto restoreOne = [this](const QString &dockId, const QJsonObject &customState) {
         if (dockId.isEmpty())
@@ -91,7 +91,7 @@ void DebugDockManager::restoreDockStates(const QJsonObject &stateRoot)
     }
 }
 
-void DebugDockManager::refreshIcons()
+void DockManager::refreshIcons()
 {
     using namespace MaterialIcons;
     const QColor fg = m_host->palette().color(QPalette::WindowText);
@@ -114,12 +114,12 @@ void DebugDockManager::refreshIcons()
     setIcon(m_mmuViewerDock,    CP::Layers);
 }
 
-void DebugDockManager::markDirty(uint32_t flags)
+void DockManager::markDirty(uint32_t flags)
 {
     m_dirtyFlags |= flags;
 }
 
-void DebugDockManager::refreshAll()
+void DockManager::refreshAll()
 {
     if (m_dirtyFlags == 0)
         return;
@@ -194,7 +194,7 @@ void DebugDockManager::refreshAll()
     m_dirtyFlags = 0;
 }
 
-void DebugDockManager::retranslate()
+void DockManager::retranslate()
 {
     if (m_disasmDock) m_disasmDock->setWindowTitle(tr("Disassembly"));
     if (m_registerDock) m_registerDock->setWindowTitle(tr("Registers"));
@@ -212,7 +212,7 @@ void DebugDockManager::retranslate()
     if (m_mmuViewerDock) m_mmuViewerDock->setWindowTitle(tr("MMU Viewer"));
 }
 
-void DebugDockManager::raise()
+void DockManager::raise()
 {
     m_autoShownDocks.clear();
 
@@ -232,7 +232,7 @@ void DebugDockManager::raise()
     showDock(m_disasmDock, false);
 }
 
-void DebugDockManager::hideAutoShown()
+void DockManager::hideAutoShown()
 {
     for (DockWidget *dock : m_autoShownDocks)
     {
@@ -242,7 +242,7 @@ void DebugDockManager::hideAutoShown()
     m_autoShownDocks.clear();
 }
 
-void DebugDockManager::setEditMode(bool enabled)
+void DockManager::setEditMode(bool enabled)
 {
     const auto dockChildren = m_host->findChildren<DockWidget *>();
     for (DockWidget *dw : dockChildren)

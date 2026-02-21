@@ -28,7 +28,7 @@
 #include "core/misc.h"
 #include "core/usblink_queue.h"
 #include "ui/widgets/console/consolewidget.h"
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/screen/framebuffer.h"
 #include "ui/theme/widgettheme.h"
@@ -112,8 +112,8 @@ void MainWindow::dragEnterEvent(QDragEnterEvent *e)
 void MainWindow::serialChar(const char c)
 {
     auto emitUart = [this](const QString &out) {
-        if (m_debugDocks && m_debugDocks->console())
-            m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Uart, out);
+        if (m_dockManager && m_dockManager->console())
+            m_dockManager->console()->appendTaggedOutput(ConsoleTag::Uart, out);
     };
 
     /* Coalesce CRLF into a single newline-stamped record.
@@ -153,13 +153,13 @@ void MainWindow::debugInputRequested(bool b)
     if (b)
     {
         debug_capture_cpu_snapshot();
-        if (m_debugDocks) m_debugDocks->raise();
-        if (m_debugDocks) {
-            m_debugDocks->markDirty();
-            m_debugDocks->refreshAll();
+        if (m_dockManager) m_dockManager->raise();
+        if (m_dockManager) {
+            m_dockManager->markDirty();
+            m_dockManager->refreshAll();
         }
-        if (m_debugDocks && m_debugDocks->console())
-            m_debugDocks->console()->focusInput();
+        if (m_dockManager && m_dockManager->console())
+            m_dockManager->console()->focusInput();
     } else {
         debug_invalidate_cpu_snapshot();
     }
@@ -174,30 +174,30 @@ void MainWindow::debuggerEntered(bool entered)
     if (entered)
     {
         debug_capture_cpu_snapshot();
-        if (m_debugDocks) m_debugDocks->raise();
-        if (m_debugDocks) {
-            m_debugDocks->markDirty();
-            m_debugDocks->refreshAll();
+        if (m_dockManager) m_dockManager->raise();
+        if (m_dockManager) {
+            m_dockManager->markDirty();
+            m_dockManager->refreshAll();
         }
-        if (m_debugDocks && m_debugDocks->console())
-            m_debugDocks->console()->focusInput();
+        if (m_dockManager && m_dockManager->console())
+            m_dockManager->console()->focusInput();
     }
     else
     {
         debug_invalidate_cpu_snapshot();
-        if (m_debugDocks) m_debugDocks->hideAutoShown();
+        if (m_dockManager) m_dockManager->hideAutoShown();
     }
 }
 
 void MainWindow::debugStr(QString str)
 {
-    if (m_debugDocks && m_debugDocks->console()) {
+    if (m_dockManager && m_dockManager->console()) {
         if (str.startsWith(QLatin1Char('>'))) {
             /* Command echo from debug line edit -- plain text, no tag */
-            m_debugDocks->console()->appendOutput(str);
+            m_dockManager->console()->appendOutput(str);
         } else {
             /* Debug engine output -- tagged and syntax-highlighted */
-            m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Debug, str);
+            m_dockManager->console()->appendTaggedOutput(ConsoleTag::Debug, str);
         }
 
     }
@@ -205,8 +205,8 @@ void MainWindow::debugStr(QString str)
 
 void MainWindow::nlogStr(QString str)
 {
-    if (m_debugDocks && m_debugDocks->console())
-        m_debugDocks->console()->appendTaggedOutput(ConsoleTag::Nlog, str);
+    if (m_dockManager && m_dockManager->console())
+        m_dockManager->console()->appendTaggedOutput(ConsoleTag::Nlog, str);
 }
 
 
@@ -387,5 +387,5 @@ void MainWindow::retranslateDocks()
     }
     if (m_dock_controls)
         m_dock_controls->setWindowTitle(tr("Controls"));
-    if (m_debugDocks) m_debugDocks->retranslate();
+    if (m_dockManager) m_dockManager->retranslate();
 }

@@ -40,7 +40,7 @@
 #include "core/flash.h"
 #include "core/mem.h"
 #include "core/misc.h"
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "transfer/usblinktreewidget.h"
 #include "ui/screen/framebuffer.h"

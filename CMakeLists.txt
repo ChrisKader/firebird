@@ -103,8 +103,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     ui/input/keymap.h
     ui/text/ansitextwriter.cpp ui/text/ansitextwriter.h
     # Debugger subsystem
-    debugger/dockmanager.cpp debugger/dockmanager.h
-    debugger/dockmanager/state.cpp
+    ui/docking/dockmanager.cpp ui/docking/dockmanager.h
+    ui/docking/dockmanager_state.cpp
     ui/widgets/disassembly/disassemblywidget.cpp ui/widgets/disassembly/disassemblywidget.h
     ui/widgets/registers/registerwidget.cpp ui/widgets/registers/registerwidget.h
     ui/widgets/hexview/hexviewwidget.cpp ui/widgets/hexview/hexviewwidget.h

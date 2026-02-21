@@ -22,7 +22,7 @@
 #include "core/flash.h"
 #include "core/gif.h"
 #include "core/misc.h"
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/screen/framebuffer.h"
 #include "ui_mainwindow.h"
@@ -323,7 +323,7 @@ void MainWindow::setUIEditMode(bool e)
 {
     settings->setValue(QStringLiteral("uiEditModeEnabled"), e);
 
-    if (m_debugDocks) m_debugDocks->setEditMode(e);
+    if (m_dockManager) m_dockManager->setEditMode(e);
 }
 
 void MainWindow::showAbout()

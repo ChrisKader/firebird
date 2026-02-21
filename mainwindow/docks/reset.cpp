@@ -23,7 +23,7 @@
 #endif
 
 #include "mainwindow/docks/baselinelayout.h"
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 #include "mainwindow/docks/baseline.h"
 #include "ui/docking/dockbackend.h"
 #include "ui/docking/dockwidget.h"
@@ -83,8 +83,8 @@ void MainWindow::resetDockLayout()
         dock->setVisible(false);
     }
 
-    if (m_debugDocks)
-        m_debugDocks->resetLayout();
+    if (m_dockManager)
+        m_dockManager->resetLayout();
 
     bool baselineRestoredWithKdd = false;
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
@@ -212,8 +212,8 @@ void MainWindow::resetDockLayout()
 #endif
     }
 
-    if (m_debugDocks)
-        m_debugDocks->restoreDockStates(makeBaselineDebugDockStateObject());
+    if (m_dockManager)
+        m_dockManager->restoreDockStates(makeBaselineDebugDockStateObject());
 
     QSet<QString> closedDockNames;
     for (const char *closedDockName : BaselineLayout::kClosedDockWidgetNames) {

@@ -75,4 +75,4 @@ Changing this order can break persisted layouts because restore requires all tar
 - Baseline reset payload builders: `mainwindow/docks/baseline.cpp`
 - Layout profile/persistence helpers: `mainwindow/layout_persistence.cpp`
 - Startup restore orchestration: `mainwindow.cpp` (`restoreStartupLayoutFromSettings`)
-- Debug docks: `debugger/dockmanager.cpp`
+- Debug docks: `ui/docking/dockmanager.cpp`

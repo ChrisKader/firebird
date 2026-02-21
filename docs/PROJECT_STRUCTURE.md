@@ -29,13 +29,12 @@ This document is the canonical guide for how to structure new code and refactors
   - `mainwindow/runtime*.cpp`: runtime actions/state transitions.
 - `ui/`: Reusable desktop widgets/components.
   - `ui/models/`: Qt model/view backing models shared with QML/widgets.
-  - `ui/docking/*`: docking abstractions (`dockbackend`, `dockwidget`, `kdockwidget`, `dockstate`).
+  - `ui/docking/*`: docking abstractions (`dockbackend`, `dockwidget`, `kdockwidget`, `dockstate`, `dockmanager`).
   - `ui/theme/*`: widget theme and icon helpers.
   - `ui/screen/*`: framebuffer and LCD widget surface plumbing.
   - `ui/input/*`: keypad bridge and key map integration.
   - `ui/text/*`: ANSI text rendering helpers for console-like widgets.
   - `ui/widgets/*`: feature widgets grouped by module (`breakpoints`, `disassembly`, `hexview`, `hwconfig`, etc.).
-- `debugger/`: Debug docking orchestration and non-widget manager logic (`dockmanager.*`).
 - `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
   - `core/power/`: Power-path override control helpers used by UI and debugger.

@@ -9,7 +9,7 @@
 #include <QTimer>
 #include <QUrl>
 
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 #include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "ui/widgets/nandbrowser/nandbrowserwidget.h"
 #include "mainwindow/layout_persistence.h"
@@ -57,7 +57,7 @@ void MainWindow::convertTabsToDocks()
     QMenu *layouts_menu = docks_menu->addMenu(tr("Layouts"));
 
     const auto saveLayoutProfileAction = [this](const QString &profileName) {
-        const QJsonObject debugDockState = m_debugDocks ? m_debugDocks->serializeDockStates()
+        const QJsonObject debugDockState = m_dockManager ? m_dockManager->serializeDockStates()
                                                         : QJsonObject();
         const QJsonObject coreDockConnections = serializeCoreDockConnections();
         QString error;
@@ -87,8 +87,8 @@ void MainWindow::convertTabsToDocks()
             if (profileName == QLatin1String("default")) {
                 resetDockLayout();
                 settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
-                if (m_debugDocks)
-                    m_debugDocks->refreshIcons();
+                if (m_dockManager)
+                    m_dockManager->refreshIcons();
                 showStatusMsg(tr("Loaded layout profile '%1'").arg(profileName));
                 return;
             }
@@ -99,11 +99,11 @@ void MainWindow::convertTabsToDocks()
         }
 
         settings->setValue(QString::fromLatin1(kSettingLayoutProfile), profileName);
-        if (m_debugDocks && !debugDockState.isEmpty())
-            m_debugDocks->restoreDockStates(debugDockState);
+        if (m_dockManager && !debugDockState.isEmpty())
+            m_dockManager->restoreDockStates(debugDockState);
         restoreCoreDockConnections(coreDockConnections);
-        if (m_debugDocks)
-            m_debugDocks->refreshIcons();
+        if (m_dockManager)
+            m_dockManager->refreshIcons();
         showStatusMsg(tr("Loaded layout profile '%1'").arg(profileName));
     };
 
@@ -142,8 +142,8 @@ void MainWindow::convertTabsToDocks()
             [loadLayoutProfileAction]() { loadLayoutProfileAction(QStringLiteral("custom")); });
     connect(resetToBaselineLayoutAction, &QAction::triggered, this, [this]() {
         resetDockLayout();
-        if (m_debugDocks)
-            m_debugDocks->refreshIcons();
+        if (m_dockManager)
+            m_dockManager->refreshIcons();
         showStatusMsg(tr("Reset layout to baseline"));
     });
     connect(saveDefaultLayoutAction, &QAction::triggered, this,
@@ -186,28 +186,28 @@ void MainWindow::convertTabsToDocks()
 
     QAction *focusAlwaysAction = focusMenu->addAction(tr("Always Raise"));
     focusAlwaysAction->setCheckable(true);
-    focusAlwaysAction->setData(static_cast<int>(DebugDockManager::DockFocusPolicy::Always));
+    focusAlwaysAction->setData(static_cast<int>(DockManager::DockFocusPolicy::Always));
     focusGroup->addAction(focusAlwaysAction);
 
     QAction *focusExplicitAction = focusMenu->addAction(tr("Raise on Explicit Actions"));
     focusExplicitAction->setCheckable(true);
-    focusExplicitAction->setData(static_cast<int>(DebugDockManager::DockFocusPolicy::ExplicitOnly));
+    focusExplicitAction->setData(static_cast<int>(DockManager::DockFocusPolicy::ExplicitOnly));
     focusGroup->addAction(focusExplicitAction);
 
     QAction *focusNeverAction = focusMenu->addAction(tr("Never Raise Automatically"));
     focusNeverAction->setCheckable(true);
-    focusNeverAction->setData(static_cast<int>(DebugDockManager::DockFocusPolicy::Never));
+    focusNeverAction->setData(static_cast<int>(DockManager::DockFocusPolicy::Never));
     focusGroup->addAction(focusNeverAction);
 
     auto applyDockFocusPolicy = [this](int value) {
-        DebugDockManager::DockFocusPolicy policy = DebugDockManager::DockFocusPolicy::Always;
-        if (value == static_cast<int>(DebugDockManager::DockFocusPolicy::ExplicitOnly))
-            policy = DebugDockManager::DockFocusPolicy::ExplicitOnly;
-        else if (value == static_cast<int>(DebugDockManager::DockFocusPolicy::Never))
-            policy = DebugDockManager::DockFocusPolicy::Never;
+        DockManager::DockFocusPolicy policy = DockManager::DockFocusPolicy::Always;
+        if (value == static_cast<int>(DockManager::DockFocusPolicy::ExplicitOnly))
+            policy = DockManager::DockFocusPolicy::ExplicitOnly;
+        else if (value == static_cast<int>(DockManager::DockFocusPolicy::Never))
+            policy = DockManager::DockFocusPolicy::Never;
         settings->setValue(QString::fromLatin1(kSettingDockFocusPolicy), static_cast<int>(policy));
-        if (m_debugDocks)
-            m_debugDocks->setDockFocusPolicy(policy);
+        if (m_dockManager)
+            m_dockManager->setDockFocusPolicy(policy);
     };
     connect(focusGroup, &QActionGroup::triggered, this, [applyDockFocusPolicy](QAction *action) {
         if (!action)
@@ -261,6 +261,13 @@ void MainWindow::convertTabsToDocks()
     m_dock_files = dock_files;
     m_dock_keypad = dock_keypad;
 
+    if (!m_dockManager)
+        m_dockManager = std::make_unique<DockManager>(content_window, material_icon_font, this);
+    m_dockManager->registerMainDock(DockManager::MainDockId::Files, m_dock_files);
+    m_dockManager->registerMainDock(DockManager::MainDockId::Keypad, m_dock_keypad);
+    m_dockManager->registerMainDock(DockManager::MainDockId::Screen, m_dock_lcd);
+    m_dockManager->registerMainDock(DockManager::MainDockId::Controls, m_dock_controls);
+
     /* STEP 3: Create utility docks that were not tab pages. */
     /* Create NAND Browser dock */
     m_nandBrowser = new NandBrowserWidget(content_window);
@@ -273,6 +280,7 @@ void MainWindow::convertTabsToDocks()
                                  true,
                                  true,
                                  false);
+    m_dockManager->registerMainDock(DockManager::MainDockId::NandBrowser, m_dock_nand);
 
     /* Create Hardware Configuration dock */
     m_hwConfig = new HwConfigWidget(content_window);
@@ -285,6 +293,7 @@ void MainWindow::convertTabsToDocks()
                                      true,
                                      true,
                                      false);
+    m_dockManager->registerMainDock(DockManager::MainDockId::HardwareConfig, m_dock_hwconfig);
 
     /* External LCD as an optional floating dock (instead of a separate window). */
     m_dock_ext_lcd = createMainDock(tr("Screen (External)"),
@@ -296,6 +305,7 @@ void MainWindow::convertTabsToDocks()
                                     false,
                                     true,
                                     false);
+    m_dockManager->registerMainDock(DockManager::MainDockId::ExternalScreen, m_dock_ext_lcd);
     m_dock_ext_lcd->setFloating(true);
     m_dock_ext_lcd->hide();
     connect(m_dock_ext_lcd, &DockWidget::visibilityChanged, this, [this](bool visible) {
@@ -329,17 +339,16 @@ void MainWindow::convertTabsToDocks()
     // Keep default corner behavior so all docks behave like regular Qt docks.
 
     /* STEP 5: Create debugger docks and finalize initial dock visibility. */
-    /* Create the CEmu-style debugger docks via DebugDockManager */
-    m_debugDocks = std::make_unique<DebugDockManager>(content_window, material_icon_font, this);
-    m_debugDocks->createDocks(docks_menu);
-    connect(m_debugDocks.get(), &DebugDockManager::debugCommand,
+    /* Create the CEmu-style debugger docks via DockManager */
+    m_dockManager->createDocks(docks_menu);
+    connect(m_dockManager.get(), &DockManager::debugCommand,
             this, &MainWindow::debuggerCommand);
 
     int savedFocusPolicy = settings->value(QString::fromLatin1(kSettingDockFocusPolicy),
-                                           static_cast<int>(DebugDockManager::DockFocusPolicy::Always)).toInt();
-    if (savedFocusPolicy < static_cast<int>(DebugDockManager::DockFocusPolicy::Always) ||
-        savedFocusPolicy > static_cast<int>(DebugDockManager::DockFocusPolicy::Never)) {
-        savedFocusPolicy = static_cast<int>(DebugDockManager::DockFocusPolicy::Always);
+                                           static_cast<int>(DockManager::DockFocusPolicy::Always)).toInt();
+    if (savedFocusPolicy < static_cast<int>(DockManager::DockFocusPolicy::Always) ||
+        savedFocusPolicy > static_cast<int>(DockManager::DockFocusPolicy::Never)) {
+        savedFocusPolicy = static_cast<int>(DockManager::DockFocusPolicy::Always);
     }
     applyDockFocusPolicy(savedFocusPolicy);
     for (QAction *action : focusGroup->actions()) {

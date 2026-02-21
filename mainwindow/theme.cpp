@@ -7,7 +7,7 @@
 #include <QRegularExpression>
 #include <QToolButton>
 
-#include "debugger/dockmanager.h"
+#include "ui/docking/dockmanager.h"
 #include "ui/widgets/disassembly/disassemblywidget.h"
 #include "ui/widgets/hexview/hexviewwidget.h"
 #include "ui/theme/materialicons.h"
@@ -235,8 +235,8 @@ void MainWindow::applyWidgetTheme()
     applyButtonUxDefaults(this);
 
     /* Refresh dock icons (color may have changed with theme) and thin title bars */
-    if (m_debugDocks)
-        m_debugDocks->refreshIcons();
+    if (m_dockManager)
+        m_dockManager->refreshIcons();
     if (content_window) {
         const auto dockChildren = content_window->findChildren<DockWidget *>();
         for (DockWidget *dw : dockChildren) {
@@ -272,8 +272,8 @@ void MainWindow::applyWidgetTheme()
     }
 
     /* Force repaint on custom-painted widgets (they read theme colors directly) */
-    if (m_debugDocks && m_debugDocks->disassembly())
-        m_debugDocks->disassembly()->viewport()->update();
-    if (m_debugDocks && m_debugDocks->hexView())
-        m_debugDocks->hexView()->viewport()->update();
+    if (m_dockManager && m_dockManager->disassembly())
+        m_dockManager->disassembly()->viewport()->update();
+    if (m_dockManager && m_dockManager->hexView())
+        m_dockManager->hexView()->viewport()->update();
 }

@@ -20,7 +20,7 @@
 #include "ui/docking/dockwidget.h"
 #include "app/qmlbridge.h"
 
-class DebugDockManager;
+class DockManager;
 class NandBrowserWidget;
 class HwConfigWidget;
 
@@ -276,8 +276,8 @@ private:
     QToolButton *debugger_toggle_button = nullptr;
     std::function<void()> updatePlayPauseButtonFn;
 
-    // Debug subsystem (owns all 12 debug dock widgets)
-    std::unique_ptr<DebugDockManager> m_debugDocks;
+    // Unified docking subsystem (main and debug dock registration/orchestration)
+    std::unique_ptr<DockManager> m_dockManager;
 
     // Serial line buffer for forwarding to Console dock
     QString m_serialLineBuf;

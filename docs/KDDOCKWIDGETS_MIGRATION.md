@@ -63,4 +63,4 @@ What it does:
 ## Per-Dock State Hook
 
 - Debug widgets now opt into `DockStateSerializable` (`ui/docking/dockstate.h`) to persist custom per-dock UI state.
-- `DebugDockManager` saves/restores these states under `debugDockState` in layout JSON/profile files.
+- `DockManager` saves/restores these states under `debugDockState` in layout JSON/profile files.
