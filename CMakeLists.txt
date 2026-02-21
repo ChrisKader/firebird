@@ -87,6 +87,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     app/emuthread.cpp app/emuthread.h
     app/powercontrol.cpp app/powercontrol.h
     app/qmlbridge.cpp app/qmlbridge.h
+    app/qmlbridge/settings.cpp
+    app/qmlbridge/runtime.cpp
     app/kitmodel.cpp app/kitmodel.h
     # Shared UI components
     ui/dockwidget.cpp ui/dockwidget.h
