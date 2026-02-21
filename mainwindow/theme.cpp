@@ -216,10 +216,22 @@ void MainWindow::applyWidgetTheme()
      * separator lines that Qt draws at each dock-area boundary.  Target only
      * the outer window (objectName "MainWindow") so content_window's dock
      * resize handles remain functional. */
-    setStyleSheet(QStringLiteral(
+    const QString outerWindowStyle = QStringLiteral(
         "QMainWindow#MainWindow::separator { width: 0; height: 0; }"
         "QToolBar#headerToolBar { border: none; }"
-    ) + sharedButtonUx);
+    );
+#ifdef FIREBIRD_USE_KDDOCKWIDGETS
+    // Keep button CSS scoped to local containers on the KDD path.
+    setStyleSheet(outerWindowStyle);
+    if (ui->headerBar)
+        ui->headerBar->setStyleSheet(sharedButtonUx);
+    if (status_bar_tray)
+        status_bar_tray->setStyleSheet(sharedButtonUx);
+    if (m_dock_controls && m_dock_controls->widget())
+        m_dock_controls->widget()->setStyleSheet(sharedButtonUx);
+#else
+    setStyleSheet(outerWindowStyle + sharedButtonUx);
+#endif
     applyButtonUxDefaults(this);
 
     /* Refresh dock icons (color may have changed with theme) and thin title bars */
