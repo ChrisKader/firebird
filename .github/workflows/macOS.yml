@@ -26,19 +26,34 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@f03f05556819ceb3781ee2f455ec44c339d683c0 # v4
       with:
+          version: "6.7.3"
+          host: mac
           target: desktop
-          # Broken: https://github.com/jurplel/install-qt-action/issues/239
-          # setup-python: false
+          arch: clang_64
+          cache: true
 
-    - name: Build firebird-emu Qt on macOS
+    - name: Build and install KDDockWidgets 2.4.0
+      shell: bash
       run: |
-        set -e
-        mkdir build
-        cd build
-        qmake .. && make -j4
-        macdeployqt firebird-emu.app -qmldir=../qml
+        set -euxo pipefail
+        brew install ninja
+        git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git kddockwidgets
+        cmake -S kddockwidgets -B kdd-build -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.deps/kddockwidgets-2.4" \
+          -DKDDockWidgets_NO_SPDLOG=ON
+        cmake --build kdd-build --parallel
+        cmake --install kdd-build
+
+    - name: Build firebird-emu on macOS (Qt6/CMake)
+      shell: bash
+      run: |
+        set -euxo pipefail
+        cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+        cmake --build build --parallel
+        macdeployqt build/firebird-emu.app -qmldir=./qml
         mkdir -p /tmp/firebird-emu_macOS/
-        mv firebird-emu.app /tmp/firebird-emu_macOS/
+        mv build/firebird-emu.app /tmp/firebird-emu_macOS/
 
     - name: "Codesign firebird-emu.app"
       env:

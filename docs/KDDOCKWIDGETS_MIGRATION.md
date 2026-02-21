@@ -4,22 +4,22 @@ This file tracks Phase 1 dependency groundwork for KDDockWidgets migration.
 
 ## Build Flag
 
-- CMake option: `FIREBIRD_ENABLE_KDDOCKWIDGETS` (default: `OFF`)
+- CMake option: `FIREBIRD_ENABLE_KDDOCKWIDGETS` (default: `ON`)
 - When enabled:
   - Requires `find_package(KDDockWidgets 2.4 EXACT REQUIRED)`
   - Defines `FIREBIRD_USE_KDDOCKWIDGETS=1`
   - Links against an exported KDDockWidgets target if available
 
-## Why Disabled by Default
+## Default Build Path
 
-The current UI still uses Qt `QDockWidget`. Enabling KDDockWidgets in this stage
-only validates dependency wiring and keeps migration work isolated from the
-stable path.
+KDDockWidgets is now part of the default desktop build path. Use `build/`
+as the canonical CMake build directory; a separate `build-kdd/` flow is no
+longer required.
 
 ## Platform Status (Current)
 
 - Linux: not verified in this phase
-- macOS: scaffold builds with option OFF (default path)
+- macOS: scaffold builds with option ON (default path)
 - Windows: not verified in this phase
 - Android: not verified in this phase
 - Emscripten/WebAssembly: not verified in this phase

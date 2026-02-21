@@ -10,7 +10,7 @@ find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick QuickWidgets Widgets)
 
 qt_standard_project_setup()
 
-option(FIREBIRD_ENABLE_KDDOCKWIDGETS "Enable experimental KDDockWidgets migration path" OFF)
+option(FIREBIRD_ENABLE_KDDOCKWIDGETS "Enable KDDockWidgets docking backend" ON)
 
 add_executable(firebird-layout-convert
     tools/layout_convert.cpp
@@ -204,6 +204,13 @@ target_compile_definitions(firebird-emu PRIVATE
 
 if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
     set(_kddockwidgets_version 2.4.0)
+    set(_kddockwidgets_local_prefix "${CMAKE_SOURCE_DIR}/.deps/kddockwidgets-2.4")
+    set(_kddockwidgets_local_config
+        "${_kddockwidgets_local_prefix}/lib/cmake/KDDockWidgets-qt6/KDDockWidgets-qt6Config.cmake")
+    if(EXISTS "${_kddockwidgets_local_config}")
+        list(PREPEND CMAKE_PREFIX_PATH "${_kddockwidgets_local_prefix}")
+    endif()
+
     find_package(KDDockWidgets ${_kddockwidgets_version} EXACT CONFIG QUIET)
     if(NOT TARGET KDDockWidgets::KDDockWidgets
        AND NOT TARGET KDDockWidgets::kddockwidgets

@@ -12,28 +12,51 @@ jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-22.04, ubuntu-24.04-arm]
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
           fetch-depth: 0 # submodule checkout does not work with depth=1 (the default)
 
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y qtbase5-dev qtdeclarative5-dev
+          sudo apt install -y \
+            cmake \
+            ninja-build \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            libgl1-mesa-dev \
+            libegl1 \
+            libxkbcommon-x11-0
 
       - name: Build firebird-headless
         working-directory: headless
         run: make -j8
 
-      - name: Build firebird
+      - name: Build and install KDDockWidgets 2.4.0
+        shell: bash
         run: |
-          mkdir build
-          cd build
-          qmake ..
-          make -j4
+          set -euxo pipefail
+          git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git kddockwidgets
+          cmake -S kddockwidgets -B kdd-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.deps/kddockwidgets-2.4" \
+            -DKDDockWidgets_NO_SPDLOG=ON
+          cmake --build kdd-build --parallel
+          cmake --install kdd-build
+
+      - name: Configure Firebird
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build firebird
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure

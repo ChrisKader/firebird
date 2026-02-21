@@ -4,7 +4,10 @@ This document tracks Phase 5 integration coverage for KDDockWidgets layout behav
 
 ## CI Matrix
 
-- Workflow: `.github/workflows/kdd-layout-validation.yml`
+- Workflows:
+  - `.github/workflows/main.yml`
+  - `.github/workflows/macOS.yml`
+  - `.github/workflows/windows.yml`
 - OS coverage:
   - Linux (`ubuntu-24.04`)
   - macOS (`macos-14`)
@@ -12,7 +15,7 @@ This document tracks Phase 5 integration coverage for KDDockWidgets layout behav
 - Build mode:
   - `FIREBIRD_ENABLE_KDDOCKWIDGETS=ON`
 - Test execution:
-  - `ctest --test-dir build-kdd --output-on-failure`
+  - `ctest --test-dir build --output-on-failure`
 
 ## Covered Automated Scenarios
 

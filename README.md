@@ -32,25 +32,19 @@ _macOS:_ | _iOS:_
 Building
 --------
 
-First, you need to install Qt5.  
-Then, you can either use Qt Creator directly (don't forget to configure your kits/compilers etc.!), or run:
+First, install Qt 6 and CMake (desktop build).  
+Then run:
 
 ```
-mkdir -p build
-cd build
-qmake ..
-make
+cmake -S . -B build
+cmake --build build -j8
 ```
-##### A special case: iOS with translation (≈JIT) enabled:
 
-There seems to be a bug in qmake that makes the required .S get ignored when building a JIT-enabled ([`TRANSLATION_ENABLED = true`](https://github.com/nspire-emus/firebird/blob/master/firebird.pro#L4)) binary.  
-As a workaround, you'll have to take care of it manually:
+Notes:
 
-1. Hit Build in Qt Creator, on an iOS kit/target. (It'll fail)
-2. Open the generated .xcodeproj file (in the build folder) in Xcode
-3. Locate `asmcode_arm.S` in the file list, click on it, and in the right sidebar, add it to the Firebird target
-4. Adjust any other project settings as you see fit (certs/profiles/team/signings/entitlements/etc. though this should be automatic except the Team choice)
-5. Build/Run
+1. Desktop default build enables the KDDockWidgets backend.
+2. If your local `build/` dir was configured before this default changed, rerun configure with:
+   `cmake -S . -B build -DFIREBIRD_ENABLE_KDDOCKWIDGETS=ON`
 
 
 License
