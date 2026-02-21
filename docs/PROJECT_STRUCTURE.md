@@ -14,6 +14,10 @@ Status snapshot as of February 21, 2026:
 - Phase 5 (wider repo decomposition): open
 - Phase 6 (ratchet enforcement): open
 
+Phase 5 scope includes `core/` subfolderization: as oversized core files are split,
+they should be moved into subsystem folders instead of adding new top-level
+`core/*.c*` files.
+
 ## Source-Backed Rule Policy
 
 - Every architecture/style rule in this file includes at least one primary Qt/KDD source link.
@@ -54,7 +58,16 @@ Status snapshot as of February 21, 2026:
     - Each debug widget module may expose a local `dockregistration.cpp` for dock metadata/factory registration.
 - `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
-  - `core/power/`: Power-path override control helpers used by UI and debugger.
+  - Current active folders:
+    - `core/power/`: power-path override control helpers used by UI and debugger.
+    - `core/os/`: OS-platform shims and target-specific OS glue.
+    - `core/tests/`: core-focused tests.
+  - Phase 5 target layout (applied incrementally while refactoring):
+    - `core/debug/`: debugger command handling, API, remote debug transport, GDB glue.
+    - `core/usb/`: USB device/host emulation and usblink transport.
+    - `core/memory/`: MMU/memory map, flash, NAND/FS, memory helpers.
+    - `core/cpu/`: CPU/interpreter/JIT translation and coprocessor logic.
+    - `core/peripherals/`: non-USB peripheral models (LCD, timers, PMU, keypad, serial, interrupt).
 - `transfer/`: USB file transfer UI/components.
 - `docs/`: Architecture and behavior specifications.
 - `tools/`: Dev and CI support scripts.
@@ -99,6 +112,22 @@ Boundary considered:
 Alternatives evaluated:
 Follow-up split ticket:
 ```
+
+## Core Subfolderization Policy (Phase 5)
+
+- New files created by `core/` refactors must go under a subsystem folder (for example `core/debug/` or `core/usb/`) rather than `core/` root.
+- When splitting an oversized top-level `core/*.c*` file, move extracted units into subsystem folders in the same change.
+- Prefer cohesive module names over generic buckets:
+  - Preferred: `core/debug/remote.cpp`
+  - Avoid: `core/misc2.cpp`
+- Keep behavior-preserving scope: folder moves plus decomposition should not include unrelated logic changes.
+- Update all build references (`CMakeLists.txt`) and include paths in the same PR.
+- Temporary exceptions are allowed only when a move would create circular include churn; exceptions must include a follow-up ticket in the PR.
+
+Sources:
+- Qt Creator modular architecture inspiration: https://github.com/qt-creator/qt-creator
+- Qt Creator coding style (organization consistency): https://doc.qt.io/qtcreator-extending/coding-style.html
+- Separation-of-concerns rationale used across this plan: https://doc.qt.io/qt-6.5/model-view-programming.html
 
 ## Qt Rules
 
