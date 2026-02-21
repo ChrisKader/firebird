@@ -89,7 +89,7 @@
 #include "ui_mainwindow.h"
 #include "app/qmlbridge.h"
 #include "app/powercontrol.h"
-#include "app/baselinelayout.h"
+#include "mainwindow/docks/baselinelayout.h"
 #include "ui/framebuffer.h"
 #include "ui/keypadbridge.h"
 #include "debugger/dockmanager.h"

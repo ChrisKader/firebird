@@ -27,7 +27,7 @@
     #include <kddockwidgets/core/View.h>
 #endif
 
-#include "app/baselinelayout.h"
+#include "mainwindow/docks/baselinelayout.h"
 #include "debugger/dockmanager.h"
 #include "mainwindow/docks/baseline.h"
 #include "ui/dockwidget.h"

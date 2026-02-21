@@ -4,7 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
-#include "app/baselinelayout.h"
+#include "mainwindow/docks/baselinelayout.h"
 
 static QString coreDockAreaToString(Qt::DockWidgetArea area)
 {
