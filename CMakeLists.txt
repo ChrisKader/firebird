@@ -56,10 +56,10 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/cx2.cpp core/cx2.h
     core/cx2_peripherals.cpp
     core/debug.cpp core/debug.h
-    core/debug_cli.cpp
-    core/debug_remote.cpp
-    core/debug_api.cpp core/debug_api.h
-    core/debug_api_peek.cpp
+    core/debug/debug_cli.cpp
+    core/debug/debug_remote.cpp
+    core/debug/debug_api.cpp core/debug_api.h
+    core/debug/debug_api_peek.cpp
     core/des.c core/des.h
     core/disasm.c core/disasm.h
     core/emu.cpp core/emu.h
@@ -237,7 +237,10 @@ qt_add_qml_module(firebird-emu
     NO_RESOURCE_TARGET_PATH
 )
 
-target_include_directories(firebird-emu PRIVATE ${CMAKE_SOURCE_DIR})
+target_include_directories(firebird-emu PRIVATE
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/core
+)
 
 target_compile_definitions(firebird-emu PRIVATE
 
