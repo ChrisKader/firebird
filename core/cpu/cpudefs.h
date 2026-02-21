@@ -1,7 +1,7 @@
 #ifndef CPUDEFS_H
 #define CPUDEFS_H
 
-#include "bitfield.h"
+#include "cpu/bitfield.h"
 
 // Structure of instructions, enums etc.
 

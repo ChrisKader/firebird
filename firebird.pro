@@ -223,7 +223,7 @@ HEADERS += \
     core/jit/armcode_bin.h \
     core/jit/armsnippets.h \
     core/jit/asmcode.h \
-    core/bitfield.h \
+    core/cpu/bitfield.h \
     core/soc/casplus.h \
     core/cpu/cpu.h \
     core/cpu/cpudefs.h \
