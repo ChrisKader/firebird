@@ -6,6 +6,9 @@ Sources: `data/diags.bin`, `data/osloader.bin`, runtime MMIO traces.
 Companion full-path audit:
 `/Users/ck/dev/firebird/docs/cx2-power-code-audit.md`
 
+Ruled-out touchpad transport analysis:
+`/Users/ck/dev/firebird/docs/cx2-i2c-touchpad-transport.md`
+
 ## 1) Direct MMIO block at `0x90100000` (TG2989 PMIC)
 
 Observed direct register use in DIAGS:
@@ -78,6 +81,16 @@ Primary dispatcher used for mapping below:
 | `0x65` | `0x1C24 -> 0x1C2C` | PMU lifecycle callback path B (sets `0x820/0x828` bits then external handler). | Low |
 | `0x66` | `0x184C -> 0x1B38` | Clears `0x90140804` bit `0x100`, then delay/callback path. | Medium |
 | `0x67` | `0x1868 -> 0x1B48` | Calls selector helper `0x10001440` and posts result. | Medium |
+
+### 2.3) Ruled-out transport path: `0x90050000` (touchpad-side)
+
+The `0x90050000` serial bus/controller path was investigated as a possible PMIC
+transport, then ruled out for PMIC ownership in Firebird.
+
+- Emulator map ties APB slot `0x05` to `touchpad_cx_read/touchpad_cx_write`.
+- Keep this PMIC doc focused on `0x901000xx` and `0x901400xx/0x901408xx`.
+- Full reverse-engineered details for that transport now live in:
+  `docs/cx2-i2c-touchpad-transport.md`.
 
 ## 3) Emulator implications
 
