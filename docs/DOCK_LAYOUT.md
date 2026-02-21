@@ -68,6 +68,8 @@ Changing this order can break persisted layouts because restore requires all tar
 
 ## Related code
 
-- Dock creation: `mainwindow.cpp` (`convertTabsToDocks`)
-- Reset defaults: `mainwindow.cpp` (`resetDockLayout`)
+- Dock creation: `mainwindow/docks/setup.cpp` (`convertTabsToDocks`)
+- Reset defaults: `mainwindow/docks/reset.cpp` (`resetDockLayout`)
+- Layout profile/persistence helpers: `mainwindow/layout_persistence.cpp`
+- Startup restore orchestration: `mainwindow.cpp` (`restoreStartupLayoutFromSettings`)
 - Debug docks: `debugger/dockmanager.cpp`

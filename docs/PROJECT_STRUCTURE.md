@@ -22,6 +22,11 @@ This document is the canonical guide for how to structure new code and refactors
 ## Directory Ownership Map
 
 - `mainwindow/`: Desktop main-window behavior modules (bootstrap, docks, theme, runtime actions).
+  - `mainwindow.cpp`: orchestration/state persistence entry points.
+  - `mainwindow/bootstrap.cpp`: constructor/startup UI wiring.
+  - `mainwindow/docks/*.cpp`: dock construction/reset behavior.
+  - `mainwindow/layout_persistence.cpp`: profile and layout serialization.
+  - `mainwindow/runtime*.cpp`: runtime actions/state transitions.
 - `ui/`: Reusable desktop widgets/components.
 - `debugger/`: Debug panel widgets and docking manager.
 - `app/`: Cross-UI app services (`EmuThread`, `QMLBridge`, shared app logic).

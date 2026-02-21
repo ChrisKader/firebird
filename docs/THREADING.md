@@ -13,7 +13,7 @@ See also:
 
 ## Signal/slot direction
 
-- Emu -> GUI uses `Qt::QueuedConnection` in `mainwindow.cpp` so UI updates always run on the GUI thread.
+- Emu -> GUI uses `Qt::QueuedConnection` in `mainwindow/bootstrap.cpp` and `mainwindow/runtime.cpp` so UI updates always run on the GUI thread.
   - Examples: `serialChar`, `debugStr`, `nlogStr`, `isBusy`, `debuggerEntered`, state transitions.
 - GUI -> Emu currently uses direct calls/flag updates (for example pause/reset/debugger commands).
   - These calls are intentionally lightweight and mostly set shared flags that the emulation loop consumes.

@@ -506,7 +506,9 @@ void QMLBridge::saveKits()
 
 void QMLBridge::usblink_progress_changed(int percent, void *qml_bridge_p)
 {
-    auto &&qml_bridge = reinterpret_cast<QMLBridge*>(qml_bridge_p);
+    auto *qml_bridge = static_cast<QMLBridge *>(qml_bridge_p);
+    if (!qml_bridge)
+        return;
     emit qml_bridge->usblinkProgressChanged(percent);
 }
 

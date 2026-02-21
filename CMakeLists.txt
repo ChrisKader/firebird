@@ -134,6 +134,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     mainwindow/theme.cpp
     mainwindow/runtime.cpp
     mainwindow/runtime/actions.cpp
+    mainwindow/runtime/window.cpp
 )
 
 # mainwindow.ui stays in the repo root; runtime module sources include the
@@ -145,6 +146,7 @@ set_source_files_properties(mainwindow/docks/setup.cpp PROPERTIES SKIP_AUTOUIC O
 set_source_files_properties(mainwindow/docks/reset.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/runtime.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/runtime/actions.cpp PROPERTIES SKIP_AUTOUIC ON)
+set_source_files_properties(mainwindow/runtime/window.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/theme.cpp PROPERTIES SKIP_AUTOUIC ON)
 qt_add_qml_module(firebird-emu
     URI firebird_emu

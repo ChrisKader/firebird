@@ -252,7 +252,7 @@ void MainWindow::usblinkProgress(int progress)
 
 void MainWindow::usblink_progress_callback(int progress, void *userData)
 {
-    MainWindow *mw = reinterpret_cast<MainWindow *>(userData);
+    MainWindow *mw = static_cast<MainWindow *>(userData);
     if (!mw || !mw->ui)
         return;
 
@@ -389,4 +389,3 @@ void MainWindow::retranslateDocks()
         m_dock_controls->setWindowTitle(tr("Controls"));
     if (m_debugDocks) m_debugDocks->retranslate();
 }
-
