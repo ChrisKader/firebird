@@ -75,7 +75,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/mem.c core/mem.h
     core/misc.c core/misc.h
     core/mmu.c core/mmu.h
-    core/nspire_log_hook.cpp core/nspire_log_hook.h
+    core/debug/nspire_log_hook.cpp core/nspire_log_hook.h
     core/os/os.h
     core/schedule.c core/schedule.h
     core/serial.c
