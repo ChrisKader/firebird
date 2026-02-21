@@ -11,31 +11,31 @@ extern "C" {
 
 /* PL190/VIC has 32 interrupt input lines (0..31). */
 #define INT_IRQ0   0
-#define INT_IRQ1   1
-#define INT_IRQ2   2
-#define INT_IRQ3   3
-#define INT_IRQ4   4
+#define INT_IRQ1   1 // UART1
+#define INT_IRQ2   2 // DMA_CONTROLLER
+#define INT_IRQ3   3 // WATCHDOG
+#define INT_IRQ4   4 // RTC
 #define INT_IRQ5   5
 #define INT_IRQ6   6
-#define INT_IRQ7   7
-#define INT_IRQ8   8
-#define INT_IRQ9   9
+#define INT_IRQ7   7 // GPIO
+#define INT_IRQ8   8 // USB_OTG
+#define INT_IRQ9   9 // USB_HOST
 #define INT_IRQ10  10
-#define INT_IRQ11  11
+#define INT_IRQ11  11 // ADC
 #define INT_IRQ12  12
-#define INT_IRQ13  13
-#define INT_IRQ14  14
-#define INT_IRQ15  15
-#define INT_IRQ16  16
-#define INT_IRQ17  17
-#define INT_IRQ18  18
-#define INT_IRQ19  19
-#define INT_IRQ20  20
-#define INT_IRQ21  21
+#define INT_IRQ13  13 // SD_HOST_CONTROLLER
+#define INT_IRQ14  14 // HDQ_1WIRE/INT_LCD_CONTRAST
+#define INT_IRQ15  15 // POWER_MANAGEMENT
+#define INT_IRQ16  16 // KEYPAD
+#define INT_IRQ17  17 // FAST_TIMER
+#define INT_IRQ18  18 // FIRST_TIMER
+#define INT_IRQ19  19 // SECOND_TIMER
+#define INT_IRQ20  20 // I2C
+#define INT_IRQ21  21 // LCD_CONTROLLER
 #define INT_IRQ22  22
 #define INT_IRQ23  23
-#define INT_IRQ24  24
-#define INT_IRQ25  25
+#define INT_IRQ24  24 // TOUCHPAD_IRQ0
+#define INT_IRQ25  25 // TOUCHPAD_IRQ1
 #define INT_IRQ26  26
 #define INT_IRQ27  27
 #define INT_IRQ28  28
@@ -63,20 +63,39 @@ extern "C" {
 #define INT_I2C                     INT_IRQ20
 #define INT_LCD_CONTROLLER          INT_IRQ21
 
+/* Resolved from firmware callsites / MMIO correlation. */
+#define INT_DMA_CONTROLLER          INT_IRQ2  /* logical ID 3; 0xBC000000 block */
+#define INT_TOUCHPAD_IRQ0           INT_IRQ24 /* logical ID 25; 0x90050000 path */
+#define INT_TOUCHPAD_IRQ1           INT_IRQ25 /* logical ID 26; 0x90050000 path */
+
+/* Still unresolved roles from TI-Nspire.bin IRQ map (0x1132A188). */
+#define INT_UNKNOWN_IRQ0            INT_IRQ0  /* logical ID 0 */
+#define INT_UNKNOWN_IRQ5            INT_IRQ5  /* logical ID 6 */
+#define INT_UNKNOWN_IRQ6            INT_IRQ6  /* logical ID 7 */
+#define INT_UNKNOWN_IRQ10           INT_IRQ10 /* logical ID 11 */
+#define INT_UNKNOWN_IRQ22           INT_IRQ22 /* logical ID 23 */
+#define INT_UNKNOWN_IRQ23           INT_IRQ23 /* logical ID 24 */
+#define INT_UNKNOWN_IRQ26           INT_IRQ26 /* logical ID 27 */
+
+/* Backward-compat aliases for recently resolved names. */
+#define INT_UNKNOWN_IRQ2            INT_DMA_CONTROLLER
+#define INT_UNKNOWN_IRQ24           INT_TOUCHPAD_IRQ0
+#define INT_UNKNOWN_IRQ25           INT_TOUCHPAD_IRQ1
+
 /* Backward-compatible aliases used by existing code. */
-#define INT_SERIAL   INT_SERIAL_UART
-#define INT_WATCHDOG INT_WATCHDOG_TIMER
-#define INT_USB      INT_USB_OTG
-#define INT_POWER    INT_POWER_MANAGEMENT
-#define INT_TIMER_FAST INT_FAST_TIMER
-#define INT_TIMER_FIRST INT_FIRST_TIMER
+#define INT_SERIAL       INT_SERIAL_UART
+#define INT_WATCHDOG     INT_WATCHDOG_TIMER
+#define INT_USB          INT_USB_OTG
+#define INT_POWER        INT_POWER_MANAGEMENT
+#define INT_TIMER_FAST   INT_FAST_TIMER
+#define INT_TIMER_FIRST  INT_FIRST_TIMER
 #define INT_TIMER_SECOND INT_SECOND_TIMER
-#define INT_TIMER0   INT_FAST_TIMER
-#define INT_TIMER1   INT_FIRST_TIMER
-#define INT_TIMER2   INT_SECOND_TIMER
-#define INT_LCD      INT_LCD_CONTROLLER
+#define INT_TIMER0       INT_FAST_TIMER
+#define INT_TIMER1       INT_FIRST_TIMER
+#define INT_TIMER2       INT_SECOND_TIMER
+#define INT_LCD          INT_LCD_CONTROLLER
 /* Historical alias retained for existing ADC mirror code paths. */
-#define INT_ADC_ALT  INT_SD_HOST_CONTROLLER
+#define INT_ADC_ALT      INT_SD_HOST_CONTROLLER
 
 typedef struct interrupt_state {
 	uint32_t active;

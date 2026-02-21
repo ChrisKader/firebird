@@ -19,27 +19,65 @@ Direct reads/writes to other `0x901000xx` offsets were not found in boot ROM han
 ## 2) PMIC command ID interface (not APB register offsets)
 
 Bootloader/OSLoader/DIAGS also use a PMIC command layer with IDs around `0x3E9..0x400`.
-These IDs are passed through firmware message wrappers (for example, DIAGS around `0x8560`, OSLoader around `0x8cb4`).
+These IDs are passed through firmware message wrappers (for example, DIAGS around `0x8560`, OSLoader around `0x8CB4`).
 
-| Command ID | Observed wrapper behavior | Width |
-| --- | --- | --- |
-| `0x3E9` | read-like wrapper and 2-arg wrapper variant | `u16` / args |
-| `0x3EA` | read-like wrapper and 2-arg wrapper variant | `u16` / args |
-| `0x3EB` | read-like wrapper | `u32` |
-| `0x3EC` | read-like wrapper | `u16` |
-| `0x3ED` | read-like wrapper | `u32` |
-| `0x3EE` | write-like wrapper with 1 arg | arg |
-| `0x3EF` | write-like wrapper with 1 arg | arg |
-| `0x3F5` | read-like wrapper | `u16` |
-| `0x3FA` | write-like wrapper with 1 arg | arg |
-| `0x3FB` | read-like wrapper | `u8` |
-| `0x3FC` | write-like wrapper with no explicit arg payload | op |
-| `0x3FD` | read-like wrapper | `u32` |
-| `0x3FE` | read-like wrapper | `u32` |
-| `0x3FF` | write-like wrapper with 1 arg | arg |
-| `0x400` | read-like wrapper | `u32` |
+Primary dispatcher used for mapping below:
+- TI-Nspire service handler `0x10001730` (`"Aladdin PMU"` table entry at `0x10C5C850`)
+- helper block `0x10000B70..0x1000172C`
 
-Semantics of each command ID are still partially unknown; this table is based on call signatures and return widths only.
+### 2.1) Command map (`0x3E9..0x40E`)
+
+| Command ID | Dispatcher path | Helper/register path | Inferred purpose | Confidence |
+| --- | --- | --- | --- | --- |
+| `0x3E9` | `0x1858 -> 0x1878 -> 0x1888` | `0x10001474` -> `0x90140060/0x90140050` (clear bit) | Clear selector-mapped PMU status bit (high-halfword domain). | High |
+| `0x3EA` | `0x1858 -> 0x1B64` | `0x10001528` -> `0x90140060/0x90140050` (set bit) | Set selector-mapped PMU status bit (high-halfword domain). | High |
+| `0x3EB` | `0x1BB4 -> 0x1BD4` | `0x10000B70` reads `0x90140060` or `0x90140050` | Active-low status query through selector table (`0xFF` => forced true). | High |
+| `0x3EC` | `0x1BB4 -> 0x1BD0` | `0x10001704` (calls `0x100016C4` twice) | Two-lane PMU control write sequence (`lane 0` then `lane 1`, mode `2`). | Medium |
+| `0x3ED` | `0x17BC -> 0x1B08` | `0x10001568` | Set mapped PMU bit and mirror/update PMU sideband flags (`+0x04/+0xC4/+0x814`). | High |
+| `0x3EE` | `0x17BC -> 0x1B94` | `0x100014B4` | Clear mapped PMU bit and mirror/update PMU sideband flags (`+0x04/+0xC4`). | High |
+| `0x3EF` | `0x17E4 -> 0x1BA4` | `0x10000C14` reads `0x90140000` | Scan selector list and return first active index/state token. | High |
+| `0x3F0` | `0x17F0 -> 0x1B84` | `0x100015D4` (`0x90140000`), `0x100015F0` (`0x90140818`) | Set PMU command bitfield entry; special path toggles `0x90140818` bit `0x10` based on argument. | High |
+| `0x3F1` | falls through | sets `result = -5` | Not implemented in this dispatcher. | High |
+| `0x3F2` | `0x17F8 -> 0x1808` | `0x10000C7C` | Force `0x90140000 = 0xFFFFFFFF`. | High |
+| `0x3F3` | `0x17D8` (`>=` check) | direct return | Accepted/no-op in this handler path. | Medium |
+| `0x3F4` | `0x17D8` (`>=` check) | direct return | Accepted/no-op in this handler path. | Medium |
+| `0x3F5` | `0x188C` (`<0x3F6` path) | `0x100016C4` then `0x1042C120` | Generic PMU lane/mode write (`arg0` lane, `arg1` mode), then notify/flush callback. | Medium |
+| `0x3F6` | `0x188C -> 0x1960` | `0x10000C08` | Read selector-indexed status byte at `table+0x75`. | High |
+| `0x3F7` | `0x1890` (`>0x3F6`) | direct return | Accepted/no-op in this handler path. | Medium |
+| `0x3F8` | `0x1890` (`>0x3F6`) | direct return | Accepted/no-op in this handler path. | Medium |
+| `0x3F9` | `0x1744 -> 0x1B00` | `0x10001408` | PMU init/reset sequence (`+0x850/+0x854` clear/seed, `+0x20 |= 0x400`). | High |
+| `0x3FA` | `0x192C -> 0x1990` | `0x10000AB0(sel=1)` | Derived measurement/query class #1 (clock/power-domain dependent). | Medium |
+| `0x3FB` | `0x192C -> 0x19A0` | `0x10000AB0(sel=2)` | Derived measurement/query class #2. | Medium |
+| `0x3FC` | `0x193C -> 0x1980` | `0x10000AB0(sel=3)` | Derived measurement/query class #3. | Medium |
+| `0x3FD` | `0x1944 -> 0x1950` | `0x10000AB0(sel=4)` | Derived measurement/query class #4. | Medium |
+| `0x3FE` | `0x1810 -> 0x1AF0` | reads `0x90140030` | Return PMU clocks/config register value. | High |
+| `0x3FF` | `0x182C -> 0x1B74` | `0x100015F0` | Toggle `0x90140818` bit `0x10` (argument-dependent). | High |
+| `0x400` | `0x1838 -> 0x1840` | reads `state+0x6C` | Return PMU cached state byte (`mode/status token`). | Medium |
+| `0x401` | `0x181C -> 0x1AE0` | `0x10001198` | Set PMU state machine token (`state+0x74`) and invoke transition hooks for select IDs. | Medium |
+| `0x402` | `0x1C88 -> 0x1CB4` | `0x10000FC8` | Read table-based threshold/calibration bucket. | Medium |
+| `0x403` | `0x1C94 -> 0x1C00` | `0x10001394` -> `0x90140830/0x90140834` | Program PMU packed config fields from argument bytes. | Medium |
+| `0x404` | `0x175C -> 0x1B18` | `0x100010AC` | PMU command callback using active PMU state context. | Medium |
+| `0x405` | `0x18DC` (`<0x406`) | direct return (`0x0A`) | Constant status return (`10`). | High |
+| `0x406` | `0x18DC` (`==0x406`) | direct return (`0x09`) | Constant status return (`9`). | High |
+| `0x407` | `0x18FC -> 0x19B8` | `0x10001238` -> `0x90140810` bit0 | Return PMU flag bit0 from `0x90140810`. | High |
+| `0x408` | `0x1908 -> 0x1914` | read `0x90140810` bit4 | Return PMU flag bit4 from `0x90140810`. | High |
+| `0x409` | `0x176C -> 0x19B0` | branch `0x1000172C -> 0x10338FF4` | External PMU service callback/notify path. | Low |
+| `0x40A` | `0x178C -> 0x1B24` | `0x10000C90` -> `0x90140810` bit8 | Return PMU flag bit8 from `0x90140810`. | High |
+| `0x40B` | `0x1798/0x17A0` | `0x1000124C` or `0x100012D8` -> `0x90140800` | Set/clear mapped bits in PMU control register `0x90140800` (direction from request flag). | Medium |
+| `0x40C` | `0x177C -> 0x1B30` | `0x10001364` -> `0x90140804` | Set `0x100` in `0x90140804`. | High |
+| `0x40D` | `0x1BE8 -> 0x1C14` | `0x1000137C` -> `0x90140804` | Clear `0x100` in `0x90140804`. | High |
+| `0x40E` | `0x1BF4 -> 0x1C00` | `0x10001394` -> `0x90140830/0x90140834` | Program packed PMU config fields (extended variant with 2 args). | Medium |
+
+### 2.2) Non-`0x3E9..0x40E` service commands in same dispatcher
+
+| Command ID | Path | Inferred purpose | Confidence |
+| --- | --- | --- | --- |
+| `0x01` | `0x18C8 -> 0x19C4` | PMU bring-up/state seed sequence (`0x820/0x828/0x83C/0x840`, state bytes). | Medium |
+| `0x07` | `0x18BC` | Explicit success/no-op return. | High |
+| `0x64` | `0x1C1C -> 0x1C60` | PMU lifecycle callback path A (power/sleep related external handlers). | Low |
+| `0x65` | `0x1C24 -> 0x1C2C` | PMU lifecycle callback path B (sets `0x820/0x828` bits then external handler). | Low |
+| `0x66` | `0x184C -> 0x1B38` | Clears `0x90140804` bit `0x100`, then delay/callback path. | Medium |
+| `0x67` | `0x1868 -> 0x1B48` | Calls selector helper `0x10001440` and posts result. | Medium |
 
 ## 3) Emulator implications
 
