@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include "casplus.h"
+#include "soc/casplus.h"
 #include "timing/schedule.h"
 #include "peripherals/keypad.h"
 #include "cpu/cpu.h"

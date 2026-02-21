@@ -41,14 +41,14 @@ CXXFLAGS += -std=c++11 $(FLAGS)
 LFLAGS +=
 LIBS := -lz
 
-CSOURCES   += ../core/armsnippets_loader.c ../core/casplus.c ../core/crypto/des.c ../core/disassembly/disasm.c ../core/debug/gdbstub.c \
+CSOURCES   += ../core/armsnippets_loader.c ../core/soc/casplus.c ../core/crypto/des.c ../core/disassembly/disasm.c ../core/debug/gdbstub.c \
               ../core/peripherals/interrupt.c ../core/peripherals/lcd.c ../core/peripherals/link.c ../core/memory/mem.c ../core/peripherals/misc.c \
               ../core/memory/mmu.c ../core/timing/schedule.c ../core/peripherals/serial.c ../core/crypto/sha256.c ../core/usb/usb.c ../core/usb/usblink.c \
               ../core/os/os-linux.c
 
 CPPSOURCES += ../core/cpu/arm_interpreter.cpp ../core/cpu/coproc.cpp ../core/cpu/cpu.cpp ../core/debug/debug.cpp ../core/emu.cpp \
               ../core/storage/flash.cpp ../core/gif.cpp ../core/cpu/thumb_interpreter.cpp ../core/usb/usblink_queue.cpp main.cpp \
-              ../core/peripherals/keypad.cpp ../core/cx2.cpp ../core/usb/usb_cx2.cpp ../core/usb/usblink_cx2.cpp ../core/storage/fieldparser.cpp
+              ../core/peripherals/keypad.cpp ../core/soc/cx2.cpp ../core/usb/usb_cx2.cpp ../core/usb/usblink_cx2.cpp ../core/storage/fieldparser.cpp
 
 OBJS = $(patsubst %.S, %.o, $(ASMSOURCES))
 OBJS += $(patsubst %.c, %.o, $(CSOURCES))

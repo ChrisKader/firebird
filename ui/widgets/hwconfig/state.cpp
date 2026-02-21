@@ -4,7 +4,7 @@
 #include <climits>
 #include <cstdlib>
 
-#include "core/cx2.h"
+#include "core/soc/cx2.h"
 #include "core/emu.h"
 #include "core/peripherals/misc.h"
 

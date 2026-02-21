@@ -136,7 +136,7 @@ Use this quick validation after battery/PMU changes:
 ## 8) Relevant emulator implementation files
 
 - `core/peripherals/misc.c` (CX II ADC sample generation, battery code mapping)
-- `core/cx2.cpp` (Aladdin PMU register model, `0x90140060` composition)
+- `core/soc/cx2.cpp` (Aladdin PMU register model, `0x90140060` composition)
 - `ui/widgets/hwconfig/hwconfigwidget.cpp` (battery/charger override UI wiring)
 
 ## 9) Stage-specific expectations (CX II CAS)

@@ -28,8 +28,8 @@ Runtime trace used:
 `/Users/ck/dev/firebird/core/memory/mem.c` maps CX II power-related MMIO as:
 
 - `0x900B0000` (`apb_set_map(0x0B, adc_cx2_read_word, adc_cx2_write_word)`) -> FTADCC010 model in `/Users/ck/dev/firebird/core/peripherals/misc.c`
-- `0x90100000` (`apb_set_map(0x10, tg2989_pmic_read, tg2989_pmic_write)`) -> PMIC ID/status model in `/Users/ck/dev/firebird/core/cx2.cpp`
-- `0x90140000` (`apb_set_map(0x14, aladdin_pmu_read, aladdin_pmu_write)`) -> Aladdin PMU model in `/Users/ck/dev/firebird/core/cx2.cpp`
+- `0x90100000` (`apb_set_map(0x10, tg2989_pmic_read, tg2989_pmic_write)`) -> PMIC ID/status model in `/Users/ck/dev/firebird/core/soc/cx2.cpp`
+- `0x90140000` (`apb_set_map(0x14, aladdin_pmu_read, aladdin_pmu_write)`) -> Aladdin PMU model in `/Users/ck/dev/firebird/core/soc/cx2.cpp`
 - `0x90020000` (`apb_set_map(0x02, serial_cx_read, serial_cx_write)`) -> UART1 path in `/Users/ck/dev/firebird/core/peripherals/serial.c`
 - `0x90070000` (`apb_set_map(0x07, serial_cx2_read, serial_cx2_write)`) -> UART2 path in `/Users/ck/dev/firebird/core/peripherals/serial.c`
 
@@ -57,7 +57,7 @@ Battery/charger sample composition currently modeled:
 - `0x900B0008` and `0x900B0014`: auxiliary VREF channel (696)
 - `0x900B0018`: data-only VBUS sample (read path masked to low 10-bit ADC code)
 
-### 2.2 PMIC (`0x901000xx`) in `/Users/ck/dev/firebird/core/cx2.cpp`
+### 2.2 PMIC (`0x901000xx`) in `/Users/ck/dev/firebird/core/soc/cx2.cpp`
 
 Explicitly modeled:
 
@@ -69,7 +69,7 @@ Model policy:
 - model bucket set to TG2985
 - sign clear to select `...E` variant path
 
-### 2.3 Aladdin PMU (`0x901400xx` and `0x901408xx`) in `/Users/ck/dev/firebird/core/cx2.cpp`
+### 2.3 Aladdin PMU (`0x901400xx` and `0x901408xx`) in `/Users/ck/dev/firebird/core/soc/cx2.cpp`
 
 Explicit PMU base behavior:
 

@@ -174,7 +174,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/cpu/thumb_interpreter.cpp \
     core/usb/usblink_queue.cpp \
     core/armsnippets_loader.c \
-    core/casplus.c \
+    core/soc/casplus.c \
     core/crypto/des.c \
     core/disassembly/disasm.c \
     core/debug/gdbstub.c \
@@ -203,7 +203,7 @@ SOURCES += $$ASMCODE_IMPL \
     fbaboutdialog.cpp \
     ui/docking/widgets/dockwidget.cpp \
     ui/widgets/main/consolelineedit/consolelineedit.cpp \
-    core/cx2.cpp
+    core/soc/cx2.cpp
 
 FORMS += \
     mainwindow.ui
@@ -224,7 +224,7 @@ HEADERS += \
     core/armsnippets.h \
     core/asmcode.h \
     core/bitfield.h \
-    core/casplus.h \
+    core/soc/casplus.h \
     core/cpu/cpu.h \
     core/cpu/cpudefs.h \
     core/debug/debug.h \
@@ -254,7 +254,7 @@ HEADERS += \
     fbaboutdialog.h \
     ui/docking/widgets/dockwidget.h \
     ui/widgets/main/consolelineedit/consolelineedit.h \
-    core/cx2.h
+    core/soc/cx2.h
 
 # For localization
 lupdate_only {

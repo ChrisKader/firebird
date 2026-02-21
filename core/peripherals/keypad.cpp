@@ -10,7 +10,7 @@
 #include "timing/schedule.h"
 #include "peripherals/interrupt.h"
 #include "memory/mem.h"
-#include "cx2.h"
+#include "soc/cx2.h"
 
 /* 900E0000: Keypad controller */
 keypad_state keypad;

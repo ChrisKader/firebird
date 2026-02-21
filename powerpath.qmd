@@ -5,7 +5,7 @@ This document describes the power-path logic as it is currently implemented in c
 Primary implementation files:
 
 - `/Users/ck/dev/firebird/core/peripherals/misc.c` (rail model, charger state, ADC synthesis)
-- `/Users/ck/dev/firebird/core/cx2.cpp` (PMU/PMIC register projection)
+- `/Users/ck/dev/firebird/core/soc/cx2.cpp` (PMU/PMIC register projection)
 - `/Users/ck/dev/firebird/core/usb/usb_cx2.cpp` (USB physical attach gating)
 - `/Users/ck/dev/firebird/core/power/powercontrol.cpp` (UI/runtime override behavior)
 - `/Users/ck/dev/firebird/mainwindow.cpp` and `/Users/ck/dev/firebird/ui/widgets/hwconfig/hwconfigwidget.cpp` (override initialization/reset)
@@ -164,7 +164,7 @@ Top-level ADC bank (`0x900B0000` region) is projected as:
 
 ## 7. PMU / PMIC Register Projection
 
-From `/Users/ck/dev/firebird/core/cx2.cpp`:
+From `/Users/ck/dev/firebird/core/soc/cx2.cpp`:
 
 - TG2989/TG2985 status is refreshed from `cx2_external_power_present()`, which
   requires qualified external rails (`usb_ok || dock_ok`) from the power model.

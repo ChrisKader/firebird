@@ -1,7 +1,7 @@
 #include "emu.h"
 
 #include "memory/mem.h"
-#include "cx2.h"
+#include "soc/cx2.h"
 #include "peripherals/misc.h"
 #include "timing/schedule.h"
 #include "peripherals/interrupt.h"

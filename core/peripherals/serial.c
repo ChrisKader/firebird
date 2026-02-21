@@ -4,7 +4,7 @@
 #include "peripherals/interrupt.h"
 #include "peripherals/misc.h"
 #include "memory/mem.h"
-#include "casplus.h"
+#include "soc/casplus.h"
 #include "os/os.h"
 
 FILE *xmodem_file;

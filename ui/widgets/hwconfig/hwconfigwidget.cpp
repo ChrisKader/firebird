@@ -5,7 +5,7 @@
 #include <QFormLayout>
 
 #include "core/power/powercontrol.h"
-#include "core/cx2.h"
+#include "core/soc/cx2.h"
 #include "core/emu.h"
 #include "core/peripherals/misc.h"
 #include "core/memory/mem.h"

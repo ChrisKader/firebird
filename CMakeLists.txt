@@ -49,11 +49,11 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/armsnippets_loader.c
     core/asmcode.c core/asmcode.h
     core/bitfield.h
-    core/casplus.c core/casplus.h
+    core/soc/casplus.c core/soc/casplus.h
     core/cpu/coproc.cpp
     core/cpu/cpu.cpp core/cpu/cpu.h
     core/cpu/cpudefs.h
-    core/cx2.cpp core/cx2.h
+    core/soc/cx2.cpp core/soc/cx2.h
     core/peripherals/cx2_peripherals.cpp
     core/debug/debug.cpp core/debug/debug.h
     core/debug/debug_cli.cpp
