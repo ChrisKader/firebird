@@ -54,8 +54,12 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/cpu.cpp core/cpu.h
     core/cpudefs.h
     core/cx2.cpp core/cx2.h
+    core/cx2_peripherals.cpp
     core/debug.cpp core/debug.h
+    core/debug_cli.cpp
+    core/debug_remote.cpp
     core/debug_api.cpp core/debug_api.h
+    core/debug_api_peek.cpp
     core/des.c core/des.h
     core/disasm.c core/disasm.h
     core/emu.cpp core/emu.h
@@ -80,6 +84,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/translate.h
     core/usb.c core/usb.h
     core/usb_cx2.cpp core/usb_cx2.h
+    core/usb_cx2_state.cpp
     core/usblink.c core/usblink.h
     core/usblink_cx2.cpp core/usblink_cx2.h
     core/usblink_queue.cpp core/usblink_queue.h
