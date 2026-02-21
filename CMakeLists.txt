@@ -107,10 +107,13 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     ui/docking/manager/debugdockregistration.cpp ui/docking/manager/debugdockregistration.h
     ui/docking/manager/dockmanager_state.cpp
     ui/widgets/disassembly/disassemblywidget.cpp ui/widgets/disassembly/disassemblywidget.h
+    ui/widgets/disassembly/disassemblywidget_runtime.cpp
     ui/widgets/disassembly/dockregistration.cpp
     ui/widgets/registers/registerwidget.cpp ui/widgets/registers/registerwidget.h
     ui/widgets/registers/dockregistration.cpp
     ui/widgets/hexview/hexviewwidget.cpp ui/widgets/hexview/hexviewwidget.h
+    ui/widgets/hexview/hexviewwidget_search.cpp
+    ui/widgets/hexview/hexviewwidget_context.cpp
     ui/widgets/hexview/dockregistration.cpp
     ui/widgets/breakpoints/breakpointwidget.cpp ui/widgets/breakpoints/breakpointwidget.h
     ui/widgets/breakpoints/dockregistration.cpp
