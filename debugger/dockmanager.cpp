@@ -4,11 +4,7 @@
 #include <QMenu>
 #include <QShortcut>
 
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    #include <kddockwidgets/MainWindow.h>
-    #include <kddockwidgets/KDDockWidgets.h>
-#endif
-
+#include "ui/dockbackend.h"
 #include "ui/dockwidget.h"
 #include "ui/kdockwidget.h"
 #include "ui/keypadbridge.h"
@@ -82,121 +78,6 @@ void applyStandardDockFeatures(DockWidget *dw, bool closable = true)
     dw->setFeatures(features);
 }
 
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-KDDockWidgets::QtWidgets::MainWindow *asKDDMainWindow(QMainWindow *window)
-{
-    return dynamic_cast<KDDockWidgets::QtWidgets::MainWindow *>(window);
-}
-
-KDDockWidgets::Location toKDDLocation(Qt::DockWidgetArea area)
-{
-    switch (area) {
-    case Qt::LeftDockWidgetArea: return KDDockWidgets::Location_OnLeft;
-    case Qt::TopDockWidgetArea: return KDDockWidgets::Location_OnTop;
-    case Qt::RightDockWidgetArea: return KDDockWidgets::Location_OnRight;
-    case Qt::BottomDockWidgetArea: return KDDockWidgets::Location_OnBottom;
-    default: return KDDockWidgets::Location_OnRight;
-    }
-}
-#endif
-
-void addDockWidgetCompat(QMainWindow *window,
-                         DockWidget *dock,
-                         Qt::DockWidgetArea area,
-                         DockWidget *relativeTo = nullptr,
-                         bool startHidden = false)
-{
-    if (!window || !dock)
-        return;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    if (auto *kdd = asKDDMainWindow(window)) {
-        KDDockWidgets::InitialOption initial;
-        if (dock->widget()) {
-            const QSize hinted = dock->widget()->sizeHint();
-            if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
-                initial.preferredSize = hinted;
-        }
-        if (startHidden)
-            initial.visibility = KDDockWidgets::InitialVisibilityOption::StartHidden;
-        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo, initial);
-        return;
-    }
-#else
-    Q_UNUSED(relativeTo);
-    Q_UNUSED(startHidden);
-    window->addDockWidget(area, dock);
-#endif
-}
-
-void tabifyDockWidgetCompat(QMainWindow *window, DockWidget *first, DockWidget *second)
-{
-    if (!window || !first || !second)
-        return;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    if (asKDDMainWindow(window)) {
-        first->addDockWidgetAsTab(second);
-        return;
-    }
-#else
-    window->tabifyDockWidget(first, second);
-#endif
-}
-
-void removeDockWidgetCompat(QMainWindow *window, DockWidget *dock)
-{
-    if (!window || !dock)
-        return;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    Q_UNUSED(window);
-    dock->close();
-#else
-    window->removeDockWidget(dock);
-#endif
-}
-
-void splitDockWidgetCompat(QMainWindow *window, DockWidget *first, DockWidget *second, Qt::Orientation orientation)
-{
-    if (!window || !first || !second)
-        return;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    Q_UNUSED(window);
-    KDDockWidgets::InitialOption initial;
-    if (second->widget()) {
-        const QSize hinted = second->widget()->sizeHint();
-        if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
-            initial.preferredSize = hinted;
-    }
-    first->addDockWidgetToContainingWindow(
-        second,
-        orientation == Qt::Horizontal ? KDDockWidgets::Location_OnRight
-                                      : KDDockWidgets::Location_OnBottom,
-        first,
-        initial);
-#else
-    window->splitDockWidget(first, second, orientation);
-#endif
-}
-
-void resizeDocksCompat(QMainWindow *window,
-                       const QList<DockWidget *> &docks,
-                       const QList<int> &sizes,
-                       Qt::Orientation orientation)
-{
-    Q_UNUSED(window);
-    Q_UNUSED(docks);
-    Q_UNUSED(sizes);
-    Q_UNUSED(orientation);
-#ifndef FIREBIRD_USE_KDDOCKWIDGETS
-    if (!window)
-        return;
-    QList<QDockWidget *> qDocks;
-    qDocks.reserve(docks.size());
-    for (DockWidget *dock : docks)
-        qDocks.append(dock);
-    window->resizeDocks(qDocks, sizes, orientation);
-#endif
-}
-
 } // namespace
 
 DebugDockManager::DebugDockManager(QMainWindow *host, const QFont &iconFont,
@@ -257,7 +138,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
         dw->applyThinTitlebar(true);
         dw->setWidget(widget);
         applyStandardDockFeatures(dw, !coreDock);
-        addDockWidgetCompat(m_host, dw, area, nullptr, !coreDock);
+        DockBackend::addDockWidgetCompat(m_host, dw, area, nullptr, !coreDock);
 #ifndef FIREBIRD_USE_KDDOCKWIDGETS
         if (!coreDock)
             dw->hide();
@@ -298,7 +179,7 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
                            DebugDockId::Stack, Qt::RightDockWidgetArea, false);
 
     /* Tab Registers and Stack together */
-    tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
     m_registerDock->raise();
 
     m_hexDock = makeDock(tr("Memory"), m_hexWidget,
@@ -329,16 +210,16 @@ void DebugDockManager::createDocks(QMenu *docksMenu)
     refreshIcons();
 
     /* Tab together: Memory, Breakpoints, Watchpoints, Port Monitor, + new docks */
-    tabifyDockWidgetCompat(m_host, m_hexDock, m_breakpointDock);
-    tabifyDockWidgetCompat(m_host, m_breakpointDock, m_watchpointDock);
-    tabifyDockWidgetCompat(m_host, m_watchpointDock, m_portMonitorDock);
-    tabifyDockWidgetCompat(m_host, m_portMonitorDock, m_keyHistoryDock);
-    tabifyDockWidgetCompat(m_host, m_keyHistoryDock, m_consoleDock);
-    tabifyDockWidgetCompat(m_host, m_consoleDock, m_memVisDock);
-    tabifyDockWidgetCompat(m_host, m_memVisDock, m_cycleCounterDock);
-    tabifyDockWidgetCompat(m_host, m_cycleCounterDock, m_timerMonitorDock);
-    tabifyDockWidgetCompat(m_host, m_timerMonitorDock, m_lcdStateDock);
-    tabifyDockWidgetCompat(m_host, m_lcdStateDock, m_mmuViewerDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_hexDock, m_breakpointDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_breakpointDock, m_watchpointDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_watchpointDock, m_portMonitorDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_portMonitorDock, m_keyHistoryDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_keyHistoryDock, m_consoleDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_consoleDock, m_memVisDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_memVisDock, m_cycleCounterDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_cycleCounterDock, m_timerMonitorDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_timerMonitorDock, m_lcdStateDock);
+    DockBackend::tabifyDockWidgetCompat(m_host, m_lcdStateDock, m_mmuViewerDock);
     m_hexDock->raise();
 
     /* -- Connect signals ----------------------------------- */
@@ -455,10 +336,10 @@ void DebugDockManager::addHexViewDock()
     dw->applyThinTitlebar(true);
     dw->setWidget(widget);
     applyStandardDockFeatures(dw);
-    addDockWidgetCompat(m_host, dw, Qt::BottomDockWidgetArea);
+    DockBackend::addDockWidgetCompat(m_host, dw, Qt::BottomDockWidgetArea);
 
     if (m_hexDock)
-        tabifyDockWidgetCompat(m_host, m_hexDock, dw);
+        DockBackend::tabifyDockWidgetCompat(m_host, m_hexDock, dw);
     dw->raise();
 
     if (m_docksMenu) {
@@ -484,23 +365,23 @@ void DebugDockManager::resetLayout()
     for (DockWidget *dw : debugDocks)
     {
         if (dw)
-            removeDockWidgetCompat(m_host, dw);
+            DockBackend::removeDockWidgetCompat(m_host, dw);
     }
 
     /* Right area: Disassembly on top, Registers/Stack tabbed below */
     if (m_disasmDock) {
-        addDockWidgetCompat(m_host, m_disasmDock, Qt::RightDockWidgetArea);
+        DockBackend::addDockWidgetCompat(m_host, m_disasmDock, Qt::RightDockWidgetArea);
         m_disasmDock->setVisible(true);
     }
     if (m_registerDock) {
-        addDockWidgetCompat(m_host, m_registerDock, Qt::RightDockWidgetArea);
+        DockBackend::addDockWidgetCompat(m_host, m_registerDock, Qt::RightDockWidgetArea);
         m_registerDock->setVisible(true);
     }
     if (m_stackDock) {
-        addDockWidgetCompat(m_host, m_stackDock, Qt::RightDockWidgetArea);
+        DockBackend::addDockWidgetCompat(m_host, m_stackDock, Qt::RightDockWidgetArea);
         m_stackDock->setVisible(true);
         if (m_registerDock)
-            tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
+            DockBackend::tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
         if (m_registerDock) m_registerDock->raise();
     }
 
@@ -511,14 +392,14 @@ void DebugDockManager::resetLayout()
     auto placeGroup = [this](DockWidget *anchor, const QList<DockWidget *> &tabs) -> DockWidget * {
         if (!anchor)
             return nullptr;
-        addDockWidgetCompat(m_host, anchor, Qt::BottomDockWidgetArea);
+        DockBackend::addDockWidgetCompat(m_host, anchor, Qt::BottomDockWidgetArea);
         anchor->setVisible(true);
         for (DockWidget *dw : tabs) {
             if (!dw)
                 continue;
-            addDockWidgetCompat(m_host, dw, Qt::BottomDockWidgetArea, anchor);
+            DockBackend::addDockWidgetCompat(m_host, dw, Qt::BottomDockWidgetArea, anchor);
             dw->setVisible(true);
-            tabifyDockWidgetCompat(m_host, anchor, dw);
+            DockBackend::tabifyDockWidgetCompat(m_host, anchor, dw);
         }
         return anchor;
     };
@@ -533,7 +414,7 @@ void DebugDockManager::resetLayout()
                                               m_cycleCounterDock });
 
     if (memoryRoot && debugToolsRoot)
-        splitDockWidgetCompat(m_host, memoryRoot, debugToolsRoot, Qt::Horizontal);
+        DockBackend::splitDockWidgetCompat(m_host, memoryRoot, debugToolsRoot, Qt::Horizontal);
 
     if (m_hexDock)
         m_hexDock->raise();
@@ -543,14 +424,14 @@ void DebugDockManager::resetLayout()
     QList<int> hSizes;
     if (m_disasmDock) { hTargets << m_disasmDock; hSizes << 400; }
     if (!hTargets.isEmpty())
-        resizeDocksCompat(m_host, hTargets, hSizes, Qt::Horizontal);
+        DockBackend::resizeDocksCompat(m_host, hTargets, hSizes, Qt::Horizontal);
 
     QList<DockWidget *> vTargets;
     QList<int> vSizes;
     if (memoryRoot) { vTargets << memoryRoot; vSizes << 200; }
     else if (debugToolsRoot) { vTargets << debugToolsRoot; vSizes << 200; }
     if (!vTargets.isEmpty())
-        resizeDocksCompat(m_host, vTargets, vSizes, Qt::Vertical);
+        DockBackend::resizeDocksCompat(m_host, vTargets, vSizes, Qt::Vertical);
 
     auto hideByDefault = [](DockWidget *dock) {
         if (dock)

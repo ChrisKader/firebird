@@ -17,9 +17,7 @@
 #include <utility>
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    #include <kddockwidgets/MainWindow.h>
     #include <kddockwidgets/DockWidget.h>
-    #include <kddockwidgets/KDDockWidgets.h>
     #include <kddockwidgets/LayoutSaver.h>
     #include <kddockwidgets/qtcommon/View.h>
     #include <kddockwidgets/core/DockWidget.h>
@@ -34,74 +32,6 @@
 #include "ui/dockwidget.h"
 #include "ui/kdockwidget.h"
 #include "ui/materialicons.h"
-
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-static KDDockWidgets::QtWidgets::MainWindow *asKDDMainWindow(QMainWindow *window)
-{
-    return dynamic_cast<KDDockWidgets::QtWidgets::MainWindow *>(window);
-}
-
-static KDDockWidgets::Location toKDDLocation(Qt::DockWidgetArea area)
-{
-    switch (area) {
-    case Qt::LeftDockWidgetArea: return KDDockWidgets::Location_OnLeft;
-    case Qt::TopDockWidgetArea: return KDDockWidgets::Location_OnTop;
-    case Qt::RightDockWidgetArea: return KDDockWidgets::Location_OnRight;
-    case Qt::BottomDockWidgetArea: return KDDockWidgets::Location_OnBottom;
-    default: return KDDockWidgets::Location_OnRight;
-    }
-}
-#endif
-
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-static void addDockWidgetCompatWithAnyRelative(QMainWindow *window,
-                                               DockWidget *dock,
-                                               Qt::DockWidgetArea area,
-                                               KDDockWidgets::QtWidgets::DockWidget *relativeTo = nullptr,
-                                               bool startHidden = false,
-                                               bool preserveCurrentSize = false,
-                                               const QSize &preferredSize = QSize())
-{
-    if (!window || !dock)
-        return;
-
-    if (auto *kdd = asKDDMainWindow(window)) {
-        KDDockWidgets::InitialOption initial;
-        if (preferredSize.isValid() && preferredSize.width() > 0 && preferredSize.height() > 0)
-            initial.preferredSize = preferredSize;
-        if (preserveCurrentSize) {
-            const QSize current = dock->size();
-            if (current.isValid() && current.width() > 0 && current.height() > 0)
-                initial.preferredSize = current;
-        }
-        if (!initial.preferredSize.isValid() && dock->widget()) {
-            const QSize hinted = dock->widget()->sizeHint();
-            if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
-                initial.preferredSize = hinted;
-        }
-        if (startHidden)
-            initial.visibility = KDDockWidgets::InitialVisibilityOption::StartHidden;
-        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo, initial);
-        return;
-    }
-}
-#endif
-
-static void tabifyDockWidgetCompat(QMainWindow *window,
-                                   DockWidget *first,
-                                   DockWidget *second)
-{
-    if (!window || !first || !second || first == second)
-        return;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    if (asKDDMainWindow(window)) {
-        first->addDockWidgetAsTab(second);
-        return;
-    }
-#else
-    window->tabifyDockWidget(first, second);
-#endif
-}
 
 void MainWindow::resetDockLayout()
 {
@@ -203,33 +133,22 @@ void MainWindow::resetDockLayout()
         const QSize preferred(frame->width, frame->height);
 
         primary->setFloating(false);
+        QObject *relativeTo = nullptr;
+        if (const BaselineLayout::DecodedFrameRule *relativeFrame =
+                decodedFrameById(placement.relativeFrameId)) {
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
-        KDDockWidgets::QtWidgets::DockWidget *relativeTo = nullptr;
-        if (const BaselineLayout::DecodedFrameRule *relativeFrame =
-                decodedFrameById(placement.relativeFrameId)) {
             relativeTo = anyDockByName(relativeFrame->dockWidgets[0]);
-        }
-        addDockWidgetCompatWithAnyRelative(content_window,
-                                           primary,
-                                           placement.area,
-                                           relativeTo,
-                                           false,
-                                           false,
-                                           preferred);
 #else
-        DockWidget *relativeTo = nullptr;
-        if (const BaselineLayout::DecodedFrameRule *relativeFrame =
-                decodedFrameById(placement.relativeFrameId)) {
             relativeTo = dockByName(relativeFrame->dockWidgets[0]);
-        }
-        DockBackend::addDockWidgetCompat(content_window,
-                                         primary,
-                                         placement.area,
-                                         relativeTo,
-                                         false,
-                                         false,
-                                         preferred);
 #endif
+        }
+        DockBackend::addDockWidgetCompatAnyRelative(content_window,
+                                                    primary,
+                                                    placement.area,
+                                                    relativeTo,
+                                                    false,
+                                                    false,
+                                                    preferred);
         primary->setVisible(true);
 
         std::array<DockWidget *, 4> frameDocks = {{ nullptr, nullptr, nullptr, nullptr }};
@@ -245,7 +164,7 @@ void MainWindow::resetDockLayout()
                 dock->setFloating(false);
                 // Tab directly into the primary frame. Splitting first and then tabifying
                 // perturbs KDD's splitter geometry and drifts away from baseline.
-                tabifyDockWidgetCompat(content_window, primary, dock);
+                DockBackend::tabifyDockWidgetCompat(content_window, primary, dock);
             }
             dock->setVisible(true);
             if (frameDockCount < static_cast<int>(frameDocks.size()))

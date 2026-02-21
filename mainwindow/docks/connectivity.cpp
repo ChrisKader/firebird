@@ -6,11 +6,7 @@
 #include <climits>
 #include <utility>
 
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    #include <kddockwidgets/MainWindow.h>
-    #include <kddockwidgets/KDDockWidgets.h>
-#endif
-
+#include "ui/dockbackend.h"
 #include "ui/dockwidget.h"
 
 static QString coreDockAreaToString(Qt::DockWidgetArea area)
@@ -457,31 +453,7 @@ void MainWindow::applyConnectedCoreDocks(DockWidget *sourceDock, bool syncSize)
 
         // Avoid repeated dock reattachment loops while user drags/resizes docked panels.
         if (!from->isFloating() && !to->isFloating()) {
-            // Re-dock relative placement using existing create/add helper path in docks.cpp.
-            auto addDockWidgetCompat = [this](DockWidget *dock,
-                                              Qt::DockWidgetArea dockArea,
-                                              DockWidget *relativeTo) {
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-                if (auto *kdd = dynamic_cast<KDDockWidgets::QtWidgets::MainWindow *>(content_window)) {
-                    KDDockWidgets::InitialOption initial;
-                    const QSize current = dock->size();
-                    if (current.isValid() && current.width() > 0 && current.height() > 0)
-                        initial.preferredSize = current;
-                    kdd->addDockWidget(
-                        dock,
-                        dockArea == Qt::LeftDockWidgetArea   ? KDDockWidgets::Location_OnLeft :
-                        dockArea == Qt::TopDockWidgetArea    ? KDDockWidgets::Location_OnTop :
-                        dockArea == Qt::BottomDockWidgetArea ? KDDockWidgets::Location_OnBottom :
-                                                               KDDockWidgets::Location_OnRight,
-                        relativeTo,
-                        initial);
-                    return;
-                }
-#else
-                content_window->addDockWidget(dockArea, dock);
-#endif
-            };
-            addDockWidgetCompat(to, area, from);
+            DockBackend::addDockWidgetCompat(content_window, to, area, from, false, true);
             to->setVisible(true);
             return;
         }
