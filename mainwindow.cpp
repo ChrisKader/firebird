@@ -400,7 +400,9 @@ MainWindow::~MainWindow()
     delete flash_dialog;
     flash_dialog = nullptr;
 
-    savePersistentUiState();
+    // UI state is persisted from the canonical shutdown path in closeEvent().
+    if (!m_persistentUiStateSaved)
+        qWarning("MainWindow destroyed without closeEvent persistence path");
     delete settings;
     delete ui;
 }

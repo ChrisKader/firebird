@@ -20,6 +20,8 @@ Changing this order can break persisted layouts because restore requires all tar
 ## Persistence
 
 - Layout state is saved with `KDDockWidgets::LayoutSaver::serializeLayout()`.
+- Canonical save path is `MainWindow::closeEvent` (`mainwindow/runtime/window.cpp`), so
+  layout/geometry persistence runs while the dock tree is still alive.
 - Primary persisted layout store is profile JSON in `AppConfigLocation/layouts/`
   (default profile: `layouts/default.json`).
 - A compact serialized layout blob is also saved in settings key `dockLayoutJson`.

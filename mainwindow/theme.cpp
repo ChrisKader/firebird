@@ -221,8 +221,8 @@ void MainWindow::applyWidgetTheme()
         "QToolBar#headerToolBar { border: none; }"
     );
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    // Keep button CSS scoped to local containers on the KDD path.
-    setStyleSheet(outerWindowStyle);
+    // Keep KDD path styles scoped to local widgets instead of root-window CSS.
+    setStyleSheet(QString());
     if (ui->headerBar)
         ui->headerBar->setStyleSheet(sharedButtonUx);
     if (status_bar_tray)

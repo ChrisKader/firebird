@@ -14,8 +14,12 @@ void MainWindow::closeEvent(QCloseEvent *e)
     if (flash_dialog)
         flash_dialog->setProperty("visible", false);
 
+    const bool suspendOnClose = qmlBridge()
+            ? qmlBridge()->getSuspendOnClose()
+            : (settings && settings->value(QStringLiteral("suspendOnClose")).toBool());
+
     if (!close_after_suspend &&
-        settings->value(QStringLiteral("suspendOnClose")).toBool() && emuThread().isRunning() && exiting == false)
+        suspendOnClose && emuThread().isRunning() && exiting == false)
     {
         close_after_suspend = true;
         qDebug("Suspending...");
