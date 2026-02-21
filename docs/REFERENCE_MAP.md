@@ -10,7 +10,7 @@ This appendix maps each enforced or planned engineering rule to sources and impa
 | FRB-QT-004 | Preserve stable unique names for dock/state persistence | https://doc.qt.io/qt-6/qmainwindow.html | `mainwindow/docks/setup.cpp`, `mainwindow/docks/reset.cpp`, `mainwindow/layout_persistence.cpp`, `docs/DOCK_LAYOUT.md` | enforced |
 | FRB-ARCH-001 | Keep UI, docking state, and core logic separated by module boundaries | https://doc.qt.io/qt-6.5/model-view-programming.html, https://kdab.github.io/KDDockWidgets/ | `mainwindow/*`, `app/*`, `core/*`, `debugger/*` | partial |
 | FRB-KDD-001 | Avoid unsupported broad dock styling paths on KDD internals | https://kdab.github.io/KDDockWidgets/custom_styling.html | `mainwindow/theme.cpp`, `ui/dockwidget.cpp` | enforced |
-| FRB-KDD-002 | Use public KDD APIs only; avoid private-handle reinterpret casts | https://kdab.github.io/KDDockWidgets/installation_and_usage.html, https://github.com/KDAB/KDDockWidgets/tree/main/examples | `ui/kdockwidget.*`, `mainwindow/docks.cpp`, `mainwindow/layout_persistence.cpp` | partial |
+| FRB-KDD-002 | Use public KDD APIs only; avoid private-handle reinterpret casts | https://kdab.github.io/KDDockWidgets/installation_and_usage.html, https://github.com/KDAB/KDDockWidgets/tree/main/examples | `ui/kdockwidget.*`, `ui/dockbackend.*`, `mainwindow/docks.cpp`, `mainwindow/layout_persistence.cpp` | partial |
 | FRB-STRUCT-001 | File size target <=600 lines, exception required >1000 | https://github.com/qt-creator/qt-creator, https://doc.qt.io/qtcreator-extending/coding-style.html | whole repo | partial |
 | FRB-CI-001 | Advisory static-analysis and structure checks in CI | https://github.com/KDAB/KDDockWidgets/tree/main/tests | `.github/workflows/`, `tools/ci/`, `tools/dev/` | partial |
 
