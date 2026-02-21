@@ -4,9 +4,9 @@ This appendix maps each enforced or planned engineering rule to sources and impa
 
 | Rule ID | Rule | Sources | Firebird Areas | Status |
 |---|---|---|---|---|
-| FRB-QT-001 | Use typed signal/slot connections; avoid legacy `SIGNAL/SLOT` | https://doc.qt.io/qt-6/signalsandslots-syntaxes.html | `mainwindow/bootstrap.cpp`, `mainwindow/runtime.cpp`, `mainwindow/docks/setup.cpp`, `app/qmlbridge.cpp`, `transfer/usblinktreewidget.cpp`, `dialogs/fbaboutdialog.cpp` | enforced |
+| FRB-QT-001 | Use typed signal/slot connections; avoid legacy `SIGNAL/SLOT` | https://doc.qt.io/qt-6/signalsandslots-syntaxes.html | `mainwindow/bootstrap.cpp`, `mainwindow/runtime.cpp`, `mainwindow/docks/setup.cpp`, `app/qmlbridge*.cpp`, `transfer/usblinktreewidget.cpp`, `dialogs/fbaboutdialog.cpp` | enforced |
 | FRB-QT-002 | Respect QObject parent ownership and explicit non-owning pointers | https://doc.qt.io/qt-6/objecttrees.html, https://doc.qt.io/qt-6.8/qobject.html | `mainwindow.h`, `app/qmlbridge.h`, `debugger/*`, `ui/*` | partial |
-| FRB-QT-003 | Keep UI updates on GUI thread; queued cross-thread UI signals | https://doc.qt.io/qt-6/threads-qobject.html | `mainwindow/bootstrap.cpp`, `mainwindow/runtime.cpp`, `app/qmlbridge.cpp` | partial |
+| FRB-QT-003 | Keep UI updates on GUI thread; queued cross-thread UI signals | https://doc.qt.io/qt-6/threads-qobject.html | `mainwindow/bootstrap.cpp`, `mainwindow/runtime.cpp`, `app/qmlbridge*.cpp` | partial |
 | FRB-QT-004 | Preserve stable unique names for dock/state persistence | https://doc.qt.io/qt-6/qmainwindow.html | `mainwindow/docks/setup.cpp`, `mainwindow/docks/reset.cpp`, `mainwindow/layout_persistence.cpp`, `docs/DOCK_LAYOUT.md` | enforced |
 | FRB-ARCH-001 | Keep UI, docking state, and core logic separated by module boundaries | https://doc.qt.io/qt-6.5/model-view-programming.html, https://kdab.github.io/KDDockWidgets/ | `mainwindow/*`, `app/*`, `core/*`, `debugger/*` | partial |
 | FRB-KDD-001 | Avoid unsupported broad dock styling paths on KDD internals | https://kdab.github.io/KDDockWidgets/custom_styling.html | `mainwindow/theme.cpp`, `ui/dockwidget.cpp` | partial |

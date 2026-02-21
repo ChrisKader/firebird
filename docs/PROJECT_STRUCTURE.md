@@ -28,9 +28,11 @@ This document is the canonical guide for how to structure new code and refactors
   - `mainwindow/layout_persistence.cpp`: profile and layout serialization.
   - `mainwindow/runtime*.cpp`: runtime actions/state transitions.
 - `ui/`: Reusable desktop widgets/components.
+  - `ui/models/`: Qt model/view backing models shared with QML/widgets.
 - `debugger/`: Debug panel widgets and docking manager.
-- `app/`: Cross-UI app services (`EmuThread`, `QMLBridge`, shared app logic).
+- `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
+  - `core/power/`: Power-path override control helpers used by UI and debugger.
 - `transfer/`: USB file transfer UI/components.
 - `docs/`: Architecture and behavior specifications.
 - `tools/`: Dev and CI support scripts.
