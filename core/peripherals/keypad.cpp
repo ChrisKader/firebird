@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include <mutex>
 
@@ -16,6 +17,49 @@
 keypad_state keypad;
 
 static std::recursive_mutex keypad_mut;
+
+enum class onkey_irq30_compat_mode {
+    disabled,
+    pulse,
+    level,
+};
+
+static onkey_irq30_compat_mode keypad_onkey_irq30_mode()
+{
+    static bool initialized = false;
+    static onkey_irq30_compat_mode mode = onkey_irq30_compat_mode::disabled;
+    if (initialized)
+        return mode;
+    initialized = true;
+
+    const char *spec = getenv("FIREBIRD_ONKEY_IRQ30_COMPAT");
+    if (!spec || !*spec || !strcmp(spec, "0") || !strcmp(spec, "off")
+               || !strcmp(spec, "false") || !strcmp(spec, "disabled")) {
+        mode = onkey_irq30_compat_mode::disabled;
+    } else if (!strcmp(spec, "1") || !strcmp(spec, "pulse")
+               || !strcmp(spec, "true")) {
+        mode = onkey_irq30_compat_mode::pulse;
+    } else if (!strcmp(spec, "level") || !strcmp(spec, "hold")) {
+        mode = onkey_irq30_compat_mode::level;
+    }
+    return mode;
+}
+
+static void keypad_onkey_irq30_press()
+{
+    onkey_irq30_compat_mode mode = keypad_onkey_irq30_mode();
+    if (mode == onkey_irq30_compat_mode::disabled)
+        return;
+    int_set(INT_IRQ30, true);
+    if (mode == onkey_irq30_compat_mode::pulse)
+        int_set(INT_IRQ30, false);
+}
+
+static void keypad_onkey_irq30_release()
+{
+    if (keypad_onkey_irq30_mode() == onkey_irq30_compat_mode::level)
+        int_set(INT_IRQ30, false);
+}
 
 void keypad_int_check() {
     std::lock_guard<std::recursive_mutex> lg(keypad_mut);
@@ -38,13 +82,14 @@ void keypad_release_all_keys(void)
 }
 
 void keypad_on_pressed() {
+    keypad_onkey_irq30_press();
+
     if(emulate_cx2) {
         if (cpu_events & EVENT_SLEEP) {
             aladdin_pmu_on_key_wakeup();
         } else {
-            // CX II: Register 0x901400C4 bit 0 enables the ON key interrupt.
-            if(aladdin_pmu.int_enable & 1)
-                int_set(INT_POWER, true);
+            // Route awake ON-key events through PMU pending/enable logic.
+            aladdin_pmu_latch_onkey_wake(false);
         }
     } else {
         // Classic/CX: Check PMU on_irq_enabled register (0x900B0010)
@@ -455,6 +500,7 @@ void keypad_set_key(int row, int col, bool state)
         if (state) {
             keypad_on_pressed();
         } else {
+            keypad_onkey_irq30_release();
             if (emulate_cx2)
                 aladdin_pmu_on_key_release();
             else

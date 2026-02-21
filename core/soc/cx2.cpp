@@ -232,6 +232,10 @@ static int cx2_clamp_int(int value, int min, int max)
 static void aladdin_pmu_update_int()
 {
 	uint32_t pending = aladdin_pmu_pend_with_live_sources();
+	const uint32_t mask = aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX];
+	const bool onkey_enabled = (aladdin_pmu.int_enable & 1u) != 0;
+	if (!onkey_enabled)
+		pending &= ~PMU_IRQ_ONKEY_BIT;
 	/* ADC completion has dedicated VIC lines (11/13). Keep its PMU pending bit
 	 * visible to firmware, but do not mirror it onto INT_POWER. Otherwise the
 	 * power IRQ can stay asserted through sleep and break ON-key wake flow. */
@@ -239,8 +243,9 @@ static void aladdin_pmu_update_int()
 	/* PMU+0x24 wake bit (0x2) is status-only for ROM wake polling; it should
 	 * not by itself level-assert INT_POWER. */
 	bool on = ((aladdin_pmu.int_state & ~PMU_INT_WAKE_BIT) != 0)
-		|| ((pending & aladdin_pmu.noidea[PMU_IRQ_MASK_INDEX]) != 0);
+		|| ((pending & mask) != 0);
 	int_set(INT_POWER, on);
+	int_set(INT_IRQ30, (pending & mask & PMU_IRQ_ONKEY_BIT) != 0);
 }
 
 static uint32_t aladdin_pmu_status_80c_read_value(void)

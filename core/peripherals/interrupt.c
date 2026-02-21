@@ -1,3 +1,5 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "emu.h"
 #include "peripherals/interrupt.h"
@@ -6,6 +8,184 @@
 
 /* DC000000: Interrupt controller */
 interrupt_state intr;
+
+static struct {
+    bool initialized;
+    bool enabled;
+    bool all;
+    bool filter[32];
+} irq_trace_cfg;
+
+static struct {
+    bool initialized;
+    bool enabled;
+    bool all;
+    bool onkey_only;
+    bool include_unchanged;
+} vic_trace_cfg;
+
+static const char *irq_trace_name(uint32_t int_num)
+{
+    switch (int_num) {
+        case INT_POWER: return "POWER_MANAGEMENT";
+        case INT_KEYPAD: return "KEYPAD";
+        case INT_IRQ30: return "IRQ30";
+        default: return "";
+    }
+}
+
+static void irq_trace_init(void)
+{
+    if (irq_trace_cfg.initialized)
+        return;
+    irq_trace_cfg.initialized = true;
+
+    const char *spec = getenv("FIREBIRD_TRACE_IRQ");
+    if (!spec || !*spec)
+        return;
+
+    if (!strcmp(spec, "*") || !strcmp(spec, "all")) {
+        irq_trace_cfg.enabled = true;
+        irq_trace_cfg.all = true;
+        return;
+    }
+
+    const char *p = spec;
+    while (*p) {
+        while (*p == ' ' || *p == '\t' || *p == ',' || *p == ';')
+            p++;
+        if (!*p)
+            break;
+
+        char *end = NULL;
+        long value = strtol(p, &end, 10);
+        if (end == p) {
+            p++;
+            continue;
+        }
+
+        if (value >= 0 && value < 32) {
+            irq_trace_cfg.enabled = true;
+            irq_trace_cfg.filter[value] = true;
+        }
+        p = end;
+    }
+}
+
+static bool irq_trace_should_log(uint32_t int_num)
+{
+    irq_trace_init();
+    if (!irq_trace_cfg.enabled || int_num >= 32)
+        return false;
+    return irq_trace_cfg.all || irq_trace_cfg.filter[int_num];
+}
+
+static void irq_trace_log_transition(uint32_t int_num, bool on)
+{
+    if (!irq_trace_should_log(int_num))
+        return;
+    const char *name = irq_trace_name(int_num);
+    if (*name) {
+        fprintf(stderr,
+                "[FBIRQ] irq=%u (%s) state=%d active=0x%08X pc=0x%08X\n",
+                int_num, name, on ? 1 : 0, intr.active, arm.reg[15]);
+    } else {
+        fprintf(stderr,
+                "[FBIRQ] irq=%u state=%d active=0x%08X pc=0x%08X\n",
+                int_num, on ? 1 : 0, intr.active, arm.reg[15]);
+    }
+    fflush(stderr);
+}
+
+static void vic_trace_init(void)
+{
+    if (vic_trace_cfg.initialized)
+        return;
+    vic_trace_cfg.initialized = true;
+
+    const char *spec = getenv("FIREBIRD_TRACE_VIC");
+    if (!spec || !*spec)
+        return;
+
+    if (!strcmp(spec, "1") || !strcmp(spec, "true")
+        || !strcmp(spec, "*") || !strcmp(spec, "all")) {
+        vic_trace_cfg.enabled = true;
+        vic_trace_cfg.all = true;
+    } else if (!strcmp(spec, "onkey") || !strcmp(spec, "power")) {
+        vic_trace_cfg.enabled = true;
+        vic_trace_cfg.onkey_only = true;
+    }
+
+    const char *unchanged = getenv("FIREBIRD_TRACE_VIC_UNCHANGED");
+    if (unchanged && (*unchanged == '1' || *unchanged == 'y' || *unchanged == 'Y'
+            || *unchanged == 't' || *unchanged == 'T'))
+        vic_trace_cfg.include_unchanged = true;
+}
+
+static bool vic_trace_should_log(uint32_t int_num)
+{
+    vic_trace_init();
+    if (!vic_trace_cfg.enabled)
+        return false;
+    if (vic_trace_cfg.all)
+        return true;
+    if (vic_trace_cfg.onkey_only)
+        return int_num == INT_POWER || int_num == INT_IRQ30;
+    return false;
+}
+
+static void vic_trace_log_transition(uint32_t int_num, bool on,
+                                     uint32_t prev_active,
+                                     uint32_t prev_raw_status,
+                                     uint32_t prev_status,
+                                     uint32_t prev_irq_pending,
+                                     uint32_t prev_fiq_pending)
+{
+    if (!vic_trace_should_log(int_num))
+        return;
+
+    const uint32_t irq_pending = intr.active & intr.mask[0] & ~intr.mask[1];
+    const uint32_t fiq_pending = intr.active & intr.mask[0] & intr.mask[1];
+    const bool changed = prev_active != intr.active
+                      || prev_raw_status != intr.raw_status
+                      || prev_status != intr.status
+                      || prev_irq_pending != irq_pending
+                      || prev_fiq_pending != fiq_pending;
+    if (!changed && !vic_trace_cfg.include_unchanged)
+        return;
+    const char *name = irq_trace_name(int_num);
+
+    if (*name) {
+        fprintf(stderr,
+                "[FBVIC] src=%u(%s) set=%d changed=%d "
+                "active:%08X->%08X raw:%08X->%08X status:%08X->%08X "
+                "mask_irq=%08X mask_fiq=%08X pend_irq:%08X->%08X pend_fiq:%08X->%08X "
+                "pc=0x%08X\n",
+                int_num, name, on ? 1 : 0, changed ? 1 : 0,
+                prev_active, intr.active,
+                prev_raw_status, intr.raw_status,
+                prev_status, intr.status,
+                intr.mask[0], intr.mask[1],
+                prev_irq_pending, irq_pending,
+                prev_fiq_pending, fiq_pending,
+                arm.reg[15]);
+    } else {
+        fprintf(stderr,
+                "[FBVIC] src=%u set=%d changed=%d "
+                "active:%08X->%08X raw:%08X->%08X status:%08X->%08X "
+                "mask_irq=%08X mask_fiq=%08X pend_irq:%08X->%08X pend_fiq:%08X->%08X "
+                "pc=0x%08X\n",
+                int_num, on ? 1 : 0, changed ? 1 : 0,
+                prev_active, intr.active,
+                prev_raw_status, intr.raw_status,
+                prev_status, intr.status,
+                intr.mask[0], intr.mask[1],
+                prev_irq_pending, irq_pending,
+                prev_fiq_pending, fiq_pending,
+                arm.reg[15]);
+    }
+    fflush(stderr);
+}
 
 static void get_current_int(int is_fiq, int *current) {
     uint32_t masked_status = intr.status & intr.mask[is_fiq];
@@ -214,12 +394,23 @@ void int_cx_write_word(uint32_t addr, uint32_t value) {
 }
 
 void int_set(uint32_t int_num, bool on) {
+    if (int_num >= 32)
+        return;
+    const uint32_t prev_active = intr.active;
+    const uint32_t prev_raw_status = intr.raw_status;
+    const uint32_t prev_status = intr.status;
+    const uint32_t prev_irq_pending = intr.active & intr.mask[0] & ~intr.mask[1];
+    const uint32_t prev_fiq_pending = intr.active & intr.mask[0] & intr.mask[1];
     if (on) intr.active |= 1 << int_num;
     else    intr.active &= ~(1 << int_num);
+    if (((prev_active >> int_num) & 1u) != (on ? 1u : 0u))
+        irq_trace_log_transition(int_num, on);
     if (!emulate_cx)
         update();
     else
         update_cx();
+    vic_trace_log_transition(int_num, on, prev_active, prev_raw_status, prev_status,
+                             prev_irq_pending, prev_fiq_pending);
 }
 
 void int_reset() {
