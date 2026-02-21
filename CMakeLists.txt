@@ -123,6 +123,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     debugger/nandbrowser/nandbrowserwidget.cpp debugger/nandbrowser/nandbrowserwidget.h
     debugger/nandbrowser/nandfileeditor.cpp debugger/nandbrowser/nandfileeditor.h
     debugger/hwconfig/hwconfigwidget.cpp debugger/hwconfig/hwconfigwidget.h
+    debugger/hwconfig/state.cpp
     debugger/mmuviewer/mmuviewerwidget.cpp debugger/mmuviewer/mmuviewerwidget.h
     # Dialogs
     dialogs/fbaboutdialog.cpp dialogs/fbaboutdialog.h
