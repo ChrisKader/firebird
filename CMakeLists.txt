@@ -60,7 +60,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/debug/debug_remote.cpp
     core/debug/debug_api.cpp core/debug/debug_api.h
     core/debug/debug_api_peek.cpp
-    core/des.c core/des.h
+    core/crypto/des.c core/crypto/des.h
     core/disasm.c core/disasm.h
     core/emu.cpp core/emu.h
     core/fieldparser.cpp core/fieldparser.h
@@ -79,7 +79,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/os/os.h
     core/timing/schedule.c core/timing/schedule.h
     core/peripherals/serial.c
-    core/sha256.c core/sha256.h
+    core/crypto/sha256.c core/crypto/sha256.h
     core/cpu/thumb_interpreter.cpp
     core/cpu/translate.h
     core/usb/usb.c core/usb/usb.h

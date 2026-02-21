@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "des.h"
+#include "crypto/des.h"
 #include "emu.h"
 #include "memory/mem.h"
 

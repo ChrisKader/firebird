@@ -175,7 +175,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/usb/usblink_queue.cpp \
     core/armsnippets_loader.c \
     core/casplus.c \
-    core/des.c \
+    core/crypto/des.c \
     core/disasm.c \
     core/debug/gdbstub.c \
     core/gif.cpp \
@@ -189,7 +189,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/debug/nspire_log_hook.cpp \
     core/timing/schedule.c \
     core/peripherals/serial.c \
-    core/sha256.c \
+    core/crypto/sha256.c \
     core/usb/usb.c \
     core/usb/usb_cx2.cpp \
     core/usb/usblink.c \
@@ -228,7 +228,7 @@ HEADERS += \
     core/cpu/cpu.h \
     core/cpu/cpudefs.h \
     core/debug/debug.h \
-    core/des.h \
+    core/crypto/des.h \
     core/disasm.h \
     core/emu.h \
     core/storage/flash.h \
@@ -243,7 +243,7 @@ HEADERS += \
     core/memory/mmu.h \
     core/debug/nspire_log_hook.h \
     core/timing/schedule.h \
-    core/sha256.h \
+    core/crypto/sha256.h \
     core/cpu/translate.h \
     core/usb/usb.h \
     core/usb/usblink.h \
