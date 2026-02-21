@@ -1,5 +1,5 @@
 #include "asmcode.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "debug.h"
 #include "debug_api.h"
 #include "emu.h"

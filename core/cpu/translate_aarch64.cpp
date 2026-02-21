@@ -23,9 +23,9 @@
 #include <cstdint>
 
 #include "asmcode.h"
-#include "cpudefs.h"
+#include "cpu/cpudefs.h"
 #include "emu.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "memory/mem.h"
 #include "memory/mmu.h"
 #include "os/os.h"

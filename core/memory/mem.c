@@ -19,10 +19,10 @@
 #include "casplus.h"
 #include "memory/mem.h"
 #include "debug.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "usb/usb_cx2.h"
 #include "cx2.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "nspire_log_hook.h"
 
 uint8_t   (*read_byte_map[64])(uint32_t addr);

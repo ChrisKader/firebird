@@ -4,11 +4,11 @@
 #include <setjmp.h>
 #include "debug_api.h"
 #include "emu.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "memory/mem.h"
 #include "memory/mmu.h"
 #include "disasm.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "debug.h"
 #include "lcd.h"
 #include "misc.h"

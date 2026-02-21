@@ -13,11 +13,11 @@
 #include <unordered_set>
 #include <vector>
 
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "debug.h"
 #include "emu.h"
 #include "memory/mem.h"
-#include "translate.h"
+#include "cpu/translate.h"
 
 namespace {
 

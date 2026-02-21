@@ -1,5 +1,5 @@
-#include "cpu.h"
-#include "cpudefs.h"
+#include "cpu/cpu.h"
+#include "cpu/cpudefs.h"
 #include "memory/mmu.h"
 
 void do_cp15_mrc(uint32_t insn)

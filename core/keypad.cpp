@@ -4,7 +4,7 @@
 #include <mutex>
 
 #include "emu.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "misc.h"
 #include "keypad.h"
 #include "schedule.h"

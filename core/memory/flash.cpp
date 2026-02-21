@@ -10,7 +10,7 @@
 #include "fieldparser.h"
 #include "memory/flash.h"
 #include "memory/mem.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "os/os.h"
 
 nand_state nand;

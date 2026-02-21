@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "cpu.h"
+#include "cpu/cpu.h"
 
 #ifdef __cplusplus
 extern "C" {

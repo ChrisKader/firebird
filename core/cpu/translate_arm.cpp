@@ -23,12 +23,12 @@
 // #define REL_BRANCH
 
 #include "asmcode.h"
-#include "cpu.h"
-#include "cpudefs.h"
+#include "cpu/cpu.h"
+#include "cpu/cpudefs.h"
 #include "disasm.h"
 #include "memory/mem.h"
 #include "memory/mmu.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "os/os.h"
 
 #ifdef __thumb__

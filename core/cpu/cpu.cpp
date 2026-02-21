@@ -10,15 +10,15 @@
 
 #include "armsnippets.h"
 #include "asmcode.h"
-#include "cpu.h"
-#include "cpudefs.h"
+#include "cpu/cpu.h"
+#include "cpu/cpudefs.h"
 #include "debug.h"
 #include "debug_api.h"
 #include "emu.h"
 #include "memory/mem.h"
 #include "memory/mmu.h"
 #include "nspire_log_hook.h"
-#include "translate.h"
+#include "cpu/translate.h"
 
 // Global CPU state
 struct arm_state arm;

@@ -35,10 +35,10 @@
 #include "emu.h"
 #include "debug.h"
 #include "memory/mem.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "armsnippets.h"
 #include "gdbstub.h"
-#include "translate.h"
+#include "cpu/translate.h"
 
 static void gdbstub_disconnect(void);
 

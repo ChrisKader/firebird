@@ -4,9 +4,9 @@
 #include "os/os.h"
 #include "emu.h"
 #include "memory/mem.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "asmcode.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "debug.h"
 
 extern void translation_next() __asm__("translation_next");

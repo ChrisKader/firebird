@@ -5,7 +5,7 @@
 #include "casplus.h"
 #include "schedule.h"
 #include "keypad.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "memory/flash.h"
 #include "emu.h"
 #include "misc.h"

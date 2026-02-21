@@ -1,8 +1,8 @@
 #include <cassert>
 
 #include "asmcode.h"
-#include "cpu.h"
-#include "cpudefs.h"
+#include "cpu/cpu.h"
+#include "cpu/cpudefs.h"
 #include "debug.h"
 #include "memory/mmu.h"
 

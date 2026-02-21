@@ -1,7 +1,7 @@
 #include <string.h>
 #include "emu.h"
 #include "interrupt.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "memory/mem.h"
 
 /* DC000000: Interrupt controller */

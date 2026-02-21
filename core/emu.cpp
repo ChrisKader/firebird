@@ -10,7 +10,7 @@
 #include <zlib.h>
 
 #include "emu.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "debug.h"
 #include "debug_api.h"
 #include "memory/mmu.h"

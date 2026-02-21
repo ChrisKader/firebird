@@ -51,8 +51,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/bitfield.h
     core/casplus.c core/casplus.h
     core/cpu/coproc.cpp
-    core/cpu/cpu.cpp core/cpu.h
-    core/cpudefs.h
+    core/cpu/cpu.cpp core/cpu/cpu.h
+    core/cpu/cpudefs.h
     core/cx2.cpp core/cx2.h
     core/peripherals/cx2_peripherals.cpp
     core/debug/debug.cpp core/debug/debug.h
@@ -81,7 +81,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/serial.c
     core/sha256.c core/sha256.h
     core/cpu/thumb_interpreter.cpp
-    core/translate.h
+    core/cpu/translate.h
     core/usb/usb.c core/usb/usb.h
     core/usb/usb_cx2.cpp core/usb/usb_cx2.h
     core/usb/usb_cx2_state.cpp

@@ -225,8 +225,8 @@ HEADERS += \
     core/asmcode.h \
     core/bitfield.h \
     core/casplus.h \
-    core/cpu.h \
-    core/cpudefs.h \
+    core/cpu/cpu.h \
+    core/cpu/cpudefs.h \
     core/debug/debug.h \
     core/des.h \
     core/disasm.h \
@@ -244,7 +244,7 @@ HEADERS += \
     core/debug/nspire_log_hook.h \
     core/schedule.h \
     core/sha256.h \
-    core/translate.h \
+    core/cpu/translate.h \
     core/usb/usb.h \
     core/usb/usblink.h \
     core/usb/usblink_queue.h \

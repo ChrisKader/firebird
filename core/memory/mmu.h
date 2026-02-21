@@ -1,7 +1,7 @@
 #ifndef _H_MMU
 #define _H_MMU
 
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "emu.h"
 
 #ifdef __cplusplus

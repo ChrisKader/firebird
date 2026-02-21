@@ -1,10 +1,10 @@
 /* Loads and run ARM code snippets on the target */
 
 #include "emu.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "armsnippets.h"
 #include "memory/mem.h"
-#include "translate.h"
+#include "cpu/translate.h"
 #include "armsnippets.h"
 #include "debug.h"
 

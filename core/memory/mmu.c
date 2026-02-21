@@ -1,8 +1,8 @@
 #include <string.h>
 #include <stdint.h>
-#include "translate.h"
+#include "cpu/translate.h"
 #include "emu.h"
-#include "cpu.h"
+#include "cpu/cpu.h"
 #include "memory/mmu.h"
 #include "memory/mem.h"
 #include "os/os.h"

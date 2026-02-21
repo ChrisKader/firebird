@@ -4,7 +4,7 @@
 #define _H_ARMSNIPPETS
 
 #include <stdbool.h>
-#include "cpu.h"
+#include "cpu/cpu.h"
 
 #ifdef __cplusplus
 extern "C" {
