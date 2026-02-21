@@ -30,6 +30,7 @@
 #include "mainwindow/docks/baselinelayout.h"
 #include "debugger/dockmanager.h"
 #include "mainwindow/docks/baseline.h"
+#include "ui/dockbackend.h"
 #include "ui/dockwidget.h"
 #include "ui/kdockwidget.h"
 #include "ui/materialicons.h"
@@ -51,45 +52,6 @@ static KDDockWidgets::Location toKDDLocation(Qt::DockWidgetArea area)
     }
 }
 #endif
-
-[[maybe_unused]] static void addDockWidgetCompat(QMainWindow *window,
-                                DockWidget *dock,
-                                Qt::DockWidgetArea area,
-                                DockWidget *relativeTo = nullptr,
-                                bool startHidden = false,
-                                bool preserveCurrentSize = false,
-                                const QSize &preferredSize = QSize())
-{
-    if (!window || !dock)
-        return;
-#ifdef FIREBIRD_USE_KDDOCKWIDGETS
-    if (auto *kdd = asKDDMainWindow(window)) {
-        KDDockWidgets::InitialOption initial;
-        if (preferredSize.isValid() && preferredSize.width() > 0 && preferredSize.height() > 0) {
-            initial.preferredSize = preferredSize;
-        }
-        if (preserveCurrentSize) {
-            const QSize current = dock->size();
-            if (current.isValid() && current.width() > 0 && current.height() > 0)
-                initial.preferredSize = current;
-        }
-        if (!initial.preferredSize.isValid() && dock->widget()) {
-            const QSize hinted = dock->widget()->sizeHint();
-            if (hinted.isValid() && hinted.width() > 0 && hinted.height() > 0)
-                initial.preferredSize = hinted;
-        }
-        if (startHidden)
-            initial.visibility = KDDockWidgets::InitialVisibilityOption::StartHidden;
-        kdd->addDockWidget(dock, toKDDLocation(area), relativeTo, initial);
-        return;
-    }
-#else
-    Q_UNUSED(relativeTo);
-    Q_UNUSED(startHidden);
-    Q_UNUSED(preferredSize);
-    window->addDockWidget(area, dock);
-#endif
-}
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
 static void addDockWidgetCompatWithAnyRelative(QMainWindow *window,
@@ -260,13 +222,13 @@ void MainWindow::resetDockLayout()
                 decodedFrameById(placement.relativeFrameId)) {
             relativeTo = dockByName(relativeFrame->dockWidgets[0]);
         }
-        addDockWidgetCompat(content_window,
-                            primary,
-                            placement.area,
-                            relativeTo,
-                            false,
-                            false,
-                            preferred);
+        DockBackend::addDockWidgetCompat(content_window,
+                                         primary,
+                                         placement.area,
+                                         relativeTo,
+                                         false,
+                                         false,
+                                         preferred);
 #endif
         primary->setVisible(true);
 
