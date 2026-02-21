@@ -7,71 +7,18 @@
 
 namespace PowerControl {
 
-static bool g_forcedOffNoPower = false;
-static bool g_lastHasPowerInitialized = false;
-static bool g_lastHasPower = false;
-
-static constexpr int kMinBatteryMvForPower = 3300;
 static constexpr int kMinExternalRailMvForPower = 4500;
 
 int usbBusMillivolts();
 bool isDockAttached();
 int dockRailMillivolts();
 
-static int effectiveBatteryMvForPower()
-{
-    const int batteryMv = hw_override_get_battery_mv();
-    if (batteryMv >= 0)
-        return batteryMv;
-
-    const int batteryRaw = hw_override_get_adc_battery_level();
-    if (batteryRaw >= 0) {
-        const int clampedRaw = (batteryRaw > 930) ? 930 : batteryRaw;
-        return 3000 + (clampedRaw * (4200 - 3000) + 465) / 930;
-    }
-
-    return 4200;
-}
-
-static bool usbSourceProvidesExternalPower(UsbPowerSource usbSource)
-{
-    return usbSource == UsbPowerSource::Computer
-        || usbSource == UsbPowerSource::Charger;
-}
-
-static bool hasPower(bool batteryPresent, UsbPowerSource usbSource)
-{
-    const bool usbPower = usbSourceProvidesExternalPower(usbSource)
-        && usbBusMillivolts() >= kMinExternalRailMvForPower;
-    const bool dockPower = isDockAttached()
-        && dockRailMillivolts() >= kMinExternalRailMvForPower;
-    if (usbPower || dockPower)
-        return true;
-    return batteryPresent && (effectiveBatteryMvForPower() >= kMinBatteryMvForPower);
-}
-
 void refreshPowerState()
 {
-    const bool hasPowerNow = hasPower(isBatteryPresent(), usbPowerSource());
-    if (!g_lastHasPowerInitialized) {
-        g_lastHasPowerInitialized = true;
-        g_lastHasPower = hasPowerNow;
-        if (!hasPowerNow) {
-            g_forcedOffNoPower = true;
-            __atomic_fetch_or(&cpu_events, EVENT_SLEEP, __ATOMIC_RELAXED);
-        }
-        return;
-    }
-
-    if (!hasPowerNow) {
-        g_forcedOffNoPower = true;
-        __atomic_fetch_or(&cpu_events, EVENT_SLEEP, __ATOMIC_RELAXED);
-    } else if (!g_lastHasPower || g_forcedOffNoPower) {
-        g_forcedOffNoPower = false;
-        __atomic_fetch_and(&cpu_events, ~(uint32_t)EVENT_SLEEP, __ATOMIC_RELAXED);
-        emu_request_reset_hard();
-    }
-    g_lastHasPower = hasPowerNow;
+    /* Battery/power state is reported through ADC and PMU registers.
+     * The guest firmware decides how to react (low-battery warning,
+     * graceful shutdown, sleep, etc.) — the emulator does not force
+     * shutdown based on battery voltage. */
 }
 
 UsbPowerSource usbPowerSource()
@@ -194,8 +141,6 @@ void setDockRailMillivolts(int millivolts)
 
 void pressBackResetButton()
 {
-    if (!hasPower(isBatteryPresent(), usbPowerSource()))
-        return;
     emu_request_reset_hard();
 }
 
