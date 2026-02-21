@@ -77,7 +77,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/memory/mmu.c core/memory/mmu.h
     core/debug/nspire_log_hook.cpp core/debug/nspire_log_hook.h
     core/os/os.h
-    core/schedule.c core/schedule.h
+    core/timing/schedule.c core/timing/schedule.h
     core/peripherals/serial.c
     core/sha256.c core/sha256.h
     core/cpu/thumb_interpreter.cpp

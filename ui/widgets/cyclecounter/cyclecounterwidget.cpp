@@ -7,7 +7,7 @@
 
 extern "C" {
 #include "core/emu.h"
-#include "core/schedule.h"
+#include "core/timing/schedule.h"
 }
 
 CycleCounterWidget::CycleCounterWidget(QWidget *parent)

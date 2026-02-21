@@ -3,7 +3,7 @@
 #include "memory/mem.h"
 #include "cx2.h"
 #include "peripherals/misc.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 #include "peripherals/interrupt.h"
 #include "peripherals/keypad.h"
 

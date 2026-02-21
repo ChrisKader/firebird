@@ -62,6 +62,7 @@ they should be moved into subsystem folders instead of adding new top-level
     - `core/cpu/`: CPU/interpreter/JIT translation and coprocessor logic.
     - `core/debug/`: debugger command handling, API, remote debug transport, GDB glue.
     - `core/memory/`: RAM/MMU/address-translation and memory-map dispatch.
+    - `core/timing/`: global event scheduler and emulated clock-domain timing coordination.
     - `core/storage/`: persistent storage models (flash image + NAND filesystem helpers).
     - `core/peripherals/`: non-USB device models (interrupt, keypad, LCD, link, serial, misc peripherals, CX2 peripheral map helpers).
     - `core/usb/`: USB device/host emulation and usblink transport.

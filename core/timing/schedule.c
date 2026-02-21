@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "emu.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 
 sched_state sched;
 

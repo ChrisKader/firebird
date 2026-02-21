@@ -5,7 +5,7 @@
 #include "emu.h"
 #include "gif.h"
 #include "peripherals/interrupt.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 #include "memory/mem.h"
 #include "peripherals/lcd.h"
 

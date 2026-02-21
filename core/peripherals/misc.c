@@ -3,7 +3,7 @@
 #include <time.h>
 #include "emu.h"
 #include "peripherals/interrupt.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 #include "peripherals/misc.h"
 #include "peripherals/keypad.h"
 #include "storage/flash.h"

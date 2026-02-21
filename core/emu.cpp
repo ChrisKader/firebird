@@ -18,7 +18,7 @@
 #include "nspire_log_hook.h"
 #include "usb/usblink_queue.h"
 #include "os/os.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 #include "peripherals/misc.h"
 #include "memory/mem.h"
 

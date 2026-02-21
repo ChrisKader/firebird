@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include "casplus.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 #include "peripherals/keypad.h"
 #include "cpu/cpu.h"
 #include "storage/flash.h"

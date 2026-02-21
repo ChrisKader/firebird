@@ -7,7 +7,7 @@
 #include "cpu/cpu.h"
 #include "peripherals/misc.h"
 #include "peripherals/keypad.h"
-#include "schedule.h"
+#include "timing/schedule.h"
 #include "peripherals/interrupt.h"
 #include "memory/mem.h"
 #include "cx2.h"

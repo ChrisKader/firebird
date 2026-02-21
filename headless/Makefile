@@ -43,7 +43,7 @@ LIBS := -lz
 
 CSOURCES   += ../core/armsnippets_loader.c ../core/casplus.c ../core/des.c ../core/disasm.c ../core/debug/gdbstub.c \
               ../core/peripherals/interrupt.c ../core/peripherals/lcd.c ../core/peripherals/link.c ../core/memory/mem.c ../core/peripherals/misc.c \
-              ../core/memory/mmu.c ../core/schedule.c ../core/peripherals/serial.c ../core/sha256.c ../core/usb/usb.c ../core/usb/usblink.c \
+              ../core/memory/mmu.c ../core/timing/schedule.c ../core/peripherals/serial.c ../core/sha256.c ../core/usb/usb.c ../core/usb/usblink.c \
               ../core/os/os-linux.c
 
 CPPSOURCES += ../core/cpu/arm_interpreter.cpp ../core/cpu/coproc.cpp ../core/cpu/cpu.cpp ../core/debug/debug.cpp ../core/emu.cpp \

@@ -187,7 +187,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/peripherals/misc.c \
     core/memory/mmu.c \
     core/debug/nspire_log_hook.cpp \
-    core/schedule.c \
+    core/timing/schedule.c \
     core/peripherals/serial.c \
     core/sha256.c \
     core/usb/usb.c \
@@ -242,7 +242,7 @@ HEADERS += \
     core/peripherals/misc.h \
     core/memory/mmu.h \
     core/debug/nspire_log_hook.h \
-    core/schedule.h \
+    core/timing/schedule.h \
     core/sha256.h \
     core/cpu/translate.h \
     core/usb/usb.h \
