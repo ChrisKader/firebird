@@ -179,6 +179,8 @@ template <typename T> const T* messageCast(const NNSEMessage *message)
 
 static void handlePacket(const NNSEMessage *message, const uint8_t **streamdata = nullptr, int *streamsize = nullptr)
 {
+    const uint8_t service = uint8_t(message->service & ~AckFlag);
+
     if(message->dest != AddrMe && message->dest != AddrAll)
     {
 #ifdef DEBUG
@@ -193,7 +195,7 @@ static void handlePacket(const NNSEMessage *message, const uint8_t **streamdata 
         printf("Got ack for %02x\n", ntohs(message->seqno));
 #endif
 
-        if((message->service & (~AckFlag)) == StreamService)
+        if(service == StreamService)
         {
             // Tell usblink that an ack arrived
             usblink_received_packet(nullptr, 0);
@@ -209,22 +211,22 @@ static void handlePacket(const NNSEMessage *message, const uint8_t **streamdata 
         ack.src = message->dest;
         ack.dest = message->src;
         ack.unknown = message->unknown;
-        ack.reqAck = uint8_t(message->reqAck & ~1);
+        /* ACK packets should use reqAck=0x00. */
+        ack.reqAck = 0;
         ack.length = htons(sizeof(NNSEMessage));
         ack.seqno = message->seqno;
-
-        if(!writePacket(&ack))
-            printf("Failed to ack\n");
+        writePacket(&ack);
     }
 
-    if(message->reqAck & 8)
-    {
-        // There's no proper seqid tracking, but shouldn't be necessary
-        printf("Got packet with failed ack flag (seqid %d) - ignoring\n", ntohs(message->seqno));
+    /* reqAck bit 3 is set on retransmits after failed ACK exchange.
+     * Do not drop these globally; ACK above, and dedupe stream payloads by
+     * sequence number so retried packets don't get applied twice. */
+    if((message->reqAck & 8) && service == StreamService
+            && usblink_cx2_state.last_stream_seq_valid
+            && usblink_cx2_state.last_stream_seq == ntohs(message->seqno))
         return;
-    }
 
-    switch(message->service & ~AckFlag)
+    switch(service)
     {
     case AddrReqService:
     {
@@ -309,6 +311,13 @@ static void handlePacket(const NNSEMessage *message, const uint8_t **streamdata 
     }
     case StreamService:
     {
+        if(usblink_cx2_state.last_stream_seq_valid
+                && usblink_cx2_state.last_stream_seq == ntohs(message->seqno))
+            return;
+
+        usblink_cx2_state.last_stream_seq_valid = true;
+        usblink_cx2_state.last_stream_seq = ntohs(message->seqno);
+
         if(streamdata)
             *streamdata = message->data;
         if(streamsize)
@@ -349,42 +358,85 @@ bool usblink_cx2_send_navnet(const uint8_t *data, uint16_t size)
     return ret;
 }
 
-bool usblink_cx2_handle_packet(const uint8_t *data, uint16_t size)
+bool usblink_cx2_handle_packet(const uint8_t *data, size_t size)
 {
-    if(size < sizeof(NNSEMessage))
+    if(!data || size == 0)
         return false;
 
-    const NNSEMessage *message = reinterpret_cast<const NNSEMessage*>(data);
-
-    const auto completeLength = ntohs(message->length);
-
-    // The nspire code has if(size & 0x3F == 0) ++size; for some reason
-    if(size != completeLength + (completeLength % 64 == 0))
+    if(size > sizeof(usblink_cx2_state.rx_buf))
     {
-        error("Got too small or too big packet");
+        usblink_cx2_state.rx_len = 0;
         return false;
     }
 
+    if(usblink_cx2_state.rx_len + size > sizeof(usblink_cx2_state.rx_buf))
+    {
+        usblink_cx2_state.rx_len = 0;
+    }
+
+    memcpy(usblink_cx2_state.rx_buf + usblink_cx2_state.rx_len, data, size);
+    usblink_cx2_state.rx_len += size;
+
+    bool handled_any = false;
+    size_t offset = 0;
+    while(usblink_cx2_state.rx_len - offset >= sizeof(NNSEMessage))
+    {
+        const auto *message = reinterpret_cast<const NNSEMessage*>(usblink_cx2_state.rx_buf + offset);
+        const auto completeLength = ntohs(message->length);
+        if(completeLength < sizeof(NNSEMessage))
+        {
+            ++offset;
+            continue;
+        }
+
+        // NNSE payloads are padded by one byte when message size is a multiple
+        // of 64, matching the USB quirk used by the guest stack.
+        const size_t packetLength = completeLength + ((completeLength % 64) == 0 ? 1u : 0u);
+        if(usblink_cx2_state.rx_len - offset < packetLength)
+        {
+            // Incomplete frame tail: keep bytes buffered until next chunk.
+            break;
+        }
+
 #ifdef DEBUG
-    printf("Got packet:\n");
-    dumpPacket(message);
+        printf("Got packet:\n");
+        dumpPacket(message);
 #endif
 
-    if(compute_checksum(reinterpret_cast<const uint8_t*>(message), completeLength) != 0xFFFF)
-        return false;
+        if(compute_checksum(reinterpret_cast<const uint8_t*>(message), completeLength) != 0xFFFF)
+        {
+            ++offset;
+            continue;
+        }
 
-    const uint8_t *streamdata = nullptr;
-    int streamsize = 0;
-    handlePacket(message, &streamdata, &streamsize);
+        const uint8_t *streamdata = nullptr;
+        int streamsize = 0;
+        handlePacket(message, &streamdata, &streamsize);
 
-    if(streamsize)
-        usblink_received_packet(streamdata, streamsize);
+        if(streamsize)
+            usblink_received_packet(streamdata, streamsize);
 
-    return true;
+        handled_any = true;
+
+        offset += packetLength;
+    }
+
+    if(offset != 0)
+    {
+        const size_t remaining = usblink_cx2_state.rx_len - offset;
+        if(remaining)
+            memmove(usblink_cx2_state.rx_buf, usblink_cx2_state.rx_buf + offset, remaining);
+        usblink_cx2_state.rx_len = remaining;
+    }
+
+    return handled_any || usblink_cx2_state.rx_len > 0;
 }
 
 void usblink_cx2_reset()
 {
     usblink_cx2_state.seqno = 0;
     usblink_cx2_state.handshake_complete = false;
+    usblink_cx2_state.last_stream_seq_valid = false;
+    usblink_cx2_state.last_stream_seq = 0;
+    usblink_cx2_state.rx_len = 0;
 }
