@@ -34,6 +34,7 @@ signals:
     void uploadProgress(int progress); // Same as above
 
     void wantToAddTreeItem(QTreeWidgetItem *item, QTreeWidgetItem *parent); // To let it run in the UI thread. Internal
+    void wantToFinalizeDirectory(QTreeWidgetItem *item, bool had_error); // Same as above
     void wantToReload(); // Same as above
 
 public slots:
@@ -42,10 +43,12 @@ public slots:
 private slots:
     void customContextMenuRequested(QPoint pos); // Internal
     void dataChangedHandler(QTreeWidgetItem *item, int column); // Internal
+    void directoryExpanded(QTreeWidgetItem *item); // Internal
     void downloadEntry(); // Internal
     void deleteEntry(); // Internal
     void newFolder(); // Internal
     void addTreeItem(QTreeWidgetItem *item, QTreeWidgetItem *parent); // Has to run in the UI thread. Internal
+    void finalizeDirectory(QTreeWidgetItem *item, bool had_error); // Has to run in the UI thread. Internal
 
 private:
     static QString naturalSize(uint64_t bytes);

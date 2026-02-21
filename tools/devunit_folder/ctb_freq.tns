@@ -1,0 +1,5 @@
+#INI Help: ctb_freq.tns
+
+ctb_freq_disable = 0
+ctb_freq_index = 255
+ctb_freq_always_normal = 0

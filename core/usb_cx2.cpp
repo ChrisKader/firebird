@@ -72,6 +72,16 @@ static void usb_cx2_int_check()
     int_set(INT_USB, usb_cx2.isr & ~usb_cx2.imr);
 }
 
+static void usb_cx2_reassert_fifo_data_irq()
+{
+    // FOTG210 FIFO OUT interrupt behaves like level while data is pending.
+    // Reassert when bytes remain so guest RX does not stall after IRQ clear.
+    // Raise both OUT and SPK: guest code may gate reads on either bit.
+    for(int fifo = 0; fifo < 4; ++fifo)
+        if(usb_cx2.fifo[fifo].size)
+            usb_cx2.gisr[1] |= (0b11u << (fifo * 2));
+}
+
 struct usb_packet {
     usb_packet(uint16_t size) : size(size) {}
     uint16_t size;
@@ -79,6 +89,13 @@ struct usb_packet {
 };
 
 std::queue<usb_packet> send_queue;
+std::queue<usb_packet> send_queue_ack;
+
+static bool usb_cx2_is_ack_packet(const uint8_t *packet, size_t size)
+{
+    // NNSE service byte is at offset 1; bit7 marks ACK.
+    return size >= 2 && (packet[1] & 0x80) != 0;
+}
 
 static bool usb_cx2_real_packet_to_calc(uint8_t ep, const uint8_t *packet, size_t size)
 {
@@ -86,7 +103,11 @@ static bool usb_cx2_real_packet_to_calc(uint8_t ep, const uint8_t *packet, size_
 
     // +1 to adjust for the hack below
     if(size + 1 > sizeof(usb_cx2.fifo[fifo].data) - usb_cx2.fifo[fifo].size)
+    {
+        warn("usb_cx2_real_packet_to_calc: fifo full ep=%u fifo=%u size=%zu fifo_size=%zu",
+             ep, fifo, size, usb_cx2.fifo[fifo].size);
         return false;
+    }
 
     memcpy(&usb_cx2.fifo[fifo].data[usb_cx2.fifo[fifo].size], packet, size);
 
@@ -96,7 +117,10 @@ static bool usb_cx2_real_packet_to_calc(uint8_t ep, const uint8_t *packet, size_
      * deal with zero-length packets.
      * TODO: Move to usblink_cx2.cpp as NNSE specific. */
     if((size & 0x3F) == 0)
+    {
+        usb_cx2.fifo[fifo].data[usb_cx2.fifo[fifo].size + size] = 0;
         ++size;
+    }
 
     usb_cx2.fifo[fifo].size += size;
     usb_cx2.gisr[1] |= 1 << (fifo * 2); // FIFO OUT IRQ
@@ -110,21 +134,70 @@ static bool usb_cx2_real_packet_to_calc(uint8_t ep, const uint8_t *packet, size_
     return true;
 }
 
-bool usb_cx2_packet_to_calc(uint8_t ep, const uint8_t *packet, size_t size)
+static void usb_cx2_queue_packet(bool is_ack, const uint8_t *packet, size_t size)
 {
-    if(size > sizeof(usb_cx2.fifo[0].data) || size > sizeof(usb_packet::data))
-        return false;
-
-    // If the FIFO is busy, queue it for sending later
-    uint8_t fifo = (usb_cx2.epmap[ep > 4] >> (8 * ((ep - 1) & 0b11) + 4)) & 0b11;
-    if(usb_cx2.fifo[fifo].size)
+    if(is_ack)
+    {
+        send_queue_ack.emplace(size);
+        memcpy(send_queue_ack.back().data, packet, size);
+    }
+    else
     {
         send_queue.emplace(size);
         memcpy(send_queue.back().data, packet, size);
+    }
+}
+
+static bool usb_cx2_send_one_queued(uint8_t ep)
+{
+    if(!send_queue_ack.empty())
+    {
+        if(!usb_cx2_real_packet_to_calc(ep, send_queue_ack.front().data, send_queue_ack.front().size))
+            return false;
+        send_queue_ack.pop();
         return true;
     }
-    else
-        return usb_cx2_real_packet_to_calc(ep, packet, size);
+    if(!send_queue.empty())
+    {
+        if(!usb_cx2_real_packet_to_calc(ep, send_queue.front().data, send_queue.front().size))
+            return false;
+        send_queue.pop();
+        return true;
+    }
+
+    return false;
+}
+
+bool usb_cx2_packet_to_calc(uint8_t ep, const uint8_t *packet, size_t size)
+{
+    if(size > sizeof(usb_cx2.fifo[0].data) || size > sizeof(usb_packet::data))
+    {
+        warn("usb_cx2_packet_to_calc: oversize ep=%u size=%zu", ep, size);
+        return false;
+    }
+
+    const bool is_ack = usb_cx2_is_ack_packet(packet, size);
+
+    // Keep ACKs ahead of regular payload if retries are pending.
+    if(!is_ack && !send_queue_ack.empty())
+    {
+        usb_cx2_queue_packet(false, packet, size);
+        if(!usb_cx2_send_one_queued(ep))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    // Preserve packet boundaries: if FIFO is busy, queue and send later.
+    uint8_t fifo = (usb_cx2.epmap[ep > 4] >> (8 * ((ep - 1) & 0b11) + 4)) & 0b11;
+    if(usb_cx2.fifo[fifo].size)
+    {
+        usb_cx2_queue_packet(is_ack, packet, size);
+        return true;
+    }
+
+    return usb_cx2_real_packet_to_calc(ep, packet, size);
 }
 
 static void usb_cx2_packet_from_calc(uint8_t ep, uint8_t *packet, size_t size)
@@ -139,6 +212,10 @@ static void usb_cx2_packet_from_calc(uint8_t ep, uint8_t *packet, size_t size)
 void usb_cx2_reset()
 {
     const bool attached = usb_cx2_physical_vbus_present();
+    while(!send_queue.empty())
+        send_queue.pop();
+    while(!send_queue_ack.empty())
+        send_queue_ack.pop();
 
     usb_cx2 = {};
     usb_cx2.usbcmd = 0x80000;
@@ -226,19 +303,29 @@ void usb_cx2_fdma_update(int fdma)
     if(!(usb_cx2.fdma[fdma].ctrl & 1))
         return; // DMA disabled
 
+    auto mark_dma_complete = [&](bool error) {
+        // Hardware clears active transfer state on completion. Keep driver-
+        // visible state consistent so write paths don't report 0-byte sends.
+        usb_cx2.fdma[fdma].ctrl &= ~1u;               // DMA enable off
+        usb_cx2.fdma[fdma].ctrl &= ~(0x1FFFFu << 8);  // residual length = 0
+        if (error)
+            usb_cx2.dmasr |= 1u << (fdma + 16); // DMA error
+        else
+            usb_cx2.dmasr |= 1u << fdma; // DMA done
+        usb_cx2_int_check();
+    };
+
     bool fromMemory = usb_cx2.fdma[fdma].ctrl & 0b10;
     size_t length = (usb_cx2.fdma[fdma].ctrl >> 8) & 0x1ffff;
     if (length == 0) {
-        usb_cx2.dmasr |= 1 << fdma; // DMA done
-        usb_cx2_int_check();
+        mark_dma_complete(false);
         return;
     }
     uint8_t *ptr = nullptr;
     ptr = (uint8_t*) phys_mem_ptr(usb_cx2.fdma[fdma].addr, length);
     if (!ptr) {
         warn("USB FDMA: bad mapping fdma=%d addr=%08x len=%zu", fdma, usb_cx2.fdma[fdma].addr, length);
-        usb_cx2.dmasr |= 1u << (fdma + 16); // DMA error
-        usb_cx2_int_check();
+        mark_dma_complete(true);
         return;
     }
 
@@ -256,13 +343,18 @@ void usb_cx2_fdma_update(int fdma)
 
         // This is an entire transfer and can be longer than the FIFO
         usb_cx2_packet_from_calc(ep, ptr, length);
+
+        if(fdma > 0) {
+            // Signal FIFO IN completion for this FIFO. Jungo write completion
+            // waits on device-I/O IRQs in addition to DMA done status.
+            usb_cx2.gisr[1] |= 1u << (16 + fifo);
+        }
     }
     else
     {
         if(fdma == 0) {
             warn("USB FDMA: reading from EP0 FIFO is unsupported");
-            usb_cx2.dmasr |= 1u << (fdma + 16); // DMA error
-            usb_cx2_int_check();
+            mark_dma_complete(true);
             return;
         }
 
@@ -277,21 +369,24 @@ void usb_cx2_fdma_update(int fdma)
         // Move the remaining data to the start
         usb_cx2.fifo[fifo].size -= length;
         if(usb_cx2.fifo[fifo].size)
+        {
             memmove(usb_cx2.fifo[fifo].data, usb_cx2.fifo[fifo].data + length, usb_cx2.fifo[fifo].size);
+            usb_cx2_reassert_fifo_data_irq();
+        }
         else
         {
             usb_cx2.gisr[1] &= ~(0b11 << (fifo * 2)); // FIFO0 OUT/SPK
 
-            if(ep == 1 && send_queue.size())
-            {
-                usb_cx2_packet_to_calc(1, send_queue.front().data, send_queue.front().size);
-                send_queue.pop();
-            }
+            if(ep == 1)
+                usb_cx2_send_one_queued(1);
         }
     }
 
-    usb_cx2.dmasr |= 1 << fdma; // DMA done
-    usb_cx2_int_check();
+    // Hardware advances DMA address by bytes actually transferred.
+    // Guest write/read helpers use this to compute completed byte count.
+    usb_cx2.fdma[fdma].addr += (uint32_t)length;
+
+    mark_dma_complete(false);
 }
 
 uint32_t usb_cx2_read_word(uint32_t addr)
@@ -526,6 +621,7 @@ void usb_cx2_write_word(uint32_t addr, uint32_t value)
     case 0x144: case 0x148:
     case 0x14c:
         usb_cx2.gisr[(offset - 0x144) >> 2] &= ~value;
+        usb_cx2_reassert_fifo_data_irq();
         usb_cx2_int_check();
         return;
     case 0x150: // Rx zero length pkt

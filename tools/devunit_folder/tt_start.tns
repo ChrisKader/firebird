@@ -1,0 +1,9 @@
+#INI Help: tt_start.tns
+
+tt_select_timeout = 4
+tt_backoff_time = 8
+tt_protocol = 0
+tt_min_pkt = 0
+tt_max_pkt = 0
+tt_random = 0
+tt_continuous = 0

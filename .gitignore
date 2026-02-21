@@ -11,3 +11,5 @@ android/.gradle
 .python-version
 data/
 .deps/
+NSpireLogs.*
+NSpireLogs/

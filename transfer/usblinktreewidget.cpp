@@ -16,8 +16,9 @@ USBLinkTreeWidget::USBLinkTreeWidget(QWidget *parent)
 {
     connect(this, SIGNAL(customContextMenuRequested(QPoint)), this,  SLOT(customContextMenuRequested(QPoint)));
     connect(this, SIGNAL(itemChanged(QTreeWidgetItem*, int)), this, SLOT(dataChangedHandler(QTreeWidgetItem*,int)));
-    // This is a Qt::BlockingQueuedConnection as the usblink_dirlist_* family of functions needs to enumerate over the items directly after emitting the signal.
-    connect(this, SIGNAL(wantToAddTreeItem(QTreeWidgetItem*,QTreeWidgetItem*)), this, SLOT(addTreeItem(QTreeWidgetItem*,QTreeWidgetItem*)), Qt::BlockingQueuedConnection);
+    connect(this, SIGNAL(itemExpanded(QTreeWidgetItem*)), this, SLOT(directoryExpanded(QTreeWidgetItem*)));
+    connect(this, SIGNAL(wantToAddTreeItem(QTreeWidgetItem*,QTreeWidgetItem*)), this, SLOT(addTreeItem(QTreeWidgetItem*,QTreeWidgetItem*)), Qt::QueuedConnection);
+    connect(this, SIGNAL(wantToFinalizeDirectory(QTreeWidgetItem*,bool)), this, SLOT(finalizeDirectory(QTreeWidgetItem*,bool)), Qt::QueuedConnection);
     connect(this, SIGNAL(wantToReload()), this, SLOT(reloadFilebrowser()), Qt::QueuedConnection);
 
     this->setAcceptDrops(true);
@@ -44,7 +45,7 @@ void USBLinkTreeWidget::usblink_upload_callback(int progress, void *data)
 
     // TODO: Don't do a full refresh
     // Also refresh on error, in case of multiple transfers
-    if((progress == 100 || progress < 0) && usblink_queue_size() == 1)
+    if((progress == 100 || progress < 0) && usblink_queue_size() == 0)
         that->wantToReload(); // Reload the file explorer after uploads finished
 
     emit that->uploadProgress(progress);
@@ -179,7 +180,7 @@ bool USBLinkTreeWidget::dropMimeData(QTreeWidgetItem *parent, int index, const Q
     {
         auto local = QDir::toNativeSeparators(url.toLocalFile());
         auto remote = parentDir + QLatin1Char('/') + QFileInfo(local).fileName();
-        usblink_queue_put_file(local.toStdString(), parentDir.toStdString(), usblink_upload_callback, this);
+        usblink_queue_put_file(local.toStdString(), remote.toStdString(), usblink_upload_callback, this);
     }
 
     return true;
@@ -187,25 +188,16 @@ bool USBLinkTreeWidget::dropMimeData(QTreeWidgetItem *parent, int index, const Q
 
 bool USBLinkTreeWidget::usblink_dirlist_nested(QTreeWidgetItem *w)
 {
-    // Find a directory (w or its children) to fill
-
-    if(w->data(0, Qt::UserRole).value<bool>() == false) //Not a directory
+    // Queue one directory listing for the expanded item itself.
+    if(!w || w->data(0, Qt::UserRole).value<bool>() == false) // Not a directory
         return false;
 
-    if(w->data(1, Qt::UserRole).value<bool>() == false) //Not filled yet
-    {
-        std::string path_utf8 = usblink_path_item(w).toStdString();
-        usblink_queue_dirlist(path_utf8, USBLinkTreeWidget::usblink_dirlist_callback_nested, w);
-        return true;
-    }
-    else
-    {
-        for(int i = 0; i < w->childCount(); ++i)
-            if(usblink_dirlist_nested(w->child(i)))
-                return true;
-    }
+    if(w->data(1, Qt::UserRole).value<bool>() == true) // Already filled
+        return false;
 
-    return false;
+    std::string path_utf8 = usblink_path_item(w).toStdString();
+    usblink_queue_dirlist(path_utf8, USBLinkTreeWidget::usblink_dirlist_callback_nested, w);
+    return true;
 }
 
 QTreeWidgetItem *USBLinkTreeWidget::itemForUSBLinkFile(struct usblink_file *file)
@@ -213,9 +205,15 @@ QTreeWidgetItem *USBLinkTreeWidget::itemForUSBLinkFile(struct usblink_file *file
     QString filename = QString::fromUtf8(file->filename);
     QTreeWidgetItem *item = new QTreeWidgetItem({filename, file->is_dir ? QString() : naturalSize(file->size)});
     if(file->is_dir)
+    {
         item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsDropEnabled | Qt::ItemIsEditable | Qt::ItemIsEnabled);
+        item->setChildIndicatorPolicy(QTreeWidgetItem::ShowIndicator);
+    }
     else
+    {
         item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEditable | Qt::ItemIsEnabled);
+        item->setChildIndicatorPolicy(QTreeWidgetItem::DontShowIndicatorWhenChildless);
+    }
     item->setData(0, Qt::UserRole, QVariant(file->is_dir));
     item->setData(1, Qt::UserRole, QVariant(false));
     item->setData(2, Qt::UserRole, QVariant(filename));
@@ -229,18 +227,10 @@ void USBLinkTreeWidget::usblink_dirlist_callback_nested(struct usblink_file *fil
     //End of enumeration or error
     if(!file)
     {
-        w->setData(1, Qt::UserRole, QVariant(true)); //Dir is now filled
-
-        if(!is_error)
-        {
-            //Find a dir to fill with entries
-            for(int i = 0; i < w->treeWidget()->topLevelItemCount(); ++i)
-                if(usblink_dirlist_nested(w->treeWidget()->topLevelItem(i)))
-                    return;
-        }
+        emit usblink_tree->wantToFinalizeDirectory(w, is_error);
 
         // FIXME: If a file is transferred concurrently, this may never be set to false.
-        if(usblink_queue_size() == 1)
+        if(usblink_queue_size() == 0)
             usblink_tree->doing_dirlist = false;
 
         return;
@@ -252,21 +242,18 @@ void USBLinkTreeWidget::usblink_dirlist_callback_nested(struct usblink_file *fil
 
 void USBLinkTreeWidget::usblink_dirlist_callback(struct usblink_file *file, bool is_error, void *data)
 {
-    if(is_error)
-        return;
+    (void)data;
 
-    auto *w = static_cast<USBLinkTreeWidget*>(data);
+    if(is_error) {
+        usblink_tree->doing_dirlist = false;
+        return;
+    }
 
     //End of enumeration or error
     if(!file)
     {
-        //Find a dir to fill with entries
-        for(int i = 0; i < w->topLevelItemCount(); ++i)
-            if(usblink_dirlist_nested(w->topLevelItem(i)))
-                return;
-
         // FIXME: If a file is transferred concurrently, this may never be set to false.
-        if(usblink_queue_size() == 1)
+        if(usblink_queue_size() == 0)
             usblink_tree->doing_dirlist = false;
 
         return;
@@ -274,6 +261,16 @@ void USBLinkTreeWidget::usblink_dirlist_callback(struct usblink_file *file, bool
 
     //Add directory entry to tree widget
     emit usblink_tree->wantToAddTreeItem(itemForUSBLinkFile(file), nullptr);
+}
+
+void USBLinkTreeWidget::directoryExpanded(QTreeWidgetItem *item)
+{
+    bool is_false = false;
+    if(!doing_dirlist.compare_exchange_strong(is_false, true))
+        return;
+
+    if(!usblink_dirlist_nested(item))
+        doing_dirlist = false;
 }
 
 void USBLinkTreeWidget::dataChangedHandler(QTreeWidgetItem *item, int column)
@@ -286,6 +283,9 @@ void USBLinkTreeWidget::dataChangedHandler(QTreeWidgetItem *item, int column)
 
     std::string old_name = item->data(2, Qt::UserRole).toString().toStdString(),
              new_name = item->data(0, Qt::DisplayRole).toString().toStdString();
+
+    if(old_name == new_name)
+        return;
 
     usblink_queue_move(filepath + "/" + old_name, filepath + "/" + new_name, usblink_move_progress, item);
 }
@@ -323,4 +323,14 @@ void USBLinkTreeWidget::addTreeItem(QTreeWidgetItem *item, QTreeWidgetItem *pare
         parent->addChild(item);
     else
         this->addTopLevelItem(item);
+}
+
+void USBLinkTreeWidget::finalizeDirectory(QTreeWidgetItem *item, bool had_error)
+{
+    if(!item || had_error)
+        return;
+
+    item->setData(1, Qt::UserRole, QVariant(true)); // Dir is now filled
+    if(item->childCount() == 0)
+        item->setChildIndicatorPolicy(QTreeWidgetItem::DontShowIndicatorWhenChildless);
 }

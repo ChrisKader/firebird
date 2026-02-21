@@ -3181,7 +3181,7 @@ void MainWindow::usblink_progress_callback(int progress, void *userData)
 
     // TODO: Don't do a full refresh
     // Also refresh on error, in case of multiple transfers
-    if ((progress == 100 || progress < 0) && usblink_queue_size() == 1)
+    if ((progress == 100 || progress < 0) && usblink_queue_size() == 0)
         mw->ui->usblinkTree->wantToReload(); // Reload the file explorer after uploads finished
 
     if (progress < 0 || progress > 100)
@@ -3821,10 +3821,17 @@ void MainWindow::connectUSB()
 
 void MainWindow::usblinkChanged(bool state)
 {
+    const bool was_connected = m_usbUiConnected;
+    m_usbUiConnected = state;
+
     ui->actionConnect->setText(state ? tr("Disconnect USB") : tr("Connect USB"));
     ui->actionConnect->setChecked(state);
     ui->buttonUSB->setToolTip(state ? tr("Disconnect USB") : tr("Connect USB"));
     ui->buttonUSB->setChecked(state);
+
+    // Auto-refresh file browser once when USB data link transitions to connected.
+    if(state && !was_connected && ui->usblinkTree)
+        ui->usblinkTree->wantToReload();
 }
 
 void MainWindow::setExtLCD(bool state)

@@ -279,6 +279,7 @@ private:
     // Window management
     bool focus_pause_enabled = false;
     bool focus_auto_paused = false;
+    bool m_usbUiConnected = false;
 
     // Utility docks converted from legacy tabs
     DockWidget *m_dock_files = nullptr;
