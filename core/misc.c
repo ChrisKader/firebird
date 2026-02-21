@@ -259,8 +259,8 @@ void gpio_reset() {
     gpio.output.w    = 0x0000000000000000;
 
     /* CX II unmodeled digital inputs are typically pull-up biased.
-     * Start high to avoid false "present/attached" on unknown mappings,
-     * then drive known detect pins to modeled values below. */
+     * Start high to avoid false "not-ready" on unknown mappings, then
+     * drive modeled detect lines to their emulated values below. */
     gpio.input.w = emulate_cx2 ? 0xFFFFFFFFFFFFFFFFULL : 0x00000000071F001FULL;
     gpio_sync_cx2_detect_inputs();
     gpio.prev_input.w = gpio.input.w;

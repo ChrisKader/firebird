@@ -601,37 +601,185 @@ void cx2_backlight_write(uint32_t addr, uint32_t value)
 		cx2_backlight_refresh_lcd_contrast();
 }
 
-/* 90040000: FTSSP010 SPI controller connected to the LCD.
-   Only the bare minimum to get the OS to boot is implemented. */
+/* 90040000: FTSSP010 SPI controller connected to the LCD panel.
+ *
+ * Register layout (as used by CX II firmware):
+ *   +0x00  CR0    Control register 0 (bits[3:0] = frame_size - 1)
+ *   +0x04  CR1    Control register 1 (bit 1 = SSP enable)
+ *   +0x08/+0x18 DATA   TX/RX data register (full-duplex FIFO)
+ *   +0x0C  STATUS Bit1=TX not full, Bit2=RX not empty, Bit4=Busy
+ *
+ * The LCD panel responds to MIPI DCS read commands over 9-bit SPI:
+ *   0xDA -> 0x06 (Display ID1)    \  Together these identify
+ *   0xDB -> 0x85 (Display ID2)    /  "GP IPS" panel (index 0xD)
+ * Response is encoded in 9-bit frame as (byte << 1).
+ */
 struct cx2_lcd_spi_state cx2_lcd_spi;
+
+static uint32_t lcd_spi_cr0;
+static uint32_t lcd_spi_cr1;
+static uint8_t  lcd_spi_last_cmd;
+
+static uint32_t lcd_spi_rx_fifo[16];
+static int lcd_spi_rx_head;
+static int lcd_spi_rx_count;
+static uint16_t lcd_spi_pending_words[4];
+static int lcd_spi_pending_len;
+static int lcd_spi_pending_pos;
+
+void cx2_lcd_spi_reset(void)
+{
+	cx2_lcd_spi.busy = false;
+	lcd_spi_cr0 = 0;
+	lcd_spi_cr1 = 0;
+	lcd_spi_last_cmd = 0;
+	lcd_spi_rx_head = 0;
+	lcd_spi_rx_count = 0;
+	lcd_spi_pending_len = 0;
+	lcd_spi_pending_pos = 0;
+}
+
+static uint8_t lcd_spi_panel_response_byte(uint8_t cmd)
+{
+	switch (cmd) {
+	case 0xDA: return 0x06; /* Display ID1 */
+	case 0xDB: return 0x85; /* Display ID2 */
+	case 0xDC: return 0x4A; /* Display ID3 */
+	default:   return 0x00;
+	}
+}
+
+static bool lcd_spi_extract_id_cmd(uint16_t frame, uint8_t *out_cmd)
+{
+	/* 9-bit SPI frame: bit8 is D/C (0=command, 1=data). */
+	if (frame & 0x100u)
+		return false;
+
+	uint8_t raw = (uint8_t)(frame & 0xFFu);
+	uint8_t shifted = (uint8_t)((frame >> 1) & 0xFFu);
+	if (raw == 0x04 || (raw >= 0xDA && raw <= 0xDF)) {
+		*out_cmd = raw;
+		return true;
+	}
+	if (shifted == 0x04 || (shifted >= 0xDA && shifted <= 0xDF)) {
+		*out_cmd = shifted;
+		return true;
+	}
+	return false;
+}
+
+static void lcd_spi_prepare_id_response(uint8_t cmd)
+{
+	lcd_spi_pending_len = 0;
+	lcd_spi_pending_pos = 0;
+
+	/* Read Display ID command returns 3 bytes on this panel family.
+	 * The bootloader unpacks 9-bit words with overlapping bit windows.
+	 * These packed words decode to 06,85,4A ("GP IPS", index 0xD). */
+	if (cmd == 0x04) {
+		/* One leading dummy keeps alignment with the bootloader's RX priming
+		 * behavior before it decodes bytes from the transfer buffer. */
+		lcd_spi_pending_words[0] = 0x000;
+		lcd_spi_pending_words[1] = 0x006;
+		lcd_spi_pending_words[2] = 0x10A;
+		lcd_spi_pending_words[3] = 0x128;
+		lcd_spi_pending_len = 4;
+		return;
+	}
+
+	if (cmd >= 0xDA && cmd <= 0xDC) {
+		/* Single-byte reads go through a different path (value >> 1). */
+		lcd_spi_pending_words[0] = (uint16_t)lcd_spi_panel_response_byte(cmd) << 1;
+		lcd_spi_pending_len = 1;
+	}
+}
+
+static void lcd_spi_rx_push(uint32_t value)
+{
+	if (lcd_spi_rx_count < 16) {
+		int tail = (lcd_spi_rx_head + lcd_spi_rx_count) % 16;
+		lcd_spi_rx_fifo[tail] = value;
+		lcd_spi_rx_count++;
+	}
+}
+
+static void lcd_spi_rx_clear(void)
+{
+	lcd_spi_rx_head = 0;
+	lcd_spi_rx_count = 0;
+}
+
+static uint32_t lcd_spi_rx_pop(void)
+{
+	if (lcd_spi_rx_count > 0) {
+		uint32_t data = lcd_spi_rx_fifo[lcd_spi_rx_head];
+		lcd_spi_rx_head = (lcd_spi_rx_head + 1) % 16;
+		lcd_spi_rx_count--;
+		return data;
+	}
+	return 0;
+}
 
 uint32_t cx2_lcd_spi_read(uint32_t addr)
 {
-	switch (addr & 0xFFF)
+	uint32_t offset = addr & 0xFFF;
+	switch (offset)
 	{
-	case 0x0C: // REG_SR
+	case 0x00: return lcd_spi_cr0;
+	case 0x04: return lcd_spi_cr1;
+	case 0x08:
+	case 0x18:
+		return lcd_spi_rx_pop();
+	case 0x0C:
 	{
-		uint32_t ret = 0x10 | (cx2_lcd_spi.busy ? 0x04 : 0x02);
+		/* FTSSP010 transfer loop in bootloader:
+		 *   - checks bit1 (0x2) before TX writes
+		 *   - checks bits[9:4] (0x3F0) before RX reads
+		 * Expose RX availability only when FIFO actually has data. */
+		uint32_t rx_level = (uint32_t)(lcd_spi_rx_count & 0x3F) << 4;
+		uint32_t status = 0x02u | rx_level;
 		cx2_lcd_spi.busy = false;
-		return ret;
+		return status;
 	}
 	default:
-		// Ignored.
 		return 0;
 	}
 }
 
 void cx2_lcd_spi_write(uint32_t addr, uint32_t value)
 {
-	(void) value;
-
-	switch (addr & 0xFF)
+	uint32_t offset = addr & 0xFFF;
+	switch (offset)
 	{
-	case 0x18: // REG_DR
+	case 0x00: lcd_spi_cr0 = value; break;
+	case 0x04: lcd_spi_cr1 = value; break;
+	case 0x08:
+	case 0x18:
+	{
+		/* Each TX write clocks one 9-bit full-duplex SPI frame.
+		 * D/C is bit8, payload is bits[7:0]. Panel-ID probes are DCS
+		 * read commands sent with D/C=0, followed by a data phase where
+		 * the panel returns one byte. */
+		uint16_t frame = value & 0x1FF;
+		uint8_t cmd = 0;
+		uint16_t response_word = 0;
+
+		if (lcd_spi_extract_id_cmd(frame, &cmd)) {
+			lcd_spi_last_cmd = cmd;
+			/* Drop stale full-duplex garbage from prior non-read traffic so
+			 * ID decode consumes only this command's response stream. */
+			lcd_spi_rx_clear();
+			lcd_spi_prepare_id_response(cmd);
+			/* Command phase clocks in a dummy word (response_word = 0). */
+		} else if (lcd_spi_pending_pos < lcd_spi_pending_len) {
+			response_word = lcd_spi_pending_words[lcd_spi_pending_pos++];
+		}
+		/* Full-duplex: every TX frame produces one RX frame. */
+		lcd_spi_rx_push(response_word);
 		cx2_lcd_spi.busy = true;
 		break;
+	}
 	default:
-		// Ignored
 		break;
 	}
 }
