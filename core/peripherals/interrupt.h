@@ -3,21 +3,59 @@
 #ifndef _H_INTERRUPT
 #define _H_INTERRUPT
 
+#include <stdbool.h>
+#include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define INT_SERIAL   1
-#define INT_WATCHDOG 3
-#define INT_GPIO     7
-#define INT_USB      8
-#define INT_ADC      11
-#define INT_POWER    15
-#define INT_KEYPAD   16
-#define INT_TIMER0   17
-#define INT_TIMER1   18
-#define INT_TIMER2   19
-#define INT_LCD      21
+/* PL190/VIC has 32 interrupt input lines (0..31). */
+#define INT_IRQ0   0
+#define INT_IRQ1   1
+#define INT_IRQ2   2
+#define INT_IRQ3   3
+#define INT_IRQ4   4
+#define INT_IRQ5   5
+#define INT_IRQ6   6
+#define INT_IRQ7   7
+#define INT_IRQ8   8
+#define INT_IRQ9   9
+#define INT_IRQ10  10
+#define INT_IRQ11  11
+#define INT_IRQ12  12
+#define INT_IRQ13  13
+#define INT_IRQ14  14
+#define INT_IRQ15  15
+#define INT_IRQ16  16
+#define INT_IRQ17  17
+#define INT_IRQ18  18
+#define INT_IRQ19  19
+#define INT_IRQ20  20
+#define INT_IRQ21  21
+#define INT_IRQ22  22
+#define INT_IRQ23  23
+#define INT_IRQ24  24
+#define INT_IRQ25  25
+#define INT_IRQ26  26
+#define INT_IRQ27  27
+#define INT_IRQ28  28
+#define INT_IRQ29  29
+#define INT_IRQ30  30
+#define INT_IRQ31  31
+
+/* Named aliases for lines currently modeled in code paths. */
+#define INT_SERIAL   INT_IRQ1
+#define INT_WATCHDOG INT_IRQ3
+#define INT_GPIO     INT_IRQ7
+#define INT_USB      INT_IRQ8
+#define INT_ADC      INT_IRQ11
+#define INT_ADC_ALT  INT_IRQ13
+#define INT_POWER    INT_IRQ15
+#define INT_KEYPAD   INT_IRQ16
+#define INT_TIMER0   INT_IRQ17
+#define INT_TIMER1   INT_IRQ18
+#define INT_TIMER2   INT_IRQ19
+#define INT_LCD      INT_IRQ21
 
 typedef struct interrupt_state {
 	uint32_t active;

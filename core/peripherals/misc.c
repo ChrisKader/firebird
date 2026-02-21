@@ -2084,9 +2084,9 @@ static void cx2_adc_update_irq(void)
 {
     bool on = cx2_adc_irq_should_assert();
     int_set(INT_ADC, on);
-    /* CX II bootloader ADC paths use logical IRQ 13 mapping in several places.
-     * Mirror the source onto raw IRQ 13 as well so either mask path can fire. */
-    int_set(13, on);
+    /* CX II bootloader ADC paths use logical IRQ13 in several places.
+     * Mirror the source onto that line so either mask path can fire. */
+    int_set(INT_ADC_ALT, on);
     aladdin_pmu_set_adc_pending(on);
 }
 

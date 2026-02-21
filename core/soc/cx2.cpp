@@ -102,7 +102,7 @@ bool cx2_peripherals_resume(const emu_snapshot *snapshot);
 static uint32_t aladdin_pmu_pend_with_live_sources(void)
 {
 	uint32_t pending = aladdin_pmu.noidea[PMU_IRQ_PEND_INDEX];
-	if (intr.active & ((1u << INT_ADC) | (1u << 13)))
+	if (intr.active & ((1u << INT_ADC) | (1u << INT_ADC_ALT)))
 		pending |= PMU_IRQ_ADC_BIT;
 	return pending;
 }
