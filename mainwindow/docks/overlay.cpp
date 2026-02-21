@@ -7,9 +7,9 @@
 #include <QTimer>
 #include <QToolButton>
 
-#include "ui/dockbackend.h"
-#include "ui/dockwidget.h"
-#include "ui/materialicons.h"
+#include "ui/docking/dockbackend.h"
+#include "ui/docking/dockwidget.h"
+#include "ui/theme/materialicons.h"
 
 void MainWindow::scheduleCoreDockConnectOverlayRefresh()
 {

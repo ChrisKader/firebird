@@ -8,10 +8,10 @@
 #include <QToolButton>
 
 #include "debugger/dockmanager.h"
-#include "ui/widgets/debugger/disassembly/disassemblywidget.h"
-#include "ui/widgets/debugger/hexview/hexviewwidget.h"
-#include "ui/materialicons.h"
-#include "ui/widgettheme.h"
+#include "ui/widgets/disassembly/disassemblywidget.h"
+#include "ui/widgets/hexview/hexviewwidget.h"
+#include "ui/theme/materialicons.h"
+#include "ui/theme/widgettheme.h"
 #include "ui_mainwindow.h"
 
 static QString normalize_button_tooltip_text(QString text)

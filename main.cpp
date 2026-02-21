@@ -10,7 +10,7 @@
 #include <QQmlApplicationEngine>
 
 #include "app/emuthread.h"
-#include "ui/framebuffer.h"
+#include "ui/screen/framebuffer.h"
 #include "app/qmlbridge.h"
 #include "ui/models/kitmodel.h"
 

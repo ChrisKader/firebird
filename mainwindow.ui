@@ -771,7 +771,7 @@
   <customwidget>
    <class>LCDWidget</class>
    <extends>QWidget</extends>
-   <header>ui/lcdwidget.h</header>
+   <header>ui/screen/lcdwidget.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

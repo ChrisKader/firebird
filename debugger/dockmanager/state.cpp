@@ -4,21 +4,21 @@
 #include <QMainWindow>
 #include <QTimer>
 
-#include "ui/dockstate.h"
-#include "ui/materialicons.h"
-#include "ui/widgets/debugger/disassembly/disassemblywidget.h"
-#include "ui/widgets/debugger/registers/registerwidget.h"
-#include "ui/widgets/debugger/hexview/hexviewwidget.h"
-#include "ui/widgets/debugger/breakpoints/breakpointwidget.h"
-#include "ui/widgets/debugger/watchpoints/watchpointwidget.h"
-#include "ui/widgets/debugger/portmonitor/portmonitorwidget.h"
-#include "ui/widgets/debugger/stack/stackwidget.h"
-#include "ui/widgets/debugger/console/consolewidget.h"
-#include "ui/widgets/debugger/memvisualizer/memoryvisualizerwidget.h"
-#include "ui/widgets/debugger/cyclecounter/cyclecounterwidget.h"
-#include "ui/widgets/debugger/timermonitor/timermonitorwidget.h"
-#include "ui/widgets/debugger/lcdstate/lcdstatewidget.h"
-#include "ui/widgets/debugger/mmuviewer/mmuviewerwidget.h"
+#include "ui/docking/dockstate.h"
+#include "ui/theme/materialicons.h"
+#include "ui/widgets/disassembly/disassemblywidget.h"
+#include "ui/widgets/registers/registerwidget.h"
+#include "ui/widgets/hexview/hexviewwidget.h"
+#include "ui/widgets/breakpoints/breakpointwidget.h"
+#include "ui/widgets/watchpoints/watchpointwidget.h"
+#include "ui/widgets/portmonitor/portmonitorwidget.h"
+#include "ui/widgets/stack/stackwidget.h"
+#include "ui/widgets/console/consolewidget.h"
+#include "ui/widgets/memvisualizer/memoryvisualizerwidget.h"
+#include "ui/widgets/cyclecounter/cyclecounterwidget.h"
+#include "ui/widgets/timermonitor/timermonitorwidget.h"
+#include "ui/widgets/lcdstate/lcdstatewidget.h"
+#include "ui/widgets/mmuviewer/mmuviewerwidget.h"
 
 void DebugDockManager::ensureExtraHexDocks(int count)
 {

@@ -41,11 +41,11 @@
 #include "core/mem.h"
 #include "core/misc.h"
 #include "debugger/dockmanager.h"
-#include "ui/widgets/debugger/hwconfig/hwconfigwidget.h"
+#include "ui/widgets/hwconfig/hwconfigwidget.h"
 #include "transfer/usblinktreewidget.h"
-#include "ui/framebuffer.h"
-#include "ui/keypadbridge.h"
-#include "ui/materialicons.h"
+#include "ui/screen/framebuffer.h"
+#include "ui/input/keypadbridge.h"
+#include "ui/theme/materialicons.h"
 #include "ui_mainwindow.h"
 
 class AdaptiveControlsWidget : public QWidget

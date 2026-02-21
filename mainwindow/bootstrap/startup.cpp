@@ -21,7 +21,7 @@
 #include "core/mem.h"
 #include "core/misc.h"
 #include "transfer/usblinktreewidget.h"
-#include "ui/materialicons.h"
+#include "ui/theme/materialicons.h"
 #include "ui_mainwindow.h"
 
 void MainWindow::setupActionAndMenuWiring()

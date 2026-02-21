@@ -27,11 +27,11 @@
 #include "core/gif.h"
 #include "core/misc.h"
 #include "core/usblink_queue.h"
-#include "ui/widgets/debugger/console/consolewidget.h"
+#include "ui/widgets/console/consolewidget.h"
 #include "debugger/dockmanager.h"
-#include "ui/widgets/debugger/hwconfig/hwconfigwidget.h"
-#include "ui/framebuffer.h"
-#include "ui/widgettheme.h"
+#include "ui/widgets/hwconfig/hwconfigwidget.h"
+#include "ui/screen/framebuffer.h"
+#include "ui/theme/widgettheme.h"
 #include "ui_mainwindow.h"
 
 void MainWindow::switchTranslator(const QLocale &locale)

@@ -10,7 +10,7 @@
 #include "core/keypad.h"
 #include "core/os/os.h"
 #include "core/usblink_queue.h"
-#include "ui/keypadbridge.h"
+#include "ui/input/keypadbridge.h"
 
 #ifndef MOBILE_UI
     #include "mainwindow.h"

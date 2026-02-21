@@ -23,8 +23,8 @@
 #include "core/gif.h"
 #include "core/misc.h"
 #include "debugger/dockmanager.h"
-#include "ui/widgets/debugger/hwconfig/hwconfigwidget.h"
-#include "ui/framebuffer.h"
+#include "ui/widgets/hwconfig/hwconfigwidget.h"
+#include "ui/screen/framebuffer.h"
 #include "ui_mainwindow.h"
 
 static bool likelyCx2StartupKit(QMLBridge *bridge)

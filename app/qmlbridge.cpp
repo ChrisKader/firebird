@@ -14,8 +14,8 @@
 #include "core/os/os.h"
 #include "core/keypad.h"
 #include "core/usblink_queue.h"
-#include "ui/framebuffer.h"
-#include "ui/keypadbridge.h"
+#include "ui/screen/framebuffer.h"
+#include "ui/input/keypadbridge.h"
 
 namespace {
 QMLBridge *g_qml_bridge = nullptr;

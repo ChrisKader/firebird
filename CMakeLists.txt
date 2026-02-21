@@ -91,40 +91,40 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     app/qmlbridge/runtime.cpp
     ui/models/kitmodel.cpp ui/models/kitmodel.h
     # Shared UI components
-    ui/dockwidget.cpp ui/dockwidget.h
-    ui/dockbackend.cpp ui/dockbackend.h
-    ui/dockstate.h
-    ui/kdockwidget.cpp ui/kdockwidget.h
-    ui/widgettheme.cpp ui/widgettheme.h
-    ui/materialicons.cpp ui/materialicons.h
-    ui/lcdwidget.cpp ui/lcdwidget.h
-    ui/framebuffer.cpp ui/framebuffer.h
-    ui/keypadbridge.cpp ui/keypadbridge.h
-    ui/keymap.h
-    ui/ansitextwriter.cpp ui/ansitextwriter.h
+    ui/docking/dockwidget.cpp ui/docking/dockwidget.h
+    ui/docking/dockbackend.cpp ui/docking/dockbackend.h
+    ui/docking/dockstate.h
+    ui/docking/kdockwidget.cpp ui/docking/kdockwidget.h
+    ui/theme/widgettheme.cpp ui/theme/widgettheme.h
+    ui/theme/materialicons.cpp ui/theme/materialicons.h
+    ui/screen/lcdwidget.cpp ui/screen/lcdwidget.h
+    ui/screen/framebuffer.cpp ui/screen/framebuffer.h
+    ui/input/keypadbridge.cpp ui/input/keypadbridge.h
+    ui/input/keymap.h
+    ui/text/ansitextwriter.cpp ui/text/ansitextwriter.h
     # Debugger subsystem
     debugger/dockmanager.cpp debugger/dockmanager.h
     debugger/dockmanager/state.cpp
-    ui/widgets/debugger/disassembly/disassemblywidget.cpp ui/widgets/debugger/disassembly/disassemblywidget.h
-    ui/widgets/debugger/registers/registerwidget.cpp ui/widgets/debugger/registers/registerwidget.h
-    ui/widgets/debugger/hexview/hexviewwidget.cpp ui/widgets/debugger/hexview/hexviewwidget.h
-    ui/widgets/debugger/breakpoints/breakpointwidget.cpp ui/widgets/debugger/breakpoints/breakpointwidget.h
-    ui/widgets/debugger/watchpoints/watchpointwidget.cpp ui/widgets/debugger/watchpoints/watchpointwidget.h
-    ui/widgets/debugger/stack/stackwidget.cpp ui/widgets/debugger/stack/stackwidget.h
-    ui/widgets/debugger/portmonitor/portmonitorwidget.cpp ui/widgets/debugger/portmonitor/portmonitorwidget.h
-    ui/widgets/debugger/keyhistory/keyhistorywidget.cpp ui/widgets/debugger/keyhistory/keyhistorywidget.h
-    ui/widgets/debugger/console/consolewidget.cpp ui/widgets/debugger/console/consolewidget.h
-    ui/widgets/debugger/console/state.cpp
-    ui/widgets/debugger/memvisualizer/memoryvisualizerwidget.cpp ui/widgets/debugger/memvisualizer/memoryvisualizerwidget.h
-    ui/widgets/debugger/cyclecounter/cyclecounterwidget.cpp ui/widgets/debugger/cyclecounter/cyclecounterwidget.h
-    ui/widgets/debugger/timermonitor/timermonitorwidget.cpp ui/widgets/debugger/timermonitor/timermonitorwidget.h
-    ui/widgets/debugger/lcdstate/lcdstatewidget.cpp ui/widgets/debugger/lcdstate/lcdstatewidget.h
-    ui/widgets/debugger/gotodialog.cpp ui/widgets/debugger/gotodialog.h
-    ui/widgets/debugger/nandbrowser/nandbrowserwidget.cpp ui/widgets/debugger/nandbrowser/nandbrowserwidget.h
-    ui/widgets/debugger/nandbrowser/nandfileeditor.cpp ui/widgets/debugger/nandbrowser/nandfileeditor.h
-    ui/widgets/debugger/hwconfig/hwconfigwidget.cpp ui/widgets/debugger/hwconfig/hwconfigwidget.h
-    ui/widgets/debugger/hwconfig/state.cpp
-    ui/widgets/debugger/mmuviewer/mmuviewerwidget.cpp ui/widgets/debugger/mmuviewer/mmuviewerwidget.h
+    ui/widgets/disassembly/disassemblywidget.cpp ui/widgets/disassembly/disassemblywidget.h
+    ui/widgets/registers/registerwidget.cpp ui/widgets/registers/registerwidget.h
+    ui/widgets/hexview/hexviewwidget.cpp ui/widgets/hexview/hexviewwidget.h
+    ui/widgets/breakpoints/breakpointwidget.cpp ui/widgets/breakpoints/breakpointwidget.h
+    ui/widgets/watchpoints/watchpointwidget.cpp ui/widgets/watchpoints/watchpointwidget.h
+    ui/widgets/stack/stackwidget.cpp ui/widgets/stack/stackwidget.h
+    ui/widgets/portmonitor/portmonitorwidget.cpp ui/widgets/portmonitor/portmonitorwidget.h
+    ui/widgets/keyhistory/keyhistorywidget.cpp ui/widgets/keyhistory/keyhistorywidget.h
+    ui/widgets/console/consolewidget.cpp ui/widgets/console/consolewidget.h
+    ui/widgets/console/state.cpp
+    ui/widgets/memvisualizer/memoryvisualizerwidget.cpp ui/widgets/memvisualizer/memoryvisualizerwidget.h
+    ui/widgets/cyclecounter/cyclecounterwidget.cpp ui/widgets/cyclecounter/cyclecounterwidget.h
+    ui/widgets/timermonitor/timermonitorwidget.cpp ui/widgets/timermonitor/timermonitorwidget.h
+    ui/widgets/lcdstate/lcdstatewidget.cpp ui/widgets/lcdstate/lcdstatewidget.h
+    ui/widgets/gotodialog.cpp ui/widgets/gotodialog.h
+    ui/widgets/nandbrowser/nandbrowserwidget.cpp ui/widgets/nandbrowser/nandbrowserwidget.h
+    ui/widgets/nandbrowser/nandfileeditor.cpp ui/widgets/nandbrowser/nandfileeditor.h
+    ui/widgets/hwconfig/hwconfigwidget.cpp ui/widgets/hwconfig/hwconfigwidget.h
+    ui/widgets/hwconfig/state.cpp
+    ui/widgets/mmuviewer/mmuviewerwidget.cpp ui/widgets/mmuviewer/mmuviewerwidget.h
     # Dialogs
     dialogs/fbaboutdialog.cpp dialogs/fbaboutdialog.h
     # File transfer
@@ -270,7 +270,7 @@ if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
     if(BUILD_TESTING)
         add_executable(firebird-kdd-layout-tests
             tests/kdd_layout_test.cpp
-            ui/kdockwidget.cpp
+            ui/docking/kdockwidget.cpp
         )
         target_compile_definitions(firebird-kdd-layout-tests PRIVATE
             FIREBIRD_USE_KDDOCKWIDGETS=1

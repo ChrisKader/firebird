@@ -6,8 +6,8 @@
 #include <climits>
 #include <utility>
 
-#include "ui/dockbackend.h"
-#include "ui/dockwidget.h"
+#include "ui/docking/dockbackend.h"
+#include "ui/docking/dockwidget.h"
 
 static QString coreDockAreaToString(Qt::DockWidgetArea area)
 {

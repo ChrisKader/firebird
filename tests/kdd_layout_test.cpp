@@ -11,7 +11,7 @@
 #include <kddockwidgets/DockWidget.h>
 #include <kddockwidgets/LayoutSaver.h>
 
-#include "ui/kdockwidget.h"
+#include "ui/docking/kdockwidget.h"
 
 namespace {
 

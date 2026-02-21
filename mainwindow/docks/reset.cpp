@@ -25,9 +25,9 @@
 #include "mainwindow/docks/baselinelayout.h"
 #include "debugger/dockmanager.h"
 #include "mainwindow/docks/baseline.h"
-#include "ui/dockbackend.h"
-#include "ui/dockwidget.h"
-#include "ui/materialicons.h"
+#include "ui/docking/dockbackend.h"
+#include "ui/docking/dockwidget.h"
+#include "ui/theme/materialicons.h"
 
 void MainWindow::resetDockLayout()
 {

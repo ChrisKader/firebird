@@ -160,7 +160,7 @@ QML_IMPORT_PATH += $$PWD/qml
 
 SOURCES += $$ASMCODE_IMPL \
     core/fieldparser.cpp \
-    lcdwidget.cpp \
+    ui/screen/lcdwidget.cpp \
     mainwindow.cpp \
     main.cpp \
     core/power/powercontrol.cpp \
@@ -200,8 +200,8 @@ SOURCES += $$ASMCODE_IMPL \
     usblinktreewidget.cpp \
     kitmodel.cpp \
     fbaboutdialog.cpp \
-    dockwidget.cpp \
-    consolelineedit.cpp \
+    ui/docking/dockwidget.cpp \
+    ui/widgets/main/consolelineedit/consolelineedit.cpp \
     core/cx2.cpp
 
 FORMS += \
@@ -212,9 +212,9 @@ HEADERS += \
     core/usb_cx2.h \
     core/usblink_cx2.h \
     emuthread.h \
-    lcdwidget.h \
+    ui/screen/lcdwidget.h \
     mainwindow.h \
-    keymap.h \
+    ui/input/keymap.h \
     qmlbridge.h \
     core/power/powercontrol.h \
     qtkeypadbridge.h \
@@ -251,8 +251,8 @@ HEADERS += \
     usblinktreewidget.h \
     kitmodel.h \
     fbaboutdialog.h \
-    dockwidget.h \
-    consolelineedit.h \
+    ui/docking/dockwidget.h \
+    ui/widgets/main/consolelineedit/consolelineedit.h \
     core/cx2.h
 
 # For localization

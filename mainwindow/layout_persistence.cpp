@@ -9,8 +9,8 @@
 #include <QMainWindow>
 #include <QStandardPaths>
 
-#include "ui/dockbackend.h"
-#include "ui/dockwidget.h"
+#include "ui/docking/dockbackend.h"
+#include "ui/docking/dockwidget.h"
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/LayoutSaver.h>

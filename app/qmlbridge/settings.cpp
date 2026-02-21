@@ -4,7 +4,7 @@
 
 #include "app/emuthread.h"
 #include "core/emu.h"
-#include "ui/framebuffer.h"
+#include "ui/screen/framebuffer.h"
 
 unsigned int QMLBridge::getGDBPort()
 {

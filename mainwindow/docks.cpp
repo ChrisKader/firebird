@@ -2,9 +2,9 @@
 
 #include <QMenu>
 
-#include "ui/dockbackend.h"
-#include "ui/dockwidget.h"
-#include "ui/kdockwidget.h"
+#include "ui/docking/dockbackend.h"
+#include "ui/docking/dockwidget.h"
+#include "ui/docking/kdockwidget.h"
 
 void MainWindow::applyStandardDockFeatures(DockWidget *dw, bool closable) const
 {
