@@ -138,6 +138,10 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     ui/widgets/lcdstate/dockregistration.cpp
     ui/widgets/gotodialog.cpp ui/widgets/gotodialog.h
     ui/widgets/nandbrowser/nandbrowserwidget.cpp ui/widgets/nandbrowser/nandbrowserwidget.h
+    ui/widgets/nandbrowser/nandbrowserwidget_tree.cpp
+    ui/widgets/nandbrowser/nandbrowserwidget_views.cpp
+    ui/widgets/nandbrowser/nandbrowserwidget_io.cpp
+    ui/widgets/nandbrowser/nandbrowserwidget_search.cpp
     ui/widgets/nandbrowser/nandfileeditor.cpp ui/widgets/nandbrowser/nandfileeditor.h
     ui/widgets/hwconfig/hwconfigwidget.cpp ui/widgets/hwconfig/hwconfigwidget.h
     ui/widgets/hwconfig/state.cpp

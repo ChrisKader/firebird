@@ -86,8 +86,9 @@ Status snapshot as of February 21, 2026:
 
 ## File Size Policy
 
-- Target: <= 600 lines for `.cpp` implementation files.
-- Hard exception threshold: > 1000 lines requires an explicit waiver in the PR.
+- Target: <= 600 effective lines for `.cpp` implementation files.
+- Hard exception threshold: > 1000 effective lines requires an explicit waiver in the PR.
+- Effective lines exclude blank lines and comment-only lines (as measured by `tools/dev/check_file_size.py`).
 - Generated files are excluded.
 
 Exception template (required if >1000 lines):

@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Advisory file-size checker for tracked C/C++ sources."""
+"""Advisory file-size checker for tracked C/C++ sources.
+
+Counts effective lines: excludes blank lines and comment-only lines.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +11,7 @@ import pathlib
 import subprocess
 import sys
 from dataclasses import dataclass
+from typing import Iterable
 
 
 @dataclass
@@ -24,13 +28,86 @@ def tracked_sources() -> list[str]:
     return [f for f in files if not f.startswith(excluded_prefixes)]
 
 
-def line_count(path: str) -> int:
+def effective_line_count(path: str) -> int:
     p = pathlib.Path(path)
     try:
         with p.open("r", encoding="utf-8", errors="ignore") as fh:
-            return sum(1 for _ in fh)
+            return count_effective_lines(fh)
     except OSError:
         return 0
+
+
+def count_effective_lines(lines: Iterable[str]) -> int:
+    in_block_comment = False
+    effective = 0
+
+    for raw_line in lines:
+        line = str(raw_line)
+        i = 0
+        n = len(line)
+        in_string = False
+        in_char = False
+        escaped = False
+        has_code = False
+
+        while i < n:
+            c = line[i]
+            nxt = line[i + 1] if i + 1 < n else ""
+
+            if in_block_comment:
+                if c == "*" and nxt == "/":
+                    in_block_comment = False
+                    i += 2
+                    continue
+                i += 1
+                continue
+
+            if in_string:
+                has_code = True
+                if escaped:
+                    escaped = False
+                elif c == "\\":
+                    escaped = True
+                elif c == '"':
+                    in_string = False
+                i += 1
+                continue
+
+            if in_char:
+                has_code = True
+                if escaped:
+                    escaped = False
+                elif c == "\\":
+                    escaped = True
+                elif c == "'":
+                    in_char = False
+                i += 1
+                continue
+
+            if c == "/" and nxt == "/":
+                break
+            if c == "/" and nxt == "*":
+                in_block_comment = True
+                i += 2
+                continue
+            if c == '"':
+                in_string = True
+                has_code = True
+                i += 1
+                continue
+            if c == "'":
+                in_char = True
+                has_code = True
+                i += 1
+                continue
+            if not c.isspace():
+                has_code = True
+            i += 1
+
+        if has_code:
+            effective += 1
+
+    return effective
 
 
 def main() -> int:
@@ -40,13 +117,13 @@ def main() -> int:
     parser.add_argument("--strict-cap", action="store_true", help="Return non-zero if any file exceeds cap")
     args = parser.parse_args()
 
-    stats = [FileStat(path=f, lines=line_count(f)) for f in tracked_sources()]
+    stats = [FileStat(path=f, lines=effective_line_count(f)) for f in tracked_sources()]
     stats.sort(key=lambda s: s.lines, reverse=True)
 
     over_target = [s for s in stats if s.lines > args.target]
     over_cap = [s for s in stats if s.lines > args.cap]
 
-    print(f"Target: <= {args.target} lines, Cap: <= {args.cap} lines")
+    print(f"Target: <= {args.target} effective lines, Cap: <= {args.cap} effective lines")
     print(f"Tracked files scanned: {len(stats)}")
     print(f"Over target: {len(over_target)}")
     print(f"Over cap: {len(over_cap)}")
