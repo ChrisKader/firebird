@@ -166,6 +166,7 @@ uint8_t next_seqno() {
 static usblink_dirlist_cb current_dirlist_callback;
 static usblink_progress_cb current_file_callback;
 static void *current_user_data = NULL;
+static bool usblink_forced_turbo = false;
 
 FILE *put_file = NULL;
 uint32_t put_file_size, put_file_size_orig;
@@ -211,7 +212,10 @@ send_data:
             if (prev_seqno == 1)
             {
                 gui_status_printf("Sending file: %u bytes left", put_file_size);
-                throttle_timer_off();
+                if (!usblink_forced_turbo) {
+                    throttle_timer_off();
+                    usblink_forced_turbo = true;
+                }
             }
             if (put_file_size > 0) {
                 /* Send data (05) */
@@ -288,7 +292,10 @@ fail:
     gui_usblink_changed(false);
 
 teardown:
-    throttle_timer_on();
+    if (usblink_forced_turbo) {
+        throttle_timer_on();
+        usblink_forced_turbo = false;
+    }
     put_file_state = 0;
     if (put_file)
         fclose(put_file);
@@ -845,6 +852,10 @@ void usblink_reset() {
         if (put_file)
             fclose(put_file);
         put_file = NULL;
+    }
+    if (usblink_forced_turbo) {
+        throttle_timer_on();
+        usblink_forced_turbo = false;
     }
     usblink_connected = false;
     gui_usblink_changed(usblink_connected);
