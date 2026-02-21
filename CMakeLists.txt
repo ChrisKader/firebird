@@ -63,7 +63,7 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     core/crypto/des.c core/crypto/des.h
     core/disassembly/disasm.c core/disassembly/disasm.h
     core/emu.cpp core/emu.h
-    core/fieldparser.cpp core/fieldparser.h
+    core/storage/fieldparser.cpp core/storage/fieldparser.h
     core/storage/flash.cpp core/storage/flash.h
     core/storage/nand_fs.cpp core/storage/nand_fs.h
     core/debug/gdbstub.c core/debug/gdbstub.h

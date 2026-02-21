@@ -7,7 +7,7 @@
 #include <algorithm>
 
 #include "emu.h"
-#include "fieldparser.h"
+#include "storage/fieldparser.h"
 #include "storage/flash.h"
 #include "memory/mem.h"
 #include "cpu/cpu.h"

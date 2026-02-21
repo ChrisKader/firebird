@@ -13,7 +13,7 @@ CSOURCES :=    ../core/armsnippets_loader.c ../core/asmcode.c ../core/casplus.c 
 
 CPPSOURCES := ../core/cpu/arm_interpreter.cpp ../core/cpu/coproc.cpp ../core/cpu/cpu.cpp ../core/debug/debug.cpp ../core/emu.cpp \
 	      ../core/storage/flash.cpp ../core/gif.cpp ../core/cpu/thumb_interpreter.cpp ../core/usb/usblink_queue.cpp main.cpp \
-	      ../core/fieldparser.cpp
+	      ../core/storage/fieldparser.cpp
 
 OBJS = $(patsubst %.c, %.bc, $(CSOURCES))
 OBJS += $(patsubst %.cpp, %.bc, $(CPPSOURCES))
