@@ -6,10 +6,12 @@
 #include <QSet>
 #include <QList>
 #include <QHash>
+#include <QVector>
 #include <QJsonObject>
 #include <QPointer>
 #include <cstdint>
 
+#include "ui/docking/manager/debugdockregistration.h"
 #include "ui/docking/widgets/dockwidget.h"
 
 class QMainWindow;
@@ -81,6 +83,12 @@ signals:
     void debugCommand(QString cmd);
 
 private:
+    struct DebugDockRuntime {
+        DebugDockRegistration registration;
+        QPointer<QWidget> widget;
+        QPointer<DockWidget> dock;
+    };
+
     enum DirtyFlags : uint32_t {
         DIRTY_DISASM  = 1u << 0,
         DIRTY_REGS    = 1u << 1,
@@ -126,6 +134,7 @@ private:
     QPointer<DockWidget> m_mmuViewerDock;
 
     QSet<DockWidget *> m_autoShownDocks;
+    QVector<DebugDockRuntime> m_debugDocks;
     QList<QPointer<HexViewWidget>> m_extraHexWidgets;
     QList<QPointer<DockWidget>> m_extraHexDocks;
     QPointer<QMenu> m_docksMenu;
@@ -134,6 +143,7 @@ private:
     DockFocusPolicy m_dockFocusPolicy = DockFocusPolicy::Always;
     QHash<int, QPointer<DockWidget>> m_mainDocks;
 
+    void bindRegistration(DebugDockKind kind, QWidget *widget, DockWidget *dock);
     void showDock(DockWidget *dock, bool explicitUserAction);
 };
 

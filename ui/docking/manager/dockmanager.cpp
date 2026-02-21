@@ -23,48 +23,8 @@
 #include "ui/widgets/lcdstate/lcdstatewidget.h"
 #include "ui/widgets/mmuviewer/mmuviewerwidget.h"
 #include "ui/widgets/gotodialog.h"
-#include <QFileDialog>
-#include <QMessageBox>
 
 namespace {
-
-enum class DebugDockId {
-    Disasm,
-    Registers,
-    Stack,
-    Memory,
-    Breakpoints,
-    Watchpoints,
-    PortMonitor,
-    KeyHistory,
-    Console,
-    MemVis,
-    CycleCounter,
-    TimerMonitor,
-    LCDState,
-    MMUViewer,
-};
-
-const char *dockObjectName(DebugDockId id)
-{
-    switch (id) {
-    case DebugDockId::Disasm:       return "dockDisasm";
-    case DebugDockId::Registers:    return "dockRegisters";
-    case DebugDockId::Stack:        return "dockStack";
-    case DebugDockId::Memory:       return "dockMemory";
-    case DebugDockId::Breakpoints:  return "dockBreakpoints";
-    case DebugDockId::Watchpoints:  return "dockWatchpoints";
-    case DebugDockId::PortMonitor:  return "dockPortMonitor";
-    case DebugDockId::KeyHistory:   return "dockKeyHistory";
-    case DebugDockId::Console:      return "dockConsole";
-    case DebugDockId::MemVis:       return "dockMemVis";
-    case DebugDockId::CycleCounter: return "dockCycleCounter";
-    case DebugDockId::TimerMonitor: return "dockTimerMonitor";
-    case DebugDockId::LCDState:     return "dockLCDState";
-    case DebugDockId::MMUViewer:    return "dockMMUViewer";
-    }
-    return "dockUnknown";
-}
 
 void applyStandardDockFeatures(DockWidget *dw, bool closable = true)
 {
@@ -130,6 +90,68 @@ DockWidget *DockManager::mainDock(MainDockId id) const
     return m_mainDocks.value(static_cast<int>(id));
 }
 
+void DockManager::bindRegistration(DebugDockKind kind, QWidget *widget, DockWidget *dock)
+{
+    switch (kind) {
+    case DebugDockKind::Disasm:
+        m_disasmWidget = qobject_cast<DisassemblyWidget *>(widget);
+        m_disasmDock = dock;
+        break;
+    case DebugDockKind::Registers:
+        m_registerWidget = qobject_cast<RegisterWidget *>(widget);
+        m_registerDock = dock;
+        break;
+    case DebugDockKind::Stack:
+        m_stackWidget = qobject_cast<StackWidget *>(widget);
+        m_stackDock = dock;
+        break;
+    case DebugDockKind::Memory:
+        m_hexWidget = qobject_cast<HexViewWidget *>(widget);
+        m_hexDock = dock;
+        break;
+    case DebugDockKind::Breakpoints:
+        m_breakpointWidget = qobject_cast<BreakpointWidget *>(widget);
+        m_breakpointDock = dock;
+        break;
+    case DebugDockKind::Watchpoints:
+        m_watchpointWidget = qobject_cast<WatchpointWidget *>(widget);
+        m_watchpointDock = dock;
+        break;
+    case DebugDockKind::PortMonitor:
+        m_portMonitorWidget = qobject_cast<PortMonitorWidget *>(widget);
+        m_portMonitorDock = dock;
+        break;
+    case DebugDockKind::KeyHistory:
+        m_keyHistoryWidget = qobject_cast<KeyHistoryWidget *>(widget);
+        m_keyHistoryDock = dock;
+        break;
+    case DebugDockKind::Console:
+        m_consoleWidget = qobject_cast<ConsoleWidget *>(widget);
+        m_consoleDock = dock;
+        break;
+    case DebugDockKind::MemVis:
+        m_memVisWidget = qobject_cast<MemoryVisualizerWidget *>(widget);
+        m_memVisDock = dock;
+        break;
+    case DebugDockKind::CycleCounter:
+        m_cycleCounterWidget = qobject_cast<CycleCounterWidget *>(widget);
+        m_cycleCounterDock = dock;
+        break;
+    case DebugDockKind::TimerMonitor:
+        m_timerMonitorWidget = qobject_cast<TimerMonitorWidget *>(widget);
+        m_timerMonitorDock = dock;
+        break;
+    case DebugDockKind::LCDState:
+        m_lcdStateWidget = qobject_cast<LCDStateWidget *>(widget);
+        m_lcdStateDock = dock;
+        break;
+    case DebugDockKind::MMUViewer:
+        m_mmuViewerWidget = qobject_cast<MMUViewerWidget *>(widget);
+        m_mmuViewerDock = dock;
+        break;
+    }
+}
+
 void DockManager::showDock(DockWidget *dock, bool explicitUserAction)
 {
     if (!dock)
@@ -145,16 +167,15 @@ void DockManager::showDock(DockWidget *dock, bool explicitUserAction)
 
 void DockManager::createDocks(QMenu *docksMenu)
 {
-    auto makeDock = [&](const QString &title, QWidget *widget, DebugDockId id,
-                        Qt::DockWidgetArea area, bool coreDock) -> DockWidget * {
-        const QString uniqueName = QString::fromLatin1(dockObjectName(id));
-        auto *dw = new KDockWidget(uniqueName, title, m_host);
+    auto makeDock = [&](const DebugDockRegistration &registration,
+                        QWidget *widget) -> DockWidget * {
+        auto *dw = new KDockWidget(registration.objectName, tr(registration.titleKey), m_host);
         dw->applyThinTitlebar(true);
         dw->setWidget(widget);
-        applyStandardDockFeatures(dw, !coreDock);
-        DockBackend::addDockWidgetCompat(m_host, dw, area, nullptr, !coreDock);
+        applyStandardDockFeatures(dw, !registration.coreDock);
+        DockBackend::addDockWidgetCompat(m_host, dw, registration.defaultArea, nullptr, !registration.coreDock);
 #ifndef FIREBIRD_USE_KDDOCKWIDGETS
-        if (!coreDock)
+        if (!registration.coreDock)
             dw->hide();
 #endif
 
@@ -164,77 +185,49 @@ void DockManager::createDocks(QMenu *docksMenu)
         return dw;
     };
 
-    /* Create widgets */
-    m_disasmWidget = new DisassemblyWidget(m_host);
-    m_registerWidget = new RegisterWidget(m_host);
-    m_hexWidget = new HexViewWidget(m_host);
-    m_breakpointWidget = new BreakpointWidget(m_host);
-    m_watchpointWidget = new WatchpointWidget(m_host);
-    m_portMonitorWidget = new PortMonitorWidget(m_host);
-    m_stackWidget = new StackWidget(m_host);
-    m_keyHistoryWidget = new KeyHistoryWidget(m_host);
-    m_consoleWidget = new ConsoleWidget(m_host);
-    m_memVisWidget = new MemoryVisualizerWidget(m_host);
-    m_cycleCounterWidget = new CycleCounterWidget(m_host);
-    m_timerMonitorWidget = new TimerMonitorWidget(m_host);
-    m_lcdStateWidget = new LCDStateWidget(m_host);
-    m_mmuViewerWidget = new MMUViewerWidget(m_host);
-
-    m_disasmWidget->setIconFont(m_iconFont);
-
     /* Create docks */
+    m_debugDocks.clear();
     docksMenu->addSeparator();
+    const QList<DebugDockRegistration> registrations = buildDebugDockRegistrations();
+    m_debugDocks.reserve(registrations.size());
+    for (const DebugDockRegistration &registration : registrations) {
+        if (!registration.createWidget)
+            continue;
+        QWidget *widget = registration.createWidget(m_host);
+        if (registration.initializeWidget)
+            registration.initializeWidget(widget, m_iconFont);
 
-    m_disasmDock = makeDock(tr("Disassembly"), m_disasmWidget,
-                            DebugDockId::Disasm, Qt::RightDockWidgetArea, true);
-    m_registerDock = makeDock(tr("Registers"), m_registerWidget,
-                              DebugDockId::Registers, Qt::RightDockWidgetArea, true);
-    m_stackDock = makeDock(tr("Stack"), m_stackWidget,
-                           DebugDockId::Stack, Qt::RightDockWidgetArea, false);
+        DockWidget *dock = makeDock(registration, widget);
+        m_debugDocks.push_back(DebugDockRuntime{registration, widget, dock});
+        bindRegistration(registration.kind, widget, dock);
+    }
+
+    auto tabifyIfPresent = [this](DockWidget *first, DockWidget *second) {
+        if (first && second)
+            DockBackend::tabifyDockWidgetCompat(m_host, first, second);
+    };
 
     /* Tab Registers and Stack together */
-    DockBackend::tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
-    m_registerDock->raise();
-
-    m_hexDock = makeDock(tr("Memory"), m_hexWidget,
-                         DebugDockId::Memory, Qt::BottomDockWidgetArea, true);
-    m_breakpointDock = makeDock(tr("Breakpoints"), m_breakpointWidget,
-                                DebugDockId::Breakpoints, Qt::BottomDockWidgetArea, false);
-    m_watchpointDock = makeDock(tr("Watchpoints"), m_watchpointWidget,
-                                DebugDockId::Watchpoints, Qt::BottomDockWidgetArea, false);
-    m_portMonitorDock = makeDock(tr("Port Monitor"), m_portMonitorWidget,
-                                 DebugDockId::PortMonitor, Qt::BottomDockWidgetArea, false);
-    m_keyHistoryDock = makeDock(tr("Key History"), m_keyHistoryWidget,
-                                DebugDockId::KeyHistory, Qt::BottomDockWidgetArea, false);
-
-    m_consoleDock = makeDock(tr("Console"), m_consoleWidget,
-                             DebugDockId::Console, Qt::BottomDockWidgetArea, true);
-    m_memVisDock = makeDock(tr("Memory Visualizer"), m_memVisWidget,
-                            DebugDockId::MemVis, Qt::BottomDockWidgetArea, false);
-    m_cycleCounterDock = makeDock(tr("Cycle Counter"), m_cycleCounterWidget,
-                                  DebugDockId::CycleCounter, Qt::BottomDockWidgetArea, false);
-    m_timerMonitorDock = makeDock(tr("Timer Monitor"), m_timerMonitorWidget,
-                                  DebugDockId::TimerMonitor, Qt::BottomDockWidgetArea, false);
-    m_lcdStateDock = makeDock(tr("LCD State"), m_lcdStateWidget,
-                              DebugDockId::LCDState, Qt::BottomDockWidgetArea, false);
-    m_mmuViewerDock = makeDock(tr("MMU Viewer"), m_mmuViewerWidget,
-                               DebugDockId::MMUViewer, Qt::BottomDockWidgetArea, false);
+    tabifyIfPresent(m_registerDock, m_stackDock);
+    if (m_registerDock)
+        m_registerDock->raise();
 
     /* Set Material icons on toggle actions */
     refreshIcons();
 
     /* Tab together: Memory, Breakpoints, Watchpoints, Port Monitor, + new docks */
-    DockBackend::tabifyDockWidgetCompat(m_host, m_hexDock, m_breakpointDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_breakpointDock, m_watchpointDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_watchpointDock, m_portMonitorDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_portMonitorDock, m_keyHistoryDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_keyHistoryDock, m_consoleDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_consoleDock, m_memVisDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_memVisDock, m_cycleCounterDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_cycleCounterDock, m_timerMonitorDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_timerMonitorDock, m_lcdStateDock);
-    DockBackend::tabifyDockWidgetCompat(m_host, m_lcdStateDock, m_mmuViewerDock);
-    m_hexDock->raise();
+    tabifyIfPresent(m_hexDock, m_breakpointDock);
+    tabifyIfPresent(m_breakpointDock, m_watchpointDock);
+    tabifyIfPresent(m_watchpointDock, m_portMonitorDock);
+    tabifyIfPresent(m_portMonitorDock, m_keyHistoryDock);
+    tabifyIfPresent(m_keyHistoryDock, m_consoleDock);
+    tabifyIfPresent(m_consoleDock, m_memVisDock);
+    tabifyIfPresent(m_memVisDock, m_cycleCounterDock);
+    tabifyIfPresent(m_cycleCounterDock, m_timerMonitorDock);
+    tabifyIfPresent(m_timerMonitorDock, m_lcdStateDock);
+    tabifyIfPresent(m_lcdStateDock, m_mmuViewerDock);
+    if (m_hexDock)
+        m_hexDock->raise();
 
     /* -- Connect signals ----------------------------------- */
 
@@ -367,65 +360,72 @@ void DockManager::addHexViewDock()
 
 void DockManager::resetLayout()
 {
-    /* Re-arrange debug docks with a core-visible default set. */
-    DockWidget *debugDocks[] = {
-        m_disasmDock, m_registerDock, m_stackDock,
-        m_hexDock, m_breakpointDock, m_watchpointDock, m_portMonitorDock,
-        m_keyHistoryDock, m_consoleDock, m_memVisDock, m_cycleCounterDock,
-        m_timerMonitorDock, m_lcdStateDock, m_mmuViewerDock
-    };
+    QList<DebugDockRuntime> rightDocks;
+    QList<DebugDockRuntime> memoryDocks;
+    QList<DebugDockRuntime> toolsDocks;
 
-    /* Remove all debug docks first */
-    for (DockWidget *dw : debugDocks)
-    {
-        if (dw)
-            DockBackend::removeDockWidgetCompat(m_host, dw);
-    }
+    for (const DebugDockRuntime &runtime : m_debugDocks) {
+        DockWidget *dock = runtime.dock.data();
+        if (!dock)
+            continue;
 
-    /* Right area: Disassembly on top, Registers/Stack tabbed below */
-    if (m_disasmDock) {
-        DockBackend::addDockWidgetCompat(m_host, m_disasmDock, Qt::RightDockWidgetArea);
-        m_disasmDock->setVisible(true);
-    }
-    if (m_registerDock) {
-        DockBackend::addDockWidgetCompat(m_host, m_registerDock, Qt::RightDockWidgetArea);
-        m_registerDock->setVisible(true);
-    }
-    if (m_stackDock) {
-        DockBackend::addDockWidgetCompat(m_host, m_stackDock, Qt::RightDockWidgetArea);
-        m_stackDock->setVisible(true);
-        if (m_registerDock)
-            DockBackend::tabifyDockWidgetCompat(m_host, m_registerDock, m_stackDock);
-        if (m_registerDock) m_registerDock->raise();
+        DockBackend::removeDockWidgetCompat(m_host, dock);
+
+        switch (runtime.registration.resetGroup) {
+        case DebugDockGroup::Right:
+            rightDocks.append(runtime);
+            break;
+        case DebugDockGroup::BottomMemory:
+            memoryDocks.append(runtime);
+            break;
+        case DebugDockGroup::BottomTools:
+            toolsDocks.append(runtime);
+            break;
+        }
     }
 
-    /* Bottom area groups:
-     * - Memory: Memory, Memory Visualizer, MMU Viewer, extra Memory views
-     * - Console: Console, Breakpoints, Watchpoints, Port Monitor, Key History, timers/stats
-     */
-    auto placeGroup = [this](DockWidget *anchor, const QList<DockWidget *> &tabs) -> DockWidget * {
-        if (!anchor)
-            return nullptr;
-        DockBackend::addDockWidgetCompat(m_host, anchor, Qt::BottomDockWidgetArea);
-        anchor->setVisible(true);
-        for (DockWidget *dw : tabs) {
-            if (!dw)
+    DockWidget *lastRightDock = nullptr;
+    for (const DebugDockRuntime &runtime : rightDocks) {
+        DockWidget *dock = runtime.dock.data();
+        if (!dock)
+            continue;
+        DockBackend::addDockWidgetCompat(m_host, dock, Qt::RightDockWidgetArea);
+        dock->setVisible(true);
+        if (runtime.registration.tabWithPreviousInReset && lastRightDock)
+            DockBackend::tabifyDockWidgetCompat(m_host, lastRightDock, dock);
+        lastRightDock = dock;
+    }
+    if (m_registerDock)
+        m_registerDock->raise();
+
+    auto placeGroup = [this](const QList<DebugDockRuntime> &entries) -> DockWidget * {
+        DockWidget *anchor = nullptr;
+        for (const DebugDockRuntime &entry : entries) {
+            DockWidget *dock = entry.dock.data();
+            if (!dock)
                 continue;
-            DockBackend::addDockWidgetCompat(m_host, dw, Qt::BottomDockWidgetArea, anchor);
-            dw->setVisible(true);
-            DockBackend::tabifyDockWidgetCompat(m_host, anchor, dw);
+            if (!anchor) {
+                anchor = dock;
+                DockBackend::addDockWidgetCompat(m_host, anchor, Qt::BottomDockWidgetArea);
+                anchor->setVisible(true);
+                continue;
+            }
+            DockBackend::addDockWidgetCompat(m_host, dock, Qt::BottomDockWidgetArea, anchor);
+            dock->setVisible(true);
+            DockBackend::tabifyDockWidgetCompat(m_host, anchor, dock);
         }
         return anchor;
     };
 
-    QList<DockWidget *> memoryTabs = { m_memVisDock, m_mmuViewerDock };
-    for (DockWidget *extra : m_extraHexDocks)
-        memoryTabs.append(extra);
-    DockWidget *memoryRoot = placeGroup(m_hexDock, memoryTabs);
-    DockWidget *debugToolsRoot = placeGroup(m_consoleDock,
-                                            { m_breakpointDock, m_watchpointDock, m_portMonitorDock,
-                                              m_keyHistoryDock, m_timerMonitorDock, m_lcdStateDock,
-                                              m_cycleCounterDock });
+    DockWidget *memoryRoot = placeGroup(memoryDocks);
+    for (DockWidget *extra : m_extraHexDocks) {
+        if (!extra || !memoryRoot)
+            continue;
+        DockBackend::addDockWidgetCompat(m_host, extra, Qt::BottomDockWidgetArea, memoryRoot);
+        extra->setVisible(true);
+        DockBackend::tabifyDockWidgetCompat(m_host, memoryRoot, extra);
+    }
+    DockWidget *debugToolsRoot = placeGroup(toolsDocks);
 
     if (memoryRoot && debugToolsRoot)
         DockBackend::splitDockWidgetCompat(m_host, memoryRoot, debugToolsRoot, Qt::Horizontal);
@@ -433,7 +433,6 @@ void DockManager::resetLayout()
     if (m_hexDock)
         m_hexDock->raise();
 
-    /* Sizing hints */
     QList<DockWidget *> hTargets;
     QList<int> hSizes;
     if (m_disasmDock) { hTargets << m_disasmDock; hSizes << 400; }
@@ -447,25 +446,14 @@ void DockManager::resetLayout()
     if (!vTargets.isEmpty())
         DockBackend::resizeDocksCompat(m_host, vTargets, vSizes, Qt::Vertical);
 
-    auto hideByDefault = [](DockWidget *dock) {
-        if (dock)
-            dock->setVisible(false);
-    };
-    hideByDefault(m_stackDock);
-    hideByDefault(m_breakpointDock);
-    hideByDefault(m_watchpointDock);
-    hideByDefault(m_portMonitorDock);
-    hideByDefault(m_keyHistoryDock);
-    hideByDefault(m_memVisDock);
-    hideByDefault(m_cycleCounterDock);
-    hideByDefault(m_timerMonitorDock);
-    hideByDefault(m_lcdStateDock);
-    hideByDefault(m_mmuViewerDock);
-    for (DockWidget *extra : m_extraHexDocks)
-        hideByDefault(extra);
-
-    if (m_disasmDock) m_disasmDock->setVisible(true);
-    if (m_registerDock) m_registerDock->setVisible(true);
-    if (m_hexDock) m_hexDock->setVisible(true);
-    if (m_consoleDock) m_consoleDock->setVisible(true);
+    for (const DebugDockRuntime &runtime : m_debugDocks) {
+        DockWidget *dock = runtime.dock.data();
+        if (!dock)
+            continue;
+        dock->setVisible(runtime.registration.visibleByDefault);
+    }
+    for (DockWidget *extra : m_extraHexDocks) {
+        if (extra)
+            extra->setVisible(false);
+    }
 }

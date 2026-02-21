@@ -31,6 +31,7 @@ This document is the canonical guide for how to structure new code and refactors
   - `ui/models/`: Qt model/view backing models shared with QML/widgets.
   - `ui/docking/backend/*`: backend adapters between Qt and KDD docking APIs.
   - `ui/docking/manager/*`: dock orchestration and debug-dock lifecycle/state.
+    - `debugdockregistration*`: registry model + aggregation for debug-dock metadata/factories.
   - `ui/docking/widgets/*`: dock widget wrappers (`DockWidget`, `KDockWidget`).
   - `ui/docking/state/*`: per-dock state serialization interfaces.
   - `ui/theme/*`: widget theme and icon helpers.
@@ -38,6 +39,7 @@ This document is the canonical guide for how to structure new code and refactors
   - `ui/input/*`: keypad bridge and key map integration.
   - `ui/text/*`: ANSI text rendering helpers for console-like widgets.
   - `ui/widgets/*`: feature widgets grouped by module (`breakpoints`, `disassembly`, `hexview`, `hwconfig`, etc.).
+    - Each debug widget module may expose a local `dockregistration.cpp` for dock metadata/factory registration.
 - `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
   - `core/power/`: Power-path override control helpers used by UI and debugger.

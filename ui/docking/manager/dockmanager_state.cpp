@@ -20,6 +20,33 @@
 #include "ui/widgets/lcdstate/lcdstatewidget.h"
 #include "ui/widgets/mmuviewer/mmuviewerwidget.h"
 
+namespace {
+
+ushort iconCodepoint(DebugDockIcon icon)
+{
+    using namespace MaterialIcons;
+    switch (icon) {
+    case DebugDockIcon::Code:         return CP::Code;
+    case DebugDockIcon::List:         return CP::List;
+    case DebugDockIcon::ViewColumn:   return CP::ViewColumn;
+    case DebugDockIcon::Memory:       return CP::Memory;
+    case DebugDockIcon::Bookmark:     return CP::Bookmark;
+    case DebugDockIcon::Visibility:   return CP::Visibility;
+    case DebugDockIcon::Monitor:      return CP::Monitor;
+    case DebugDockIcon::History:      return CP::History;
+    case DebugDockIcon::Terminal:     return CP::Terminal;
+    case DebugDockIcon::GridOn:       return CP::GridOn;
+    case DebugDockIcon::CycleCounter: return CP::CycleCounter;
+    case DebugDockIcon::Timer:        return CP::Timer;
+    case DebugDockIcon::Display:      return CP::Display;
+    case DebugDockIcon::Layers:       return CP::Layers;
+    case DebugDockIcon::None:         return 0;
+    }
+    return 0;
+}
+
+} // namespace
+
 void DockManager::ensureExtraHexDocks(int count)
 {
     if (count <= 0)
@@ -46,20 +73,8 @@ QJsonObject DockManager::serializeDockStates() const
         docks.append(item);
     };
 
-    appendState(m_disasmDock);
-    appendState(m_registerDock);
-    appendState(m_hexDock);
-    appendState(m_breakpointDock);
-    appendState(m_watchpointDock);
-    appendState(m_portMonitorDock);
-    appendState(m_stackDock);
-    appendState(m_keyHistoryDock);
-    appendState(m_consoleDock);
-    appendState(m_memVisDock);
-    appendState(m_cycleCounterDock);
-    appendState(m_timerMonitorDock);
-    appendState(m_lcdStateDock);
-    appendState(m_mmuViewerDock);
+    for (const DebugDockRuntime &runtime : m_debugDocks)
+        appendState(runtime.dock.data());
     for (DockWidget *dock : m_extraHexDocks)
         appendState(dock);
 
@@ -93,25 +108,13 @@ void DockManager::restoreDockStates(const QJsonObject &stateRoot)
 
 void DockManager::refreshIcons()
 {
-    using namespace MaterialIcons;
     const QColor fg = m_host->palette().color(QPalette::WindowText);
-    auto setIcon = [&](DockWidget *dw, ushort cp) {
-        if (dw) dw->toggleViewAction()->setIcon(fromCodepoint(m_iconFont, cp, fg));
+    auto setIcon = [&](DockWidget *dock, ushort cp) {
+        if (dock && cp != 0)
+            dock->toggleViewAction()->setIcon(MaterialIcons::fromCodepoint(m_iconFont, cp, fg));
     };
-    setIcon(m_disasmDock,       CP::Code);
-    setIcon(m_registerDock,     CP::List);
-    setIcon(m_stackDock,        CP::ViewColumn);
-    setIcon(m_hexDock,          CP::Memory);
-    setIcon(m_breakpointDock,   CP::Bookmark);
-    setIcon(m_watchpointDock,   CP::Visibility);
-    setIcon(m_portMonitorDock,  CP::Monitor);
-    setIcon(m_keyHistoryDock,   CP::History);
-    setIcon(m_consoleDock,      CP::Terminal);
-    setIcon(m_memVisDock,       CP::GridOn);
-    setIcon(m_cycleCounterDock, CP::CycleCounter);
-    setIcon(m_timerMonitorDock, CP::Timer);
-    setIcon(m_lcdStateDock,     CP::Display);
-    setIcon(m_mmuViewerDock,    CP::Layers);
+    for (const DebugDockRuntime &runtime : m_debugDocks)
+        setIcon(runtime.dock.data(), iconCodepoint(runtime.registration.icon));
 }
 
 void DockManager::markDirty(uint32_t flags)
@@ -196,20 +199,12 @@ void DockManager::refreshAll()
 
 void DockManager::retranslate()
 {
-    if (m_disasmDock) m_disasmDock->setWindowTitle(tr("Disassembly"));
-    if (m_registerDock) m_registerDock->setWindowTitle(tr("Registers"));
-    if (m_hexDock) m_hexDock->setWindowTitle(tr("Memory"));
-    if (m_breakpointDock) m_breakpointDock->setWindowTitle(tr("Breakpoints"));
-    if (m_watchpointDock) m_watchpointDock->setWindowTitle(tr("Watchpoints"));
-    if (m_portMonitorDock) m_portMonitorDock->setWindowTitle(tr("Port Monitor"));
-    if (m_stackDock) m_stackDock->setWindowTitle(tr("Stack"));
-    if (m_keyHistoryDock) m_keyHistoryDock->setWindowTitle(tr("Key History"));
-    if (m_consoleDock) m_consoleDock->setWindowTitle(tr("Console"));
-    if (m_memVisDock) m_memVisDock->setWindowTitle(tr("Memory Visualizer"));
-    if (m_cycleCounterDock) m_cycleCounterDock->setWindowTitle(tr("Cycle Counter"));
-    if (m_timerMonitorDock) m_timerMonitorDock->setWindowTitle(tr("Timer Monitor"));
-    if (m_lcdStateDock) m_lcdStateDock->setWindowTitle(tr("LCD State"));
-    if (m_mmuViewerDock) m_mmuViewerDock->setWindowTitle(tr("MMU Viewer"));
+    for (const DebugDockRuntime &runtime : m_debugDocks) {
+        DockWidget *dock = runtime.dock.data();
+        if (!dock)
+            continue;
+        dock->setWindowTitle(tr(runtime.registration.titleKey));
+    }
 }
 
 void DockManager::raise()

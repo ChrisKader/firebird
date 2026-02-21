@@ -104,27 +104,42 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     ui/text/ansitextwriter.cpp ui/text/ansitextwriter.h
     # Debugger subsystem
     ui/docking/manager/dockmanager.cpp ui/docking/manager/dockmanager.h
+    ui/docking/manager/debugdockregistration.cpp ui/docking/manager/debugdockregistration.h
     ui/docking/manager/dockmanager_state.cpp
     ui/widgets/disassembly/disassemblywidget.cpp ui/widgets/disassembly/disassemblywidget.h
+    ui/widgets/disassembly/dockregistration.cpp
     ui/widgets/registers/registerwidget.cpp ui/widgets/registers/registerwidget.h
+    ui/widgets/registers/dockregistration.cpp
     ui/widgets/hexview/hexviewwidget.cpp ui/widgets/hexview/hexviewwidget.h
+    ui/widgets/hexview/dockregistration.cpp
     ui/widgets/breakpoints/breakpointwidget.cpp ui/widgets/breakpoints/breakpointwidget.h
+    ui/widgets/breakpoints/dockregistration.cpp
     ui/widgets/watchpoints/watchpointwidget.cpp ui/widgets/watchpoints/watchpointwidget.h
+    ui/widgets/watchpoints/dockregistration.cpp
     ui/widgets/stack/stackwidget.cpp ui/widgets/stack/stackwidget.h
+    ui/widgets/stack/dockregistration.cpp
     ui/widgets/portmonitor/portmonitorwidget.cpp ui/widgets/portmonitor/portmonitorwidget.h
+    ui/widgets/portmonitor/dockregistration.cpp
     ui/widgets/keyhistory/keyhistorywidget.cpp ui/widgets/keyhistory/keyhistorywidget.h
+    ui/widgets/keyhistory/dockregistration.cpp
     ui/widgets/console/consolewidget.cpp ui/widgets/console/consolewidget.h
+    ui/widgets/console/dockregistration.cpp
     ui/widgets/console/state.cpp
     ui/widgets/memvisualizer/memoryvisualizerwidget.cpp ui/widgets/memvisualizer/memoryvisualizerwidget.h
+    ui/widgets/memvisualizer/dockregistration.cpp
     ui/widgets/cyclecounter/cyclecounterwidget.cpp ui/widgets/cyclecounter/cyclecounterwidget.h
+    ui/widgets/cyclecounter/dockregistration.cpp
     ui/widgets/timermonitor/timermonitorwidget.cpp ui/widgets/timermonitor/timermonitorwidget.h
+    ui/widgets/timermonitor/dockregistration.cpp
     ui/widgets/lcdstate/lcdstatewidget.cpp ui/widgets/lcdstate/lcdstatewidget.h
+    ui/widgets/lcdstate/dockregistration.cpp
     ui/widgets/gotodialog.cpp ui/widgets/gotodialog.h
     ui/widgets/nandbrowser/nandbrowserwidget.cpp ui/widgets/nandbrowser/nandbrowserwidget.h
     ui/widgets/nandbrowser/nandfileeditor.cpp ui/widgets/nandbrowser/nandfileeditor.h
     ui/widgets/hwconfig/hwconfigwidget.cpp ui/widgets/hwconfig/hwconfigwidget.h
     ui/widgets/hwconfig/state.cpp
     ui/widgets/mmuviewer/mmuviewerwidget.cpp ui/widgets/mmuviewer/mmuviewerwidget.h
+    ui/widgets/mmuviewer/dockregistration.cpp
     # Dialogs
     dialogs/fbaboutdialog.cpp dialogs/fbaboutdialog.h
     # File transfer
