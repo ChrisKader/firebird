@@ -2,6 +2,10 @@
 
 This appendix maps each enforced or planned engineering rule to sources and impacted code.
 
+Phase closure note (February 21, 2026):
+- Phases 0-4 are closed for docking/UI modernization scope.
+- Some rule rows remain `partial` because phases 5-6 track wider repo rollout and enforcement ratchets.
+
 | Rule ID | Rule | Sources | Firebird Areas | Status |
 |---|---|---|---|---|
 | FRB-QT-001 | Use typed signal/slot connections; avoid legacy `SIGNAL/SLOT` | https://doc.qt.io/qt-6/signalsandslots-syntaxes.html | `mainwindow/bootstrap.cpp`, `mainwindow/runtime.cpp`, `mainwindow/docks/setup.cpp`, `app/qmlbridge*.cpp`, `transfer/usblinktreewidget.cpp`, `dialogs/fbaboutdialog.cpp` | enforced |

@@ -2,6 +2,18 @@
 
 This document is the canonical guide for how to structure new code and refactors in Firebird.
 
+## Modernization Phase Status
+
+Status snapshot as of February 21, 2026:
+
+- Phase 0 (reference scaffolding + advisory tooling): closed
+- Phase 1 (MainWindow modularization): closed
+- Phase 2 (typed connect migration): closed
+- Phase 3 (KDD styling compliance + visual parity): closed
+- Phase 4 (safety + lifecycle cleanup): closed
+- Phase 5 (wider repo decomposition): open
+- Phase 6 (ratchet enforcement): open
+
 ## Source-Backed Rule Policy
 
 - Every architecture/style rule in this file includes at least one primary Qt/KDD source link.

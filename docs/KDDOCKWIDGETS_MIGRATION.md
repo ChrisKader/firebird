@@ -1,6 +1,6 @@
 # KDDockWidgets Migration Notes
 
-This file tracks Phase 1 dependency groundwork for KDDockWidgets migration.
+This file tracks KDDockWidgets migration status and follow-on tasks.
 
 See also:
 - `docs/PROJECT_STRUCTURE.md` for KDD usage/styling standards.
@@ -28,11 +28,15 @@ longer required.
 - Android: not verified in this phase
 - Emscripten/WebAssembly: not verified in this phase
 
-## Next Steps
+## Phase Status
 
-1. Verify `FIREBIRD_ENABLE_KDDOCKWIDGETS=ON` on desktop platforms.
-2. Add a small prototype docking area (LCD/Keypad/Console).
-3. Start layout migration tooling (`QMainWindow` state -> JSON).
+Status snapshot as of February 21, 2026:
+
+- Phase 1 (modularization groundwork): closed
+- Phase 2 (typed connect migration in affected UI paths): closed
+- Phase 3 (KDD styling compliance + visual parity checks): closed
+- Phase 4 (docking-path safety/lifecycle cleanup): closed
+- Phase 5+ (wider repo decomposition and enforcement ratchets): pending
 
 ## Converter Utility
 
