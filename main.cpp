@@ -12,7 +12,7 @@
 #include "app/emuthread.h"
 #include "ui/framebuffer.h"
 #include "app/qmlbridge.h"
-#include "app/kitmodel.h"
+#include "ui/models/kitmodel.h"
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/KDDockWidgets.h>

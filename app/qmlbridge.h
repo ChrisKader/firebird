@@ -6,7 +6,7 @@
 #include <QVector>
 #include <QtQml>
 
-#include "kitmodel.h"
+#include "ui/models/kitmodel.h"
 
 class EmuThread;
 #ifndef MOBILE_UI
