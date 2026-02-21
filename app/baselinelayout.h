@@ -144,7 +144,7 @@ inline constexpr std::array<DecodedFrameRule, 14> kDecodedFrameRules = {{
     { "21722", "tabFiles", { "tabFiles", "dockNandBrowser", nullptr, nullptr }, 2, 0, 0, 0, 448, 1035, false, 0, "contentWindow" },
     { "130173", "dockHwConfig", { "dockHwConfig", nullptr, nullptr, nullptr }, 1, 0, 0, 1040, 448, 449, false, 0, "contentWindow" },
     { "21690", "dockLCD", { "dockLCD", nullptr, nullptr, nullptr }, 1, 0, 453, 0, 487, 387, false, 0, "contentWindow" },
-    { "21563", "dockControls", { "dockControls", nullptr, nullptr, nullptr }, 1, 0, 453, 392, 487, 90, false, 0, "contentWindow" },
+    { "21563", "dockControls", { "dockControls", nullptr, nullptr, nullptr }, 1, 0, 453, 392, 487, 30, false, 0, "contentWindow" },
     { "84443", "tab", { "tab", nullptr, nullptr, nullptr }, 1, 0, 453, 487, 487, 677, false, 0, "contentWindow" },
     { "21465", "dockMemory", { "dockMemory", "dockMemVis", "dockMMUViewer", nullptr }, 3, 0, 945, 227, 1244, 403, false, 0, "contentWindow" },
     { "21658", "dockDisasm", { "dockDisasm", nullptr, nullptr, nullptr }, 1, 0, 945, 635, 1244, 529, false, 0, "contentWindow" },
@@ -256,7 +256,7 @@ inline constexpr std::array<DockProfileEntry, 21> kDockProfileEntries = {{
     { "dockWatchpoints",  "Watchpoints",       true,  false, Qt::NoDockWidgetArea, { 0, 0, 421, 314 } },
     { "dockKeyHistory",   "Key History",       true,  false, Qt::NoDockWidgetArea, { 0, 0, 513, 285 } },
     { "dockLCDState",     "LCD State",         true,  false, Qt::NoDockWidgetArea, { 0, 0, 466, 285 } },
-    { "dockControls",     "Controls",          true,  false, Qt::NoDockWidgetArea, { 0, 0, 482, 31 } },
+    { "dockControls",     "Controls",          true,  false, Qt::NoDockWidgetArea, { 0, 0, 482, 26 } },
     { "dockCycleCounter", "Cycle Counter",     false, false, Qt::NoDockWidgetArea, { 974, 1334, 1655, 293 } },
     { "dockExternalLCD",  "External LCD",      false, false, Qt::NoDockWidgetArea, { 0, 0, 0, 0 } },
 }};

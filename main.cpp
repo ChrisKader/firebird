@@ -16,6 +16,7 @@
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     #include <kddockwidgets/KDDockWidgets.h>
+    #include <kddockwidgets/Config.h>
 #endif
 
 #if !defined(NO_TRANSLATION) && defined(IS_IOS_BUILD)
@@ -117,6 +118,9 @@ int main(int argc, char **argv)
 
 #ifdef FIREBIRD_USE_KDDOCKWIDGETS
     KDDockWidgets::initFrontend(KDDockWidgets::FrontendType::QtWidgets);
+    // Remove KDDockWidgets' default hard floor (80x90) so dock minimum sizes
+    // come from our actual widget/layout constraints.
+    KDDockWidgets::Config::self().setAbsoluteWidgetMinSize(QSize(1, 1));
 #endif
 
     EmuThread emuThread;

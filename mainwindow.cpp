@@ -144,6 +144,49 @@ static constexpr const char *kLayoutSchemaKDDV1 = "firebird.kdd.layout.v1";
 static constexpr const char *kLayoutSchemaLegacyQMainWindowV1 = "firebird.qmainwindow.layout.v1";
 static constexpr int kMaxLayoutHistoryEntries = 10;
 
+static QString normalize_button_tooltip_text(QString text)
+{
+    text = text.trimmed();
+    if (text.isEmpty())
+        return text;
+    text.remove(QLatin1Char('&'));
+    if (text.endsWith(QStringLiteral("...")))
+        text.chop(3);
+    text = text.simplified();
+    return text;
+}
+
+static bool looks_like_icon_glyph(const QString &text)
+{
+    if (text.size() != 1)
+        return false;
+    const ushort cp = text.at(0).unicode();
+    return cp >= 0xE000u && cp <= 0xF8FFu; // Unicode Private Use Area
+}
+
+static QString tooltip_from_object_name(QString object_name)
+{
+    if (object_name.isEmpty())
+        return {};
+
+    if (object_name.startsWith(QStringLiteral("button")))
+        object_name.remove(0, 6);
+    else if (object_name.startsWith(QStringLiteral("btn")))
+        object_name.remove(0, 3);
+    else if (object_name.startsWith(QStringLiteral("action")))
+        object_name.remove(0, 6);
+
+    object_name.replace(QLatin1Char('_'), QLatin1Char(' '));
+    object_name.replace(QRegularExpression(QStringLiteral("([a-z0-9])([A-Z])")),
+                        QStringLiteral("\\1 \\2"));
+    object_name = normalize_button_tooltip_text(object_name);
+    if (object_name.isEmpty())
+        return {};
+
+    object_name[0] = object_name.at(0).toUpper();
+    return object_name;
+}
+
 class AdaptiveControlsWidget : public QWidget
 {
 public:
@@ -162,7 +205,8 @@ public:
         m_layout->setContentsMargins(2, 0, 2, 0);
         m_layout->setSpacing(3);
         m_layout->setAlignment(Qt::AlignCenter);
-        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Preferred);
+        setMinimumSize(0, 0);
+        setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
         refreshDirection();
     }
 
@@ -182,7 +226,24 @@ protected:
         refreshDirection();
     }
 
+    QSize minimumSizeHint() const override
+    {
+        return QSize(0, stripHeightHint());
+    }
+
+    QSize sizeHint() const override
+    {
+        return QSize(0, stripHeightHint());
+    }
+
 private:
+    int stripHeightHint() const
+    {
+        if (!m_layout)
+            return 1;
+        return qMax(1, m_layout->sizeHint().height());
+    }
+
     void tuneControl(QWidget *widget)
     {
         if (auto *button = qobject_cast<QAbstractButton *>(widget)) {
@@ -193,12 +254,16 @@ private:
 
     void refreshDirection()
     {
-        const bool vertical = height() > (width() + width() / 4);
-        m_layout->setDirection(vertical ? QBoxLayout::TopToBottom : QBoxLayout::LeftToRight);
-        m_layout->setAlignment(vertical ? (Qt::AlignTop | Qt::AlignHCenter) : Qt::AlignCenter);
-        m_stripWidget->setMaximumHeight(vertical ? QWIDGETSIZE_MAX : 34);
-        m_stripWidget->setMinimumHeight(vertical ? 72 : 18);
-        m_stripWidget->setMinimumWidth(vertical ? 18 : 0);
+        const int tightHeight = stripHeightHint();
+        m_layout->setDirection(QBoxLayout::LeftToRight);
+        m_layout->setAlignment(Qt::AlignVCenter | Qt::AlignHCenter);
+        m_stripWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
+        m_stripWidget->setMinimumHeight(tightHeight);
+        m_stripWidget->setMaximumHeight(tightHeight);
+        m_stripWidget->setMinimumWidth(0);
+        setMinimumHeight(tightHeight);
+        setMaximumHeight(QWIDGETSIZE_MAX);
+        updateGeometry();
     }
 
     QVBoxLayout *m_outerLayout = nullptr;
@@ -1990,6 +2055,7 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     // Extract control buttons from ui->frame into their own dock
     {
         auto *controlsWidget = new AdaptiveControlsWidget(content_window);
+        controlsWidget->setMinimumHeight(0);
         controlsWidget->setMinimumWidth(120);
 
         // Reparent buttons from the .ui frame into this new widget
@@ -2032,6 +2098,8 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
                                          true,
                                          false,
                                          true);
+        if (m_dock_controls)
+            m_dock_controls->setMinimumSize(QSize(0, 0));
     }
 
     // Hide the now-empty frame (cannot delete -- owned by Ui::MainWindow)
@@ -2168,11 +2236,6 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     if (status_dark_button)
     {
         applyThemeGlyph(status_dark_button, darkModeEnabled);
-        status_dark_button->setStyleSheet(QStringLiteral(
-            "QToolButton { border: 0px; background: transparent; padding: 0 6px; outline: 0px; }"
-            "QToolButton:hover { background: transparent; }"
-            "QToolButton:pressed { background: transparent; }"
-            "QToolButton:focus { outline: 0px; }"));
         connect(status_dark_button, &QToolButton::clicked, this, [this, darkAction]()
                 {
             const bool next = !qmlBridge()->getDarkTheme();
@@ -2396,6 +2459,11 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
         ui->actionSuspend->setIcon(mi(CP::Save));
         ui->actionSave->setIcon(mi(CP::Save));
         ui->actionCreate_flash->setIcon(mi(CP::Add));
+        if (ui->refreshButton) {
+            ui->refreshButton->setIcon(mi(CP::Refresh));
+            ui->refreshButton->setText(QString());
+            ui->refreshButton->setToolTip(tr("Refresh file list"));
+        }
     }
 
     // Lang switch
@@ -2683,6 +2751,42 @@ MainWindow::MainWindow(QMLBridge *qmlBridgeDep, EmuThread *emuThreadDep, QWidget
     }
 }
 
+void MainWindow::applyButtonUxDefaults(QWidget *root)
+{
+    if (!root)
+        return;
+
+    const auto buttons = root->findChildren<QAbstractButton *>();
+    for (QAbstractButton *button : buttons) {
+        if (!button)
+            continue;
+
+        if (button->toolTip().trimmed().isEmpty()) {
+            QString tip;
+
+            if (auto *toolButton = qobject_cast<QToolButton *>(button)) {
+                if (QAction *action = toolButton->defaultAction()) {
+                    tip = normalize_button_tooltip_text(action->toolTip());
+                    if (tip.isEmpty())
+                        tip = normalize_button_tooltip_text(action->text());
+                }
+            }
+
+            if (tip.isEmpty())
+                tip = normalize_button_tooltip_text(button->text());
+            if (looks_like_icon_glyph(tip))
+                tip.clear();
+            if (tip.isEmpty())
+                tip = normalize_button_tooltip_text(button->accessibleName());
+            if (tip.isEmpty())
+                tip = tooltip_from_object_name(button->objectName());
+
+            if (!tip.isEmpty())
+                button->setToolTip(tip);
+        }
+    }
+}
+
 void MainWindow::applyWidgetTheme()
 {
     const WidgetTheme &theme = currentWidgetTheme();
@@ -2708,6 +2812,27 @@ void MainWindow::applyWidgetTheme()
     pal.setColor(QPalette::Midlight, theme.surfaceAlt);
     pal.setColor(QPalette::Shadow, theme.window);
     qApp->setPalette(pal);
+
+    const QColor hoverTop = theme.surfaceAlt.lighter(110);
+    const QColor hoverBottom = theme.surfaceAlt.darker(104);
+    const QColor pressedTop = theme.surfaceAlt.darker(108);
+    const QColor pressedBottom = theme.surfaceAlt.darker(118);
+    const QString sharedButtonUx = QStringLiteral(
+        "QPushButton:hover, QToolButton:hover {"
+        "  border: 1px solid %1;"
+        "  border-radius: 6px;"
+        "  background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 %2, stop:1 %3);"
+        "}"
+        "QPushButton:pressed, QToolButton:pressed, QPushButton:checked, QToolButton:checked {"
+        "  border: 1px solid %1;"
+        "  border-radius: 6px;"
+        "  background: qlineargradient(x1:0,y1:0,x2:0,y2:1, stop:0 %4, stop:1 %5);"
+        "}"
+    ).arg(theme.accent.name(),
+          hoverTop.name(),
+          hoverBottom.name(),
+          pressedTop.name(),
+          pressedBottom.name());
 
     /* VS Code-style comprehensive stylesheet */
     if (content_window) {
@@ -2771,8 +2896,9 @@ void MainWindow::applyWidgetTheme()
             theme.scrollbarThumb.name(),      // %5 scrollbar thumb
             theme.border.name(),              // %6 splitter
             theme.accent.name()               // %7 accent
-        );
+        ) + sharedButtonUx;
         content_window->setStyleSheet(ss);
+        applyButtonUxDefaults(content_window);
     }
 
     /* The outer QMainWindow has no docks of its own; suppress the Fusion-style
@@ -2782,7 +2908,8 @@ void MainWindow::applyWidgetTheme()
     setStyleSheet(QStringLiteral(
         "QMainWindow#MainWindow::separator { width: 0; height: 0; }"
         "QToolBar#headerToolBar { border: none; }"
-    ));
+    ) + sharedButtonUx);
+    applyButtonUxDefaults(this);
 
     /* Refresh dock icons (color may have changed with theme) and thin title bars */
     if (m_debugDocks)
@@ -2814,6 +2941,11 @@ void MainWindow::applyWidgetTheme()
         if (ui->actionSuspend)       ui->actionSuspend->setIcon(mi(CP::Save));
         if (ui->actionSave)          ui->actionSave->setIcon(mi(CP::Save));
         if (ui->actionCreate_flash)  ui->actionCreate_flash->setIcon(mi(CP::Add));
+        if (ui->refreshButton) {
+            ui->refreshButton->setIcon(mi(CP::Refresh));
+            ui->refreshButton->setText(QString());
+            ui->refreshButton->setToolTip(tr("Refresh file list"));
+        }
     }
 
     /* Force repaint on custom-painted widgets (they read theme colors directly) */

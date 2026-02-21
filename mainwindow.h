@@ -178,6 +178,7 @@ private:
     void applyQMLBridgeSettings();
     void setDebuggerActive(bool active);
     void applyWidgetTheme();
+    void applyButtonUxDefaults(QWidget *root);
     void applyStandardDockFeatures(DockWidget *dw, bool closable = true) const;
     DockWidget *createMainDock(const QString &title,
                                QWidget *widget,
