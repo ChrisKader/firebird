@@ -7,7 +7,7 @@
 #include "cpu/cpu.h"
 #include "memory/mem.h"
 #include "memory/mmu.h"
-#include "disasm.h"
+#include "disassembly/disasm.h"
 #include "cpu/translate.h"
 #include "debug.h"
 #include "peripherals/lcd.h"

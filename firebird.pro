@@ -176,7 +176,7 @@ SOURCES += $$ASMCODE_IMPL \
     core/armsnippets_loader.c \
     core/casplus.c \
     core/crypto/des.c \
-    core/disasm.c \
+    core/disassembly/disasm.c \
     core/debug/gdbstub.c \
     core/gif.cpp \
     core/peripherals/interrupt.c \
@@ -229,7 +229,7 @@ HEADERS += \
     core/cpu/cpudefs.h \
     core/debug/debug.h \
     core/crypto/des.h \
-    core/disasm.h \
+    core/disassembly/disasm.h \
     core/emu.h \
     core/storage/flash.h \
     core/debug/gdbstub.h \

@@ -60,6 +60,8 @@ they should be moved into subsystem folders instead of adding new top-level
 - `core/`: Emulation core and hardware models.
   - Active module folders:
     - `core/cpu/`: CPU/interpreter/JIT translation and coprocessor logic.
+    - `core/disassembly/`: ARM disassembly helpers shared by debugger and translation tooling.
+    - `core/crypto/`: cryptographic device helpers (DES, SHA256).
     - `core/debug/`: debugger command handling, API, remote debug transport, GDB glue.
     - `core/memory/`: RAM/MMU/address-translation and memory-map dispatch.
     - `core/timing/`: global event scheduler and emulated clock-domain timing coordination.

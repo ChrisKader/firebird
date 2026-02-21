@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 #include "debug.h"
-#include "disasm.h"
+#include "disassembly/disasm.h"
 #include "emu.h"
 
 static char *strcpy2(char *dest, const char *src) {

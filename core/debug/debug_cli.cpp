@@ -4,7 +4,7 @@
 
 #include "debug.h"
 #include "emu.h"
-#include "disasm.h"
+#include "disassembly/disasm.h"
 #include "memory/mmu.h"
 
 void backtrace(uint32_t fp) {

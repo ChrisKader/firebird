@@ -13,7 +13,7 @@
 #include "emu.h"
 #include "cpu/cpu.h"
 #include "memory/mem.h"
-#include "disasm.h"
+#include "disassembly/disasm.h"
 #include "memory/mmu.h"
 #include "cpu/translate.h"
 #include "usb/usblink_queue.h"

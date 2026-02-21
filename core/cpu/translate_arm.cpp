@@ -25,7 +25,7 @@
 #include "asmcode.h"
 #include "cpu/cpu.h"
 #include "cpu/cpudefs.h"
-#include "disasm.h"
+#include "disassembly/disasm.h"
 #include "memory/mem.h"
 #include "memory/mmu.h"
 #include "cpu/translate.h"
