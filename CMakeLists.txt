@@ -129,6 +129,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     mainwindow/bootstrap.cpp
     mainwindow/layout_persistence.cpp
     mainwindow/docks.cpp
+    mainwindow/docks/connectivity.cpp
+    mainwindow/docks/overlay.cpp
     mainwindow/docks/setup.cpp
     mainwindow/docks/reset.cpp
     mainwindow/theme.cpp
@@ -142,6 +144,8 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
 set_source_files_properties(mainwindow/bootstrap.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/layout_persistence.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/docks.cpp PROPERTIES SKIP_AUTOUIC ON)
+set_source_files_properties(mainwindow/docks/connectivity.cpp PROPERTIES SKIP_AUTOUIC ON)
+set_source_files_properties(mainwindow/docks/overlay.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/docks/setup.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/docks/reset.cpp PROPERTIES SKIP_AUTOUIC ON)
 set_source_files_properties(mainwindow/runtime.cpp PROPERTIES SKIP_AUTOUIC ON)
