@@ -10,8 +10,8 @@
 #include <QUrl>
 
 #include "debugger/dockmanager.h"
-#include "debugger/hwconfig/hwconfigwidget.h"
-#include "debugger/nandbrowser/nandbrowserwidget.h"
+#include "ui/widgets/debugger/hwconfig/hwconfigwidget.h"
+#include "ui/widgets/debugger/nandbrowser/nandbrowserwidget.h"
 #include "mainwindow/layout_persistence.h"
 #include "ui_mainwindow.h"
 

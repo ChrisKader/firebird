@@ -94,11 +94,11 @@
 #include "ui/keypadbridge.h"
 #include "debugger/dockmanager.h"
 
-#include "debugger/disassembly/disassemblywidget.h"
-#include "debugger/hexview/hexviewwidget.h"
-#include "debugger/console/consolewidget.h"
-#include "debugger/nandbrowser/nandbrowserwidget.h"
-#include "debugger/hwconfig/hwconfigwidget.h"
+#include "ui/widgets/debugger/disassembly/disassemblywidget.h"
+#include "ui/widgets/debugger/hexview/hexviewwidget.h"
+#include "ui/widgets/debugger/console/consolewidget.h"
+#include "ui/widgets/debugger/nandbrowser/nandbrowserwidget.h"
+#include "ui/widgets/debugger/hwconfig/hwconfigwidget.h"
 
 static constexpr const char *kSettingHwBatteryOverride = "hwBatteryOverride";
 static constexpr const char *kSettingHwChargingOverride = "hwChargingOverride";

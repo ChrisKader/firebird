@@ -8,8 +8,8 @@
 #include <QToolButton>
 
 #include "debugger/dockmanager.h"
-#include "debugger/disassembly/disassemblywidget.h"
-#include "debugger/hexview/hexviewwidget.h"
+#include "ui/widgets/debugger/disassembly/disassemblywidget.h"
+#include "ui/widgets/debugger/hexview/hexviewwidget.h"
 #include "ui/materialicons.h"
 #include "ui/widgettheme.h"
 #include "ui_mainwindow.h"

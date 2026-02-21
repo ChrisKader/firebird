@@ -30,7 +30,8 @@ This document is the canonical guide for how to structure new code and refactors
 - `ui/`: Reusable desktop widgets/components.
   - `ui/models/`: Qt model/view backing models shared with QML/widgets.
   - `ui/dockbackend.*`: shared docking-backend adapter (KDD vs legacy fallback) for dock add/tabify/split/remove/resize and titlebar host integration points.
-- `debugger/`: Debug panel widgets and docking manager.
+  - `ui/widgets/debugger/*`: debugger widget implementations grouped by feature (`breakpoints`, `disassembly`, `hexview`, etc.).
+- `debugger/`: Debug docking orchestration and non-widget manager logic (`dockmanager.*`).
 - `app/`: Cross-UI runtime bridge services (`EmuThread`, `QMLBridge`).
 - `core/`: Emulation core and hardware models.
   - `core/power/`: Power-path override control helpers used by UI and debugger.

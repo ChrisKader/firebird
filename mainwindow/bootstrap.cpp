@@ -41,7 +41,7 @@
 #include "core/mem.h"
 #include "core/misc.h"
 #include "debugger/dockmanager.h"
-#include "debugger/hwconfig/hwconfigwidget.h"
+#include "ui/widgets/debugger/hwconfig/hwconfigwidget.h"
 #include "transfer/usblinktreewidget.h"
 #include "ui/framebuffer.h"
 #include "ui/keypadbridge.h"

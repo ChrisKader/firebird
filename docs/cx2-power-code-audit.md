@@ -100,7 +100,7 @@ Fix applied:
 
 - Added `CHARGER_AUTO = -1` in `/Users/ck/dev/firebird/core/emu.h`
 - Default changed to `CHARGER_AUTO` in `/Users/ck/dev/firebird/core/misc.c`
-- UI "override off" now restores `CHARGER_AUTO` in `/Users/ck/dev/firebird/debugger/hwconfig/hwconfigwidget.cpp`
+- UI "override off" now restores `CHARGER_AUTO` in `/Users/ck/dev/firebird/ui/widgets/debugger/hwconfig/hwconfigwidget.cpp`
 
 Effect:
 

@@ -137,7 +137,7 @@ Use this quick validation after battery/PMU changes:
 
 - `core/misc.c` (CX II ADC sample generation, battery code mapping)
 - `core/cx2.cpp` (Aladdin PMU register model, `0x90140060` composition)
-- `debugger/hwconfig/hwconfigwidget.cpp` (battery/charger override UI wiring)
+- `ui/widgets/debugger/hwconfig/hwconfigwidget.cpp` (battery/charger override UI wiring)
 
 ## 9) Stage-specific expectations (CX II CAS)
 

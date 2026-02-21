@@ -1,4 +1,4 @@
-#include "debugger/console/consolewidget.h"
+#include "ui/widgets/debugger/console/consolewidget.h"
 
 #include <QJsonArray>
 

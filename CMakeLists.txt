@@ -105,26 +105,26 @@ qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Debugger subsystem
     debugger/dockmanager.cpp debugger/dockmanager.h
     debugger/dockmanager/state.cpp
-    debugger/disassembly/disassemblywidget.cpp debugger/disassembly/disassemblywidget.h
-    debugger/registers/registerwidget.cpp debugger/registers/registerwidget.h
-    debugger/hexview/hexviewwidget.cpp debugger/hexview/hexviewwidget.h
-    debugger/breakpoints/breakpointwidget.cpp debugger/breakpoints/breakpointwidget.h
-    debugger/watchpoints/watchpointwidget.cpp debugger/watchpoints/watchpointwidget.h
-    debugger/stack/stackwidget.cpp debugger/stack/stackwidget.h
-    debugger/portmonitor/portmonitorwidget.cpp debugger/portmonitor/portmonitorwidget.h
-    debugger/keyhistory/keyhistorywidget.cpp debugger/keyhistory/keyhistorywidget.h
-    debugger/console/consolewidget.cpp debugger/console/consolewidget.h
-    debugger/console/state.cpp
-    debugger/memvisualizer/memoryvisualizerwidget.cpp debugger/memvisualizer/memoryvisualizerwidget.h
-    debugger/cyclecounter/cyclecounterwidget.cpp debugger/cyclecounter/cyclecounterwidget.h
-    debugger/timermonitor/timermonitorwidget.cpp debugger/timermonitor/timermonitorwidget.h
-    debugger/lcdstate/lcdstatewidget.cpp debugger/lcdstate/lcdstatewidget.h
-    debugger/gotodialog.cpp debugger/gotodialog.h
-    debugger/nandbrowser/nandbrowserwidget.cpp debugger/nandbrowser/nandbrowserwidget.h
-    debugger/nandbrowser/nandfileeditor.cpp debugger/nandbrowser/nandfileeditor.h
-    debugger/hwconfig/hwconfigwidget.cpp debugger/hwconfig/hwconfigwidget.h
-    debugger/hwconfig/state.cpp
-    debugger/mmuviewer/mmuviewerwidget.cpp debugger/mmuviewer/mmuviewerwidget.h
+    ui/widgets/debugger/disassembly/disassemblywidget.cpp ui/widgets/debugger/disassembly/disassemblywidget.h
+    ui/widgets/debugger/registers/registerwidget.cpp ui/widgets/debugger/registers/registerwidget.h
+    ui/widgets/debugger/hexview/hexviewwidget.cpp ui/widgets/debugger/hexview/hexviewwidget.h
+    ui/widgets/debugger/breakpoints/breakpointwidget.cpp ui/widgets/debugger/breakpoints/breakpointwidget.h
+    ui/widgets/debugger/watchpoints/watchpointwidget.cpp ui/widgets/debugger/watchpoints/watchpointwidget.h
+    ui/widgets/debugger/stack/stackwidget.cpp ui/widgets/debugger/stack/stackwidget.h
+    ui/widgets/debugger/portmonitor/portmonitorwidget.cpp ui/widgets/debugger/portmonitor/portmonitorwidget.h
+    ui/widgets/debugger/keyhistory/keyhistorywidget.cpp ui/widgets/debugger/keyhistory/keyhistorywidget.h
+    ui/widgets/debugger/console/consolewidget.cpp ui/widgets/debugger/console/consolewidget.h
+    ui/widgets/debugger/console/state.cpp
+    ui/widgets/debugger/memvisualizer/memoryvisualizerwidget.cpp ui/widgets/debugger/memvisualizer/memoryvisualizerwidget.h
+    ui/widgets/debugger/cyclecounter/cyclecounterwidget.cpp ui/widgets/debugger/cyclecounter/cyclecounterwidget.h
+    ui/widgets/debugger/timermonitor/timermonitorwidget.cpp ui/widgets/debugger/timermonitor/timermonitorwidget.h
+    ui/widgets/debugger/lcdstate/lcdstatewidget.cpp ui/widgets/debugger/lcdstate/lcdstatewidget.h
+    ui/widgets/debugger/gotodialog.cpp ui/widgets/debugger/gotodialog.h
+    ui/widgets/debugger/nandbrowser/nandbrowserwidget.cpp ui/widgets/debugger/nandbrowser/nandbrowserwidget.h
+    ui/widgets/debugger/nandbrowser/nandfileeditor.cpp ui/widgets/debugger/nandbrowser/nandfileeditor.h
+    ui/widgets/debugger/hwconfig/hwconfigwidget.cpp ui/widgets/debugger/hwconfig/hwconfigwidget.h
+    ui/widgets/debugger/hwconfig/state.cpp
+    ui/widgets/debugger/mmuviewer/mmuviewerwidget.cpp ui/widgets/debugger/mmuviewer/mmuviewerwidget.h
     # Dialogs
     dialogs/fbaboutdialog.cpp dialogs/fbaboutdialog.h
     # File transfer
