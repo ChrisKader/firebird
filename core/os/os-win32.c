@@ -10,7 +10,7 @@
 #include <share.h>
 
 #include "../emu.h"
-#include "../mmu.h"
+#include "../memory/mmu.h"
 
 static HANDLE flash_mapping;
 static int flash_fd;

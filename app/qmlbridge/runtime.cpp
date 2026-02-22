@@ -1,8 +1,12 @@
 #include "app/qmlbridge.h"
 
 #include <QFile>
+#include <QFileDialog>
 #include <QFileInfo>
+#include <QDateTime>
+#include <QDir>
 #include <QScopedPointer>
+#include <QStandardPaths>
 #include <QUrl>
 
 #include "app/emuthread.h"
@@ -84,6 +88,64 @@ QString QMLBridge::toLocalFile(QUrl url)
 bool QMLBridge::fileExists(QString path)
 {
     return QFile::exists(path);
+}
+
+void QMLBridge::importLocalFileForWasm(QString requestId, QString nameFilter)
+{
+#ifdef __EMSCRIPTEN__
+    QFileDialog::getOpenFileContent(nameFilter, [this, requestId](const QString &sourceName, const QByteArray &data) {
+        if(sourceName.isEmpty())
+        {
+            emit wasmLocalFileImported(requestId, QString(), tr("No file selected"));
+            return;
+        }
+
+        const QString appDataRoot = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+        if(appDataRoot.isEmpty())
+        {
+            emit wasmLocalFileImported(requestId, QString(), tr("App data storage is unavailable"));
+            return;
+        }
+
+        QDir rootDir(appDataRoot);
+        if(!rootDir.mkpath(QStringLiteral("imports")))
+        {
+            emit wasmLocalFileImported(requestId, QString(), tr("Could not create imports directory"));
+            return;
+        }
+
+        const QString originalName = QFileInfo(sourceName).fileName();
+        const QString safeName = originalName.isEmpty() ? QStringLiteral("import.bin") : originalName;
+        QString outputPath = rootDir.filePath(QStringLiteral("imports/") + safeName);
+
+        if(QFile::exists(outputPath))
+        {
+            const QFileInfo safeInfo(safeName);
+            const QString stem = safeInfo.completeBaseName().isEmpty() ? QStringLiteral("import") : safeInfo.completeBaseName();
+            const QString suffix = safeInfo.suffix();
+            const QString extension = suffix.isEmpty() ? QString() : QStringLiteral(".") + suffix;
+            outputPath = rootDir.filePath(QStringLiteral("imports/%1-%2%3").arg(stem, QString::number(QDateTime::currentMSecsSinceEpoch()), extension));
+        }
+
+        QFile output(outputPath);
+        if(!output.open(QIODevice::WriteOnly))
+        {
+            emit wasmLocalFileImported(requestId, QString(), tr("Could not open destination file"));
+            return;
+        }
+        if(output.write(data) != data.size())
+        {
+            emit wasmLocalFileImported(requestId, QString(), tr("Could not write selected file"));
+            return;
+        }
+        output.close();
+        emit wasmLocalFileImported(requestId, outputPath, QString());
+    });
+#else
+    Q_UNUSED(requestId);
+    Q_UNUSED(nameFilter);
+    emit wasmLocalFileImported(requestId, QString(), tr("Browser import is only available in WebAssembly builds"));
+#endif
 }
 
 int QMLBridge::kitIndexForID(unsigned int id)

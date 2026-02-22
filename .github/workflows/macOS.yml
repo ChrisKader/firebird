@@ -5,6 +5,7 @@ on:
     branches: [ master, ci/macOS ]
   pull_request:
     branches: [ master, ci/macOS ]
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -19,7 +20,7 @@ jobs:
 
     steps:
     - name: Checkout Git Repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: 'recursive'
 
@@ -37,23 +38,23 @@ jobs:
       run: |
         set -euxo pipefail
         brew install ninja
-        git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git kddockwidgets
-        cmake -S kddockwidgets -B kdd-build -G Ninja \
+        git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git .build/kddockwidgets-src
+        cmake -S .build/kddockwidgets-src -B .build/kddockwidgets-build -G Ninja \
           -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.deps/kddockwidgets-2.4" \
+          -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.build/deps/kddockwidgets-2.4" \
           -DKDDockWidgets_NO_SPDLOG=ON
-        cmake --build kdd-build --parallel
-        cmake --install kdd-build
+        cmake --build .build/kddockwidgets-build --parallel
+        cmake --install .build/kddockwidgets-build
 
     - name: Build firebird-emu on macOS (Qt6/CMake)
       shell: bash
       run: |
         set -euxo pipefail
-        cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-        cmake --build build --parallel
-        macdeployqt build/firebird-emu.app -qmldir=./qml
+        cmake -S . -B .build/macos-desktop -G Ninja -DCMAKE_BUILD_TYPE=Release
+        cmake --build .build/macos-desktop --parallel
+        macdeployqt .build/macos-desktop/firebird-emu.app -qmldir=./qml
         mkdir -p /tmp/firebird-emu_macOS/
-        mv build/firebird-emu.app /tmp/firebird-emu_macOS/
+        mv .build/macos-desktop/firebird-emu.app /tmp/firebird-emu_macOS/
 
     - name: "Codesign firebird-emu.app"
       env:

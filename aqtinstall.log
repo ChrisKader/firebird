@@ -1,0 +1,274 @@
+2026-02-22 00:39:59,897 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:39:59,897 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:39:59,898 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:02,925 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:05,947 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:08,976 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:12,000 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:15,031 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:40:18,063 - aqt.helper - WARNING - helper 8521706560 Connection to 'https://download.qt.io' failed. Retrying with fallback 'https://ftp2.nluug.nl/languages/qt/'.
+2026-02-22 00:40:18,065 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:21,098 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:24,126 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:27,151 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:30,179 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:40:33,208 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:40:36,239 - aqt.main - ERROR - installer 8521706560 Failure to connect to https://ftp2.nluug.nl/languages/qt/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml: ConnectionError
+2026-02-22 00:42:41,173 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:42:41,173 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:42:41,173 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:42:41,945 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:42:42,522 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:42:43,096 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:42:43,705 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:42:44,284 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:42:44,859 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:46:37,882 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_693/qt6_693/Updates.xml.sha256
+2026-02-22 00:46:37,883 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101/Updates.xml.sha256
+2026-02-22 00:46:37,883 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102/Updates.xml.sha256
+2026-02-22 00:46:37,884 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6100/qt6_6100/Updates.xml.sha256
+2026-02-22 00:46:40,905 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101/Updates.xml.sha256
+2026-02-22 00:46:40,905 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102/Updates.xml.sha256
+2026-02-22 00:46:40,905 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6100/qt6_6100/Updates.xml.sha256
+2026-02-22 00:46:40,905 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_693/qt6_693/Updates.xml.sha256
+2026-02-22 00:46:43,927 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6100/qt6_6100/Updates.xml.sha256
+2026-02-22 00:46:43,927 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102/Updates.xml.sha256
+2026-02-22 00:46:43,927 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101/Updates.xml.sha256
+2026-02-22 00:46:43,929 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_693/qt6_693/Updates.xml.sha256
+2026-02-22 00:46:46,952 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6100/qt6_6100/Updates.xml.sha256
+2026-02-22 00:46:46,952 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101/Updates.xml.sha256
+2026-02-22 00:46:46,952 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102/Updates.xml.sha256
+2026-02-22 00:46:46,952 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_693/qt6_693/Updates.xml.sha256
+2026-02-22 00:46:49,977 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102/Updates.xml.sha256
+2026-02-22 00:46:49,977 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101/Updates.xml.sha256
+2026-02-22 00:46:49,977 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6100/qt6_6100/Updates.xml.sha256
+2026-02-22 00:46:49,977 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_693/qt6_693/Updates.xml.sha256
+2026-02-22 00:46:53,003 - aqt.main - ERROR - installer 8521706560 Failed to download checksum for the file 'Updates.xml' from mirrors '['https://download.qt.io']
+==============================Suggested follow-up:==============================
+* Check your internet connection
+* Consider modifying `requests.max_retries_to_retrieve_hash` in settings.ini
+* Consider modifying `mirrors.trusted_mirrors` in settings.ini (see https://aqtinstall.readthedocs.io/en/stable/configuration.html#configuration)
+* Please use 'aqt list-qt mac desktop' to show versions of Qt available.
+2026-02-22 00:46:53,003 - aqt.main - ERROR - installer 8521706560 Failed to download checksum for the file 'Updates.xml' from mirrors '['https://download.qt.io']
+==============================Suggested follow-up:==============================
+* Check your internet connection
+* Consider modifying `requests.max_retries_to_retrieve_hash` in settings.ini
+* Consider modifying `mirrors.trusted_mirrors` in settings.ini (see https://aqtinstall.readthedocs.io/en/stable/configuration.html#configuration)
+* Please use 'aqt list-qt mac desktop' to show versions of Qt available.
+2026-02-22 00:46:53,003 - aqt.main - ERROR - installer 8521706560 Failed to download checksum for the file 'Updates.xml' from mirrors '['https://download.qt.io']
+==============================Suggested follow-up:==============================
+* Check your internet connection
+* Consider modifying `requests.max_retries_to_retrieve_hash` in settings.ini
+* Consider modifying `mirrors.trusted_mirrors` in settings.ini (see https://aqtinstall.readthedocs.io/en/stable/configuration.html#configuration)
+* Please use 'aqt list-qt mac desktop' to show versions of Qt available.
+2026-02-22 00:46:53,006 - aqt.main - ERROR - installer 8521706560 Failed to download checksum for the file 'Updates.xml' from mirrors '['https://download.qt.io']
+==============================Suggested follow-up:==============================
+* Check your internet connection
+* Consider modifying `requests.max_retries_to_retrieve_hash` in settings.ini
+* Consider modifying `mirrors.trusted_mirrors` in settings.ini (see https://aqtinstall.readthedocs.io/en/stable/configuration.html#configuration)
+* Please use 'aqt list-qt mac desktop' to show versions of Qt available.
+2026-02-22 00:47:54,716 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:47:54,717 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:47:54,717 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:47:55,303 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:47:55,880 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:47:56,457 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:47:57,084 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:47:57,677 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:47:58,259 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:47:58,465 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:47:58,465 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:47:58,465 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:47:59,069 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:47:59,648 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:00,261 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:00,848 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:01,849 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:48:02,432 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:48:20,214 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:48:20,214 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:48:20,214 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:48:20,808 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:48:21,381 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:48:21,953 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:48:22,522 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:48:23,091 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:48:23,716 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:48:23,920 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:48:23,920 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:48:23,921 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:24,502 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:25,075 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:25,647 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:26,249 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:48:26,823 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:48:27,437 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:50:15,131 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:50:15,131 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:50:15,131 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:15,701 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:16,311 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:16,896 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:17,495 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:18,110 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:50:18,697 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:50:18,885 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:50:18,886 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:50:18,886 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:19,460 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:20,061 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:20,638 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:21,209 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:21,783 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:50:22,351 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:50:28,536 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:50:28,537 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:50:28,537 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:29,145 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:29,731 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:30,305 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:30,927 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:31,526 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:50:32,129 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:50:32,337 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:50:32,337 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:50:32,337 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:32,942 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:33,532 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:34,107 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:34,709 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:35,301 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:50:35,876 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:50:52,318 - aqt.metadata - DEBUG - metadata 8521706560 Connection to 'https://download.qt.io' failed. Retrying with fallback 'https://mirrors.ustc.edu.cn/qtproject/'.
+2026-02-22 00:50:53,646 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:50:53,646 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:50:53,647 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:54,253 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:54,828 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:55,338 - aqt.main - ERROR - installer 8521706560 Failure to connect to https://mirrors.ustc.edu.cn/qtproject/online/qtsdkrepository/mac_x64/desktop/: ConnectionError
+2026-02-22 00:50:55,409 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:55,986 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:50:56,548 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:50:57,117 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:50:57,316 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:50:57,317 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:50:57,317 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:57,886 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:58,495 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:59,085 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:50:59,658 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:51:00,254 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:51:00,842 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:51:01,044 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:51:01,045 - aqt.main - WARNING - installer 8521706560 You are installing the Qt6-WASM version of Qt, which requires that the desktop version of Qt is also installed. You can install it with the following command:
+          `aqt install-qt mac desktop 6.10.2 clang_64`
+2026-02-22 00:51:01,045 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:51:02,659 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:51:03,216 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:51:03,805 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:51:04,372 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_singlethread/Updates.xml.sha256
+2026-02-22 00:51:04,986 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_singlethread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:51:05,577 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.2'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:51:05,783 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:51:05,783 - aqt.main - WARNING - installer 8521706560 You are installing the Qt6-WASM version of Qt, which requires that the desktop version of Qt is also installed. You can install it with the following command:
+          `aqt install-qt mac desktop 6.10.2 clang_64`
+2026-02-22 00:51:05,783 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:51:06,362 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:51:06,961 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:51:07,525 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:51:08,117 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:51:08,692 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6102/qt6_6102_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:51:09,266 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.2'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:54:37,189 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:54:37,189 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:54:37,189 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:54:37,769 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:54:38,365 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:54:38,935 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:54:39,547 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:54:40,146 - aqt.archives - WARNING - archives 8521706560 Failed to download checksum for the file 'online/qtsdkrepository/mac_x64/desktop/qt6_6101/qt6_6101_wasm_multithread/Updates.xml'. This may happen on unofficial mirrors.
+2026-02-22 00:54:40,637 - aqt.main - ERROR - installer 8521706560 Failed to locate XML data for Qt version '6.10.1'.
+==============================Suggested follow-up:==============================
+* Please use 'aqt list-qt mac desktop' to show versions available.
+2026-02-22 00:57:35,994 - aqt.metadata - DEBUG - metadata 8521706560 Connection to 'https://download.qt.io' failed. Retrying with fallback 'https://ftp.yz.yamagata-u.ac.jp/pub/qtproject/'.
+2026-02-22 00:57:39,019 - aqt.main - ERROR - installer 8521706560 Failure to connect to https://ftp.yz.yamagata-u.ac.jp/pub/qtproject/online/qtsdkrepository/all_os/wasm/: ConnectionError
+2026-02-22 00:58:20,768 - aqt.metadata - DEBUG - metadata 8521706560 Connection to 'https://download.qt.io' failed. Retrying with fallback 'https://mirrors.dotsrc.org/qtproject/'.
+2026-02-22 00:58:23,796 - aqt.main - ERROR - installer 8521706560 Failure to connect to https://mirrors.dotsrc.org/qtproject/online/qtsdkrepository/all_os/wasm/: ConnectionError
+2026-02-22 00:58:48,930 - aqt.main - INFO - installer 8521706560 aqtinstall(aqt) v3.3.0 on Python 3.12.12 [CPython Clang 17.0.0 (clang-1700.4.4.1)]
+2026-02-22 00:58:48,930 - aqt.main - INFO - installer 8521706560 Found installed mac-desktop Qt at .build/qt/6.10.1/macos
+2026-02-22 00:58:48,930 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:50,124 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtwebengine/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:50,681 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtwebengine/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:51,251 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtwebengine/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:51,814 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtwebengine/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:52,413 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtwebengine/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:53,002 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtpdf/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:53,610 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtpdf/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:54,176 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtpdf/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:54,746 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtpdf/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:55,323 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/extensions/qtpdf/6101/wasm_multithread/Updates.xml.sha256
+2026-02-22 00:58:56,188 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtbase-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z.sha256
+2026-02-22 00:58:56,189 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtsvg-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z.sha256
+2026-02-22 00:58:56,189 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtdeclarative-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z.sha256
+2026-02-22 00:58:56,189 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qttools-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z.sha256
+2026-02-22 00:58:56,769 - aqt.helper - INFO - helper 8521706560 Downloading qtsvg...
+2026-02-22 00:58:56,769 - aqt.helper - INFO - helper 8521706560 Downloading qttools...
+2026-02-22 00:58:56,769 - aqt.installer - DEBUG - installer 8521706560 Download URL: https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qttools-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:56,769 - aqt.installer - DEBUG - installer 8521706560 Download URL: https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtsvg-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:56,788 - aqt.helper - INFO - helper 8521706560 Downloading qtdeclarative...
+2026-02-22 00:58:56,788 - aqt.helper - INFO - helper 8521706560 Downloading qtbase...
+2026-02-22 00:58:56,788 - aqt.installer - DEBUG - installer 8521706560 Download URL: https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtdeclarative-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:56,788 - aqt.installer - DEBUG - installer 8521706560 Download URL: https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtbase-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:57,341 - aqt.helper - DEBUG - helper 8521706560 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtsvg-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:57,341 - aqt.helper - INFO - helper 8521706560 Redirected: qt.mirror.constant.com
+2026-02-22 00:58:57,341 - aqt.helper - DEBUG - helper 8521706560 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qttools-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:57,342 - aqt.helper - INFO - helper 8521706560 Redirected: qt.mirror.constant.com
+2026-02-22 00:58:57,357 - aqt.helper - DEBUG - helper 8521706560 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtdeclarative-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:57,357 - aqt.helper - INFO - helper 8521706560 Redirected: qt.mirror.constant.com
+2026-02-22 00:58:57,358 - aqt.helper - DEBUG - helper 8521706560 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qtbase-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:57,358 - aqt.helper - INFO - helper 8521706560 Redirected: qt.mirror.constant.com
+2026-02-22 00:58:57,984 - aqt.installer - INFO - installer 8521706560 Finished installation of qttools-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z in 1.79586171
+2026-02-22 00:58:57,986 - aqt.installer - INFO - installer 8521706560 Finished installation of qtsvg-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z in 1.79819946
+2026-02-22 00:58:57,991 - aqt.helper - DEBUG - helper 8521706560 Attempt to download checksum at https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qttranslations-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z.sha256
+2026-02-22 00:58:59,065 - aqt.helper - INFO - helper 8521706560 Downloading qttranslations...
+2026-02-22 00:58:59,065 - aqt.installer - DEBUG - installer 8521706560 Download URL: https://download.qt.io/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qttranslations-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:59,667 - aqt.helper - DEBUG - helper 8521706560 Asked to redirect(302) to: https://qt.mirror.constant.com/online/qtsdkrepository/all_os/wasm/qt6_6101/qt6_6101_wasm_multithread/qt.qt6.6101.wasm_multithread/6.10.1-0-202511161843qttranslations-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z
+2026-02-22 00:58:59,667 - aqt.helper - INFO - helper 8521706560 Redirected: qt.mirror.constant.com
+2026-02-22 00:59:00,466 - aqt.installer - INFO - installer 8521706560 Finished installation of qttranslations-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z in 2.47606829
+2026-02-22 00:59:00,808 - aqt.installer - INFO - installer 8521706560 Finished installation of qtbase-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z in 4.62016796
+2026-02-22 00:59:00,860 - aqt.installer - INFO - installer 8521706560 Finished installation of qtdeclarative-Linux-openSUSE_15_6-GCC-Linux-WebAssembly-X86_64.7z in 4.67135171
+2026-02-22 00:59:00,902 - aqt.updater - INFO - updater 8521706560 Patching .build/qt/6.10.1/wasm_multithread/bin/qmake
+2026-02-22 00:59:00,903 - aqt.updater - INFO - updater 8521706560 Patching .build/qt/6.10.1/wasm_multithread/bin/qtpaths
+2026-02-22 00:59:00,904 - aqt.updater - INFO - updater 8521706560 Patching .build/qt/6.10.1/wasm_multithread/bin/qmake6
+2026-02-22 00:59:00,904 - aqt.updater - INFO - updater 8521706560 Patching .build/qt/6.10.1/wasm_multithread/bin/qtpaths6
+2026-02-22 00:59:00,905 - aqt.updater - INFO - updater 8521706560 Patching .build/qt/6.10.1/wasm_multithread/bin/target_qt.conf
+2026-02-22 00:59:00,905 - aqt.main - INFO - installer 8521706560 Finished installation
+2026-02-22 00:59:00,905 - aqt.main - INFO - installer 8521706560 Time elapsed: 11.97581058 second
+2026-02-22 00:59:02,130 - aqt.metadata - DEBUG - metadata 8521706560 Connection to 'https://download.qt.io' failed. Retrying with fallback 'https://mirrors.ukfast.co.uk/sites/qt.io/'.
+2026-02-22 00:59:05,148 - aqt.main - ERROR - installer 8521706560 Failure to connect to https://mirrors.ukfast.co.uk/sites/qt.io/online/qtsdkrepository/all_os/wasm/: ConnectionError

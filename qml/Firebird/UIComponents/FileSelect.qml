@@ -1,6 +1,7 @@
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import Qt.labs.platform 1.1 as Platform
+import QtQuick.Dialogs 6.2 as QuickDialogs
 import QtQuick.Layouts 6.0
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
@@ -11,20 +12,76 @@ RowLayout {
     property bool selectExisting: true
     property alias subtext: subtextLabel.text
     property bool showCreateButton: false
+    property string nameFilter: ""
     signal create()
+    property int wasmRequestCounter: 0
+    property string wasmPendingRequestId: ""
 
     // Hack to force reevaluation of Emu.fileExists(filePath) after reselection.
     // Needed on Android due to persistent permissions.
     property int forceRefresh: 0
+    function openDialog(loader) {
+        if(!loader.item)
+            return;
+        if(loader.item.open)
+            loader.item.open();
+        else
+            loader.item.visible = true;
+    }
+    function requestWasmImport() {
+        wasmRequestCounter++;
+        wasmPendingRequestId = "file-select-" + wasmRequestCounter;
+        Emu.importLocalFileForWasm(wasmPendingRequestId, nameFilter);
+    }
+
+    Connections {
+        target: Emu
+        function onWasmLocalFileImported(requestId, localPath, errorText) {
+            if(requestId !== wasmPendingRequestId)
+                return;
+            wasmPendingRequestId = "";
+            if(localPath !== "") {
+                filePath = localPath;
+                forceRefresh++;
+            } else if(errorText !== "") {
+                console.warn("WASM file import failed:", errorText);
+            }
+        }
+    }
+
     Loader {
         id: dialogLoader
         active: false
-        sourceComponent: Platform.FileDialog {
+        sourceComponent: Qt.platform.os === "wasm" ? quickDialogComponent : platformDialogComponent
+        property bool pendingOpen: false
+        onLoaded: {
+            if(pendingOpen) {
+                pendingOpen = false;
+                parent.openDialog(dialogLoader);
+            }
+        }
+    }
+
+    Component {
+        id: platformDialogComponent
+        Platform.FileDialog {
             folder: Emu.dir(filePath)
             // If save dialogs are not supported, force an open dialog
             fileMode: selectExisting || !Emu.saveDialogSupported() ? Platform.FileDialog.OpenFile : Platform.FileDialog.SaveFile
             onAccepted: {
                 filePath = Emu.toLocalFile(currentFile);
+                forceRefresh++;
+            }
+        }
+    }
+
+    Component {
+        id: quickDialogComponent
+        QuickDialogs.FileDialog {
+            currentFolder: Emu.dir(filePath)
+            fileMode: selectExisting || !Emu.saveDialogSupported() ? QuickDialogs.FileDialog.OpenFile : QuickDialogs.FileDialog.SaveFile
+            onAccepted: {
+                filePath = Emu.toLocalFile(selectedFile);
                 forceRefresh++;
             }
         }
@@ -70,7 +127,19 @@ RowLayout {
         Loader {
             id: createDialogLoader
             active: false
-            sourceComponent: Platform.FileDialog {
+            sourceComponent: Qt.platform.os === "wasm" ? createQuickDialogComponent : createPlatformDialogComponent
+            property bool pendingOpen: false
+            onLoaded: {
+                if(pendingOpen) {
+                    pendingOpen = false;
+                    parent.openDialog(createDialogLoader);
+                }
+            }
+        }
+
+        Component {
+            id: createPlatformDialogComponent
+            Platform.FileDialog {
                 folder: Emu.dir(filePath)
                 fileMode: Platform.FileDialog.SaveFile
                 onAccepted: {
@@ -80,12 +149,25 @@ RowLayout {
             }
         }
 
+        Component {
+            id: createQuickDialogComponent
+            QuickDialogs.FileDialog {
+                currentFolder: Emu.dir(filePath)
+                fileMode: QuickDialogs.FileDialog.SaveFile
+                onAccepted: {
+                    filePath = Emu.toLocalFile(selectedFile);
+                    forceRefresh++;
+                }
+            }
+        }
+
         onClicked: {
             if(showCreateButton)
                 parent.create()
             else {
+                createDialogLoader.pendingOpen = true;
                 createDialogLoader.active = true;
-                createDialogLoader.item.visible = true;
+                parent.openDialog(createDialogLoader);
             }
         }
     }
@@ -93,8 +175,13 @@ RowLayout {
     IconButton {
         iconSource: "qrc:/icons/resources/icons/document-edit.png"
         onClicked: {
+            if(Qt.platform.os === "wasm" && selectExisting) {
+                requestWasmImport();
+                return;
+            }
+            dialogLoader.pendingOpen = true;
             dialogLoader.active = true;
-            dialogLoader.item.visible = true;
+            parent.openDialog(dialogLoader);
         }
     }
 }

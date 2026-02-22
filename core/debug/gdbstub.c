@@ -654,6 +654,12 @@ static void gdb_hostio_pack_stat(const struct stat *st, struct gdb_fio_stat *fst
     gdb_hostio_pack_be((long long)st->st_atimespec.tv_sec, fst->fst_atime, 4);
     gdb_hostio_pack_be((long long)st->st_mtimespec.tv_sec, fst->fst_mtime, 4);
     gdb_hostio_pack_be((long long)st->st_ctimespec.tv_sec, fst->fst_ctime, 4);
+#elif defined(_WIN32)
+    gdb_hostio_pack_be(0, fst->fst_blksize, 8);
+    gdb_hostio_pack_be(0, fst->fst_blocks, 8);
+    gdb_hostio_pack_be((long long)st->st_atime, fst->fst_atime, 4);
+    gdb_hostio_pack_be((long long)st->st_mtime, fst->fst_mtime, 4);
+    gdb_hostio_pack_be((long long)st->st_ctime, fst->fst_ctime, 4);
 #else
     gdb_hostio_pack_be((long long)st->st_blksize, fst->fst_blksize, 8);
     gdb_hostio_pack_be((long long)st->st_blocks, fst->fst_blocks, 8);

@@ -137,6 +137,7 @@ public:
     Q_INVOKABLE QString osDescription(QString path);
 
     Q_INVOKABLE bool saveDialogSupported();
+    Q_INVOKABLE void importLocalFileForWasm(QString requestId, QString nameFilter = QString());
 
     void setActive(bool b);
 #ifndef MOBILE_UI
@@ -181,6 +182,7 @@ signals:
 
     void touchpadStateChanged(qreal x, qreal y, bool contact, bool down);
     void buttonStateChanged(int id, bool state);
+    void wasmLocalFileImported(QString requestId, QString localPath, QString errorText);
 
     /* Never called. Used as NOTIFY value for writable properties
      * that aren't used outside of QML. */

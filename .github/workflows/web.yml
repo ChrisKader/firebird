@@ -1,0 +1,41 @@
+name: Build for Web (Emscripten)
+
+on:
+  push:
+    branches: [ master, ci/web ]
+  pull_request:
+    branches: [ master, ci/web ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Emscripten SDK
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.64
+
+      - name: Build web target
+        run: |
+          make -C emscripten BUILD_DIR=../.build/web -j"$(nproc)"
+          cp emscripten/firebird.html .build/web/
+          cp emscripten/firebird-utils.js .build/web/
+
+      - name: Upload web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebird-emu-web
+          path: |
+            .build/web/firebird.js
+            .build/web/firebird.wasm
+            .build/web/firebird.data
+            .build/web/firebird.html
+            .build/web/firebird-utils.js
+          if-no-files-found: warn

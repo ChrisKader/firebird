@@ -19,6 +19,7 @@ TRANSLATIONS += i18n/de_DE.ts i18n/fr_FR.ts i18n/pl_PL.ts
 QT += core gui widgets quickwidgets quick qml
 # Qt 6 note: androidextras was removed, functionality moved to QtCore
 CONFIG += c++17
+CONFIG += object_parallel_to_source
 
 TEMPLATE = app
 TARGET = firebird-emu
@@ -48,7 +49,7 @@ QT_QML_GENERATE_QMLLS_INI = ON
 
 QMAKE_CFLAGS += -g -std=gnu11 -Wall -Wextra
 QMAKE_CXXFLAGS += -g -Wall -Wextra -D QT_NO_CAST_FROM_ASCII
-INCLUDEPATH += core/debug
+INCLUDEPATH += . core core/debug
 LIBS += -lz
 
 # Override bad default options to enable better optimizations
@@ -91,9 +92,6 @@ ios|android: DEFINES += MOBILE_UI
 ios {
     DEFINES += IS_IOS_BUILD
     QMAKE_INFO_PLIST = Info.plist
-    QMAKE_CFLAGS += -mno-thumb
-    QMAKE_CXXFLAGS += -mno-thumb
-    QMAKE_LFLAGS += -mno-thumb
     ios_icon.files = $$files(resources/ios/Icon*.png)
     QMAKE_BUNDLE_DATA += ios_icon
 }
@@ -163,11 +161,26 @@ SOURCES += $$ASMCODE_IMPL \
     core/storage/fieldparser.cpp \
     ui/screen/lcdwidget.cpp \
     mainwindow.cpp \
+    mainwindow/bootstrap.cpp \
+    mainwindow/bootstrap/startup.cpp \
+    mainwindow/layout_persistence.cpp \
+    mainwindow/docks.cpp \
+    mainwindow/docks/connectivity.cpp \
+    mainwindow/docks/overlay.cpp \
+    mainwindow/docks/setup.cpp \
+    mainwindow/docks/baseline.cpp \
+    mainwindow/docks/reset.cpp \
+    mainwindow/theme.cpp \
+    mainwindow/runtime.cpp \
+    mainwindow/runtime/actions.cpp \
+    mainwindow/runtime/window.cpp \
     main.cpp \
     core/power/powercontrol.cpp \
-    emuthread.cpp \
-    qmlbridge.cpp \
-    qtkeypadbridge.cpp \
+    app/emuthread.cpp \
+    app/qmlbridge.cpp \
+    app/qmlbridge/settings.cpp \
+    app/qmlbridge/runtime.cpp \
+    ui/input/keypadbridge.cpp \
     core/cpu/arm_interpreter.cpp \
     core/cpu/coproc.cpp \
     core/cpu/cpu.cpp \
@@ -192,17 +205,73 @@ SOURCES += $$ASMCODE_IMPL \
     core/crypto/sha256.c \
     core/usb/usb.c \
     core/usb/usb_cx2.cpp \
+    core/usb/usb_cx2_state.cpp \
     core/usb/usblink.c \
     core/usb/usblink_cx2.cpp \
-    qtframebuffer.cpp \
+    ui/screen/framebuffer.cpp \
     core/debug/debug.cpp \
+    core/debug/debug_cli.cpp \
+    core/debug/debug_remote.cpp \
+    core/debug/debug_api.cpp \
+    core/debug/debug_api_peek.cpp \
     core/storage/flash.cpp \
+    core/storage/nand_fs.cpp \
     core/emu.cpp \
-    usblinktreewidget.cpp \
-    kitmodel.cpp \
-    fbaboutdialog.cpp \
+    transfer/usblinktreewidget.cpp \
+    ui/models/kitmodel.cpp \
+    dialogs/fbaboutdialog.cpp \
+    ui/theme/widgettheme.cpp \
+    ui/theme/materialicons.cpp \
     ui/docking/widgets/dockwidget.cpp \
+    ui/docking/backend/dockbackend.cpp \
+    ui/docking/widgets/kdockwidget.cpp \
+    ui/docking/manager/dockmanager.cpp \
+    ui/docking/manager/debugdockregistration.cpp \
+    ui/docking/manager/dockmanager_state.cpp \
+    ui/text/ansitextwriter.cpp \
+    ui/widgets/disassembly/disassemblywidget.cpp \
+    ui/widgets/disassembly/disassemblywidget_runtime.cpp \
+    ui/widgets/disassembly/dockregistration.cpp \
+    ui/widgets/registers/registerwidget.cpp \
+    ui/widgets/registers/dockregistration.cpp \
+    ui/widgets/hexview/hexviewwidget.cpp \
+    ui/widgets/hexview/hexviewwidget_search.cpp \
+    ui/widgets/hexview/hexviewwidget_context.cpp \
+    ui/widgets/hexview/dockregistration.cpp \
+    ui/widgets/breakpoints/breakpointwidget.cpp \
+    ui/widgets/breakpoints/dockregistration.cpp \
+    ui/widgets/watchpoints/watchpointwidget.cpp \
+    ui/widgets/watchpoints/dockregistration.cpp \
+    ui/widgets/stack/stackwidget.cpp \
+    ui/widgets/stack/dockregistration.cpp \
+    ui/widgets/portmonitor/portmonitorwidget.cpp \
+    ui/widgets/portmonitor/dockregistration.cpp \
+    ui/widgets/keyhistory/keyhistorywidget.cpp \
+    ui/widgets/keyhistory/dockregistration.cpp \
+    ui/widgets/console/consolewidget.cpp \
+    ui/widgets/console/dockregistration.cpp \
+    ui/widgets/console/state.cpp \
+    ui/widgets/memvisualizer/memoryvisualizerwidget.cpp \
+    ui/widgets/memvisualizer/dockregistration.cpp \
+    ui/widgets/cyclecounter/cyclecounterwidget.cpp \
+    ui/widgets/cyclecounter/dockregistration.cpp \
+    ui/widgets/timermonitor/timermonitorwidget.cpp \
+    ui/widgets/timermonitor/dockregistration.cpp \
+    ui/widgets/lcdstate/lcdstatewidget.cpp \
+    ui/widgets/lcdstate/dockregistration.cpp \
+    ui/widgets/gotodialog.cpp \
+    ui/widgets/nandbrowser/nandbrowserwidget.cpp \
+    ui/widgets/nandbrowser/nandbrowserwidget_tree.cpp \
+    ui/widgets/nandbrowser/nandbrowserwidget_views.cpp \
+    ui/widgets/nandbrowser/nandbrowserwidget_io.cpp \
+    ui/widgets/nandbrowser/nandbrowserwidget_search.cpp \
+    ui/widgets/nandbrowser/nandfileeditor.cpp \
+    ui/widgets/hwconfig/hwconfigwidget.cpp \
     ui/widgets/main/consolelineedit/consolelineedit.cpp \
+    ui/widgets/hwconfig/state.cpp \
+    ui/widgets/mmuviewer/mmuviewerwidget.cpp \
+    ui/widgets/mmuviewer/dockregistration.cpp \
+    core/peripherals/cx2_peripherals.cpp \
     core/soc/cx2.cpp
 
 FORMS += \
@@ -212,13 +281,13 @@ HEADERS += \
     core/storage/fieldparser.h \
     core/usb/usb_cx2.h \
     core/usb/usblink_cx2.h \
-    emuthread.h \
+    app/emuthread.h \
     ui/screen/lcdwidget.h \
     mainwindow.h \
     ui/input/keymap.h \
-    qmlbridge.h \
+    app/qmlbridge.h \
     core/power/powercontrol.h \
-    qtkeypadbridge.h \
+    ui/input/keypadbridge.h \
     core/os/os.h \
     core/jit/armcode_bin.h \
     core/jit/armsnippets.h \
@@ -248,11 +317,36 @@ HEADERS += \
     core/usb/usb.h \
     core/usb/usblink.h \
     core/usb/usblink_queue.h \
-    qtframebuffer.h \
-    usblinktreewidget.h \
-    kitmodel.h \
-    fbaboutdialog.h \
+    ui/screen/framebuffer.h \
+    transfer/usblinktreewidget.h \
+    ui/models/kitmodel.h \
+    dialogs/fbaboutdialog.h \
+    ui/theme/widgettheme.h \
+    ui/theme/materialicons.h \
     ui/docking/widgets/dockwidget.h \
+    ui/docking/backend/dockbackend.h \
+    ui/docking/widgets/kdockwidget.h \
+    ui/docking/manager/dockmanager.h \
+    ui/docking/manager/debugdockregistration.h \
+    ui/text/ansitextwriter.h \
+    ui/widgets/disassembly/disassemblywidget.h \
+    ui/widgets/registers/registerwidget.h \
+    ui/widgets/hexview/hexviewwidget.h \
+    ui/widgets/breakpoints/breakpointwidget.h \
+    ui/widgets/watchpoints/watchpointwidget.h \
+    ui/widgets/stack/stackwidget.h \
+    ui/widgets/portmonitor/portmonitorwidget.h \
+    ui/widgets/keyhistory/keyhistorywidget.h \
+    ui/widgets/console/consolewidget.h \
+    ui/widgets/memvisualizer/memoryvisualizerwidget.h \
+    ui/widgets/cyclecounter/cyclecounterwidget.h \
+    ui/widgets/timermonitor/timermonitorwidget.h \
+    ui/widgets/lcdstate/lcdstatewidget.h \
+    ui/widgets/gotodialog.h \
+    ui/widgets/nandbrowser/nandbrowserwidget.h \
+    ui/widgets/nandbrowser/nandfileeditor.h \
+    ui/widgets/hwconfig/hwconfigwidget.h \
+    ui/widgets/mmuviewer/mmuviewerwidget.h \
     ui/widgets/main/consolelineedit/consolelineedit.h \
     core/soc/cx2.h
 

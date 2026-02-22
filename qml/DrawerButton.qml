@@ -1,4 +1,3 @@
-pragma ComponentBehavior: Bound
 
 import QtQuick 6.0
 import QtQuick.Layouts 6.0

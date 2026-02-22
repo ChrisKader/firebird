@@ -35,20 +35,20 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git kddockwidgets
-          cmake -S kddockwidgets -B kdd-build -G Ninja \
+          git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git .build/kddockwidgets-src
+          cmake -S .build/kddockwidgets-src -B .build/kddockwidgets-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.deps/kddockwidgets-2.4" \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/.build/deps/kddockwidgets-2.4" \
             -DKDDockWidgets_NO_SPDLOG=ON
-          cmake --build kdd-build --parallel
-          cmake --install kdd-build
+          cmake --build .build/kddockwidgets-build --parallel
+          cmake --install .build/kddockwidgets-build
 
       - name: Configure Firebird
         run: |
-          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          cmake -S . -B .build/advisory -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Build firebird
-        run: cmake --build build --parallel
+        run: cmake --build .build/advisory --parallel
 
       - name: File size advisory
         continue-on-error: true
@@ -56,11 +56,11 @@ jobs:
 
       - name: clazy advisory
         continue-on-error: true
-        run: tools/ci/run_clazy.sh build
+        run: tools/ci/run_clazy.sh .build/advisory
 
       - name: clang-tidy advisory
         continue-on-error: true
-        run: tools/ci/run_clang_tidy_advisory.sh build
+        run: tools/ci/run_clang_tidy_advisory.sh .build/advisory
 
       - name: Reference map advisory
         continue-on-error: true

@@ -1,0 +1,66 @@
+name: Build for iOS
+
+on:
+  push:
+    branches: [ master, ci/ios ]
+  pull_request:
+    branches: [ master, ci/ios ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Qt 6 host tools (macOS desktop)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.7.3"
+          host: mac
+          target: desktop
+          arch: clang_64
+          cache: true
+
+      - name: Install Qt 6 (iOS target)
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.7.3"
+          host: mac
+          target: ios
+          arch: ios
+          cache: true
+
+      - name: Build iOS app (qmake + xcodebuild)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p .build/ios
+          cd .build/ios
+          qmake ../../firebird.pro -spec macx-ios-clang CONFIG+=release
+
+          if [ -d firebird-emu.xcodeproj ]; then
+            xcodebuild \
+              -project firebird-emu.xcodeproj \
+              -scheme firebird-emu \
+              -configuration Release \
+              -sdk iphonesimulator \
+              -destination 'generic/platform=iOS Simulator' \
+              CODE_SIGNING_ALLOWED=NO \
+              build
+          else
+            make -j"$(sysctl -n hw.logicalcpu)"
+          fi
+
+      - name: Upload iOS build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebird-emu-ios
+          path: |
+            .build/ios/**/*.app
+            .build/ios/**/*.ipa
+          if-no-files-found: warn

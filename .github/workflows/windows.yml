@@ -5,6 +5,7 @@ on:
     branches: [ master, ci/windows ]
   pull_request:
     branches: [ master, ci/windows ]
+  workflow_dispatch:
   release:
     types: [published]
 
@@ -20,7 +21,7 @@ jobs:
 
     steps:
     - name: Checkout Git Repo
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -39,25 +40,29 @@ jobs:
     - name: Build and install KDDockWidgets 2.4.0
       shell: pwsh
       run: |
-        git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git kddockwidgets
-        cmake -S kddockwidgets -B kdd-build `
-          -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE/.deps/kddockwidgets-2.4" `
+        git clone --depth 1 --branch v2.4.0 https://github.com/KDAB/KDDockWidgets.git .build/kddockwidgets-src
+        cmake -S .build/kddockwidgets-src -B .build/kddockwidgets-build `
+          -DCMAKE_INSTALL_PREFIX="$env:GITHUB_WORKSPACE/.build/deps/kddockwidgets-2.4" `
           -DKDDockWidgets_NO_SPDLOG=ON
-        cmake --build kdd-build --config Release --parallel
-        cmake --install kdd-build --config Release
+        cmake --build .build/kddockwidgets-build --config Release --parallel
+        cmake --install .build/kddockwidgets-build --config Release
 
-    - name: Build firebird-emu
+    - name: Configure + build firebird-emu
       shell: pwsh
       run: |
-        cmake -S . -B build
-        cmake --build build --config Release --parallel
-        New-Item -ItemType Directory -Force -Path build/firebird-emu | Out-Null
-        Copy-Item build/Release/firebird-emu.exe build/firebird-emu/
-        windeployqt --qmldir=./qml --no-qmltooling build/firebird-emu/firebird-emu.exe
+        cmake -S . -B .build/windows-desktop -DCMAKE_BUILD_TYPE=Release
+        cmake --build .build/windows-desktop --config Release --parallel
+
+    - name: Package app
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path .build/windows-desktop/firebird-emu | Out-Null
+        Copy-Item .build/windows-desktop/Release/firebird-emu.exe .build/windows-desktop/firebird-emu/
+        windeployqt --qmldir=./qml --no-qmltooling .build/windows-desktop/firebird-emu/firebird-emu.exe
 
     - name: Upload zip
       uses: actions/upload-artifact@v4
       with:
           name: firebird-emu-${{ matrix.qt_arch }}
-          path: build/firebird-emu/
+          path: .build/windows-desktop/firebird-emu/
           if-no-files-found: error

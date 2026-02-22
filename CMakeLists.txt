@@ -1,45 +1,35 @@
 cmake_minimum_required(VERSION 3.16)
 project(firebird-emu VERSION 1.0 LANGUAGES C CXX ASM)
 
-include(CTest)
+set(FIREBIRD_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
+option(FIREBIRD_META_BUILD "Enable meta-build driver that orchestrates platform builds" OFF)
+if(FIREBIRD_META_BUILD)
+    include(cmake/meta_build.cmake)
+    return()
+endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_AUTOUIC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Gui Qml Quick QuickWidgets Widgets)
+find_package(Qt6 QUIET COMPONENTS WidgetsPrivate)
+find_package(ZLIB REQUIRED)
 
-qt_standard_project_setup()
+if(COMMAND qt_standard_project_setup)
+    qt_standard_project_setup()
+else()
+    set(CMAKE_AUTOMOC ON)
+    set(CMAKE_AUTORCC ON)
+endif()
 
 option(FIREBIRD_ENABLE_KDDOCKWIDGETS "Enable KDDockWidgets docking backend" ON)
-
-add_executable(firebird-layout-convert
-    tools/layout_convert.cpp
+set(
+    FIREBIRD_KDDOCKWIDGETS_PREFIX
+    "${FIREBIRD_SOURCE_DIR}/.build/deps/kddockwidgets-2.4"
+    CACHE PATH
+    "Optional local KDDockWidgets install prefix"
 )
-target_link_libraries(firebird-layout-convert PRIVATE
-    Qt::Core
-    Qt::Widgets
-)
-
-if(BUILD_TESTING)
-    find_package(Qt6 REQUIRED COMPONENTS Test)
-
-    add_executable(firebird-layout-convert-tests
-        tests/layout_convert_test.cpp
-    )
-    target_link_libraries(firebird-layout-convert-tests PRIVATE
-        Qt::Core
-        Qt::Widgets
-        Qt::Test
-    )
-    add_dependencies(firebird-layout-convert-tests firebird-layout-convert)
-
-    add_test(NAME firebird-layout-convert-tests
-        COMMAND firebird-layout-convert-tests
-    )
-    set_tests_properties(firebird-layout-convert-tests PROPERTIES
-        ENVIRONMENT "QT_QPA_PLATFORM=offscreen;FIREBIRD_LAYOUT_CONVERTER=$<TARGET_FILE:firebird-layout-convert>"
-    )
-endif()
 
 qt_add_executable(firebird-emu WIN32 MACOSX_BUNDLE
     # Core emulator
@@ -238,10 +228,21 @@ qt_add_qml_module(firebird-emu
 )
 
 target_include_directories(firebird-emu PRIVATE
-    ${CMAKE_SOURCE_DIR}
-    ${CMAKE_SOURCE_DIR}/core
-    ${CMAKE_SOURCE_DIR}/core/debug
+    ${FIREBIRD_SOURCE_DIR}
 )
+
+# Avoid shadowing libstdc++ <debug/...> headers with core/debug/debug.h while
+# still allowing quoted includes like "emu.h" from non-core sources.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" OR CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(firebird-emu PRIVATE
+        -iquote${FIREBIRD_SOURCE_DIR}/core
+        -iquote${FIREBIRD_SOURCE_DIR}/core/debug
+    )
+else()
+    target_include_directories(firebird-emu PRIVATE
+        ${FIREBIRD_SOURCE_DIR}/core
+    )
+endif()
 
 target_compile_definitions(firebird-emu PRIVATE
 
@@ -255,14 +256,21 @@ target_link_libraries(firebird-emu PRIVATE
     Qt::Quick
     Qt::QuickWidgets
     Qt::Widgets
-    z
+    ZLIB::ZLIB
 )
 
-target_compile_options(firebird-emu PRIVATE
-    -Wall
-    -Wextra
-    -g
-)
+if(MSVC)
+    target_compile_options(firebird-emu PRIVATE
+        /W4
+        /Zi
+    )
+else()
+    target_compile_options(firebird-emu PRIVATE
+        -Wall
+        -Wextra
+        -g
+    )
+endif()
 
 target_compile_definitions(firebird-emu PRIVATE
     QT_NO_CAST_FROM_ASCII
@@ -270,10 +278,12 @@ target_compile_definitions(firebird-emu PRIVATE
 
 if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
     set(_kddockwidgets_version 2.4.0)
-    set(_kddockwidgets_local_prefix "${CMAKE_SOURCE_DIR}/.deps/kddockwidgets-2.4")
+    set(_kddockwidgets_local_prefix "${FIREBIRD_KDDOCKWIDGETS_PREFIX}")
     set(_kddockwidgets_local_config
         "${_kddockwidgets_local_prefix}/lib/cmake/KDDockWidgets-qt6/KDDockWidgets-qt6Config.cmake")
     if(EXISTS "${_kddockwidgets_local_config}")
+        get_filename_component(_kddockwidgets_local_dir "${_kddockwidgets_local_config}" DIRECTORY)
+        set(KDDockWidgets-qt6_DIR "${_kddockwidgets_local_dir}" CACHE PATH "Local KDDockWidgets-qt6 package directory" FORCE)
         list(PREPEND CMAKE_PREFIX_PATH "${_kddockwidgets_local_prefix}")
     endif()
 
@@ -298,27 +308,6 @@ if(FIREBIRD_ENABLE_KDDOCKWIDGETS)
 
     target_link_libraries(firebird-emu PRIVATE ${_kddockwidgets_target})
 
-    if(BUILD_TESTING)
-        add_executable(firebird-kdd-layout-tests
-            tests/kdd_layout_test.cpp
-            ui/docking/widgets/kdockwidget.cpp
-        )
-        target_compile_definitions(firebird-kdd-layout-tests PRIVATE
-            FIREBIRD_USE_KDDOCKWIDGETS=1
-        )
-        target_link_libraries(firebird-kdd-layout-tests PRIVATE
-            Qt::Core
-            Qt::Widgets
-            Qt::Test
-            ${_kddockwidgets_target}
-        )
-        add_test(NAME firebird-kdd-layout-tests
-            COMMAND firebird-kdd-layout-tests
-        )
-        set_tests_properties(firebird-kdd-layout-tests PROPERTIES
-            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-        )
-    endif()
 endif()
 
 # Resources:
@@ -405,7 +394,11 @@ qt_add_resources(firebird-emu "resources4"
         ${resources4_resource_files}
 )
 
-if(UNIX)
+if(EMSCRIPTEN)
+    target_sources(firebird-emu PUBLIC
+        core/os/os-emscripten.c
+    )
+elseif(UNIX)
     target_sources(firebird-emu PUBLIC
         core/os/os-linux.c
     )
@@ -421,9 +414,11 @@ if(WIN32)
         ws2_32
     )
 
-    target_compile_options(firebird-emu PRIVATE
-        -mno-ms-bitfields
-    )
+    if(MINGW)
+        target_compile_options(firebird-emu PRIVATE
+            -mno-ms-bitfields
+        )
+    endif()
 endif()
 
 if(ANDROID)
@@ -471,6 +466,9 @@ elseif(FB_ARCH_RAW_LOWER MATCHES "^(x86_64|amd64)$")
 elseif(FB_ARCH_RAW_LOWER MATCHES "^(i[3-6]86|x86)$")
     set(FB_ARCH "x86")
 endif()
+if(EMSCRIPTEN)
+    set(FB_ARCH "wasm")
+endif()
 
 set(TRANSLATE_SOURCES "")
 set(ASM_SOURCES "")
@@ -513,7 +511,9 @@ endif()
 if(TRANSLATION_ENABLED_ON)
     target_sources(firebird-emu PRIVATE ${ASM_SOURCES} ${TRANSLATE_SOURCES})
 else()
-    target_compile_definitions(firebird-emu PRIVATE NO_TRANSLATION)
+    if(NOT EMSCRIPTEN)
+        target_compile_definitions(firebird-emu PRIVATE NO_TRANSLATION)
+    endif()
 endif()
 
 if(DISABLE_ASMCODE_C AND TRANSLATION_ENABLED_ON)
@@ -597,8 +597,8 @@ endif()
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_custom_target(advisory-file-size
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/dev/check_file_size.py --target 600 --cap 1000
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMAND ${Python3_EXECUTABLE} ${FIREBIRD_SOURCE_DIR}/tools/dev/check_file_size.py --target 600 --cap 1000
+        WORKING_DIRECTORY ${FIREBIRD_SOURCE_DIR}
         COMMENT "Advisory file-size policy check (target 600, cap 1000)"
         VERBATIM
     )
@@ -609,11 +609,13 @@ install(TARGETS firebird-emu
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-qt_generate_deploy_qml_app_script(
-    TARGET firebird-emu
-    OUTPUT_SCRIPT deploy_script
-    NO_UNSUPPORTED_PLATFORM_ERROR
-    DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
-    MACOS_BUNDLE_POST_BUILD
-)
-install(SCRIPT ${deploy_script})
+if(COMMAND qt_generate_deploy_qml_app_script)
+    qt_generate_deploy_qml_app_script(
+        TARGET firebird-emu
+        OUTPUT_SCRIPT deploy_script
+        NO_UNSUPPORTED_PLATFORM_ERROR
+        DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
+        MACOS_BUNDLE_POST_BUILD
+    )
+    install(SCRIPT ${deploy_script})
+endif()

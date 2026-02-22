@@ -126,6 +126,12 @@ void MainWindow::recordGIF()
 
 void MainWindow::launchIdaInstantDebugging()
 {
+#if !QT_CONFIG(process)
+    QMessageBox::information(this, tr("Unsupported on this platform"),
+                             tr("IDA instant debugging is not available on this platform."));
+    return;
+#else
+
     if (!qmlBridge() || !qmlBridge()->getGDBEnabled())
     {
         QMessageBox::warning(this, tr("GDB server disabled"),
@@ -177,6 +183,7 @@ void MainWindow::launchIdaInstantDebugging()
                                  .arg(ida_path, proc->errorString()));
         proc->deleteLater();
     }
+#endif
 }
 
 void MainWindow::connectUSB()

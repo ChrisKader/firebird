@@ -1,4 +1,3 @@
-pragma ComponentBehavior: Bound
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import Firebird.Emu 1.0

@@ -1,5 +1,6 @@
 FLAGS := -g -O3 -DBENCHMARK -Wall -I..
-OUTPUT := firebird-headless
+BUILD_DIR ?= ../.build/headless
+OUTPUT := $(BUILD_DIR)/firebird-headless
 
 TOOLCHAIN_ARCH = $(shell LANG=C $(CC) -v 2>&1 | awk '/Target:(.*)/{ print $$2 }' | cut -d- -f1)
 TRANSLATION_ENABLED ?= TRUE
@@ -50,22 +51,30 @@ CPPSOURCES += ../core/cpu/arm_interpreter.cpp ../core/cpu/coproc.cpp ../core/cpu
               ../core/storage/flash.cpp ../core/gif.cpp ../core/cpu/thumb_interpreter.cpp ../core/usb/usblink_queue.cpp main.cpp \
               ../core/peripherals/keypad.cpp ../core/soc/cx2.cpp ../core/usb/usb_cx2.cpp ../core/usb/usblink_cx2.cpp ../core/storage/fieldparser.cpp
 
-OBJS = $(patsubst %.S, %.o, $(ASMSOURCES))
-OBJS += $(patsubst %.c, %.o, $(CSOURCES))
-OBJS += $(patsubst %.cpp, %.o, $(CPPSOURCES))
+REL_ASMSOURCES := $(patsubst ../%,%,$(ASMSOURCES))
+REL_CSOURCES := $(patsubst ../%,%,$(CSOURCES))
+REL_CPPSOURCES := $(patsubst ../%,%,$(CPPSOURCES))
+
+OBJS = $(addprefix $(BUILD_DIR)/obj/,$(REL_ASMSOURCES:.S=.o))
+OBJS += $(addprefix $(BUILD_DIR)/obj/,$(REL_CSOURCES:.c=.o))
+OBJS += $(addprefix $(BUILD_DIR)/obj/,$(REL_CPPSOURCES:.cpp=.o))
 
 all: $(OUTPUT)
 
-%.o: %.S Makefile
+$(BUILD_DIR)/obj/%.o: ../%.S Makefile
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
-%.o: %.c Makefile
+$(BUILD_DIR)/obj/%.o: ../%.c Makefile
+	@mkdir -p $(dir $@)
 	$(CC) -c $(CFLAGS) $< -o $@
 
-%.o: %.cpp Makefile
+$(BUILD_DIR)/obj/%.o: ../%.cpp Makefile
+	@mkdir -p $(dir $@)
 	$(CXX) -c $(CXXFLAGS) $< -o $@
 
 $(OUTPUT): $(OBJS)
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) $(LFLAGS) $^ $(LIBS) -o $@
 
 clean:

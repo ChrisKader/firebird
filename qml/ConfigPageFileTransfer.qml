@@ -1,8 +1,8 @@
-pragma ComponentBehavior: Bound
 
 import QtQuick 6.0
 import QtQuick.Controls 6.0
 import Qt.labs.platform 1.1 as Platform
+import QtQuick.Dialogs 6.2 as QuickDialogs
 import QtQuick.Layouts 6.0
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
@@ -12,6 +12,34 @@ ColumnLayout {
     spacing: 5
     readonly property int normalSize: (TextMetrics && TextMetrics.normalSize ? TextMetrics.normalSize : 13)
     readonly property int title2Size: (TextMetrics && TextMetrics.title2Size ? TextMetrics.title2Size : 18)
+    property int wasmImportCounter: 0
+    property string wasmPendingImportRequestId: ""
+
+    function openDialog(loader) {
+        if(!loader.item)
+            return;
+        if(loader.item.open)
+            loader.item.open();
+        else
+            loader.item.visible = true;
+    }
+
+    function startTransfer(urls) {
+        transferStatus.text = qsTr("Starting");
+        transferProgress.indeterminate = true;
+        for (let i = 0; i < urls.length; ++i) {
+            let source = urls[i];
+            if(typeof source === "string")
+                source = "file://" + source;
+            Emu.sendFile(source, Emu.usbdir);
+        }
+    }
+
+    function requestWasmTransferImport() {
+        wasmImportCounter++;
+        wasmPendingImportRequestId = "transfer-import-" + wasmImportCounter;
+        Emu.importLocalFileForWasm(wasmPendingImportRequestId, "");
+    }
 
     FBLabel {
         text: qsTr("File Transfer")
@@ -38,15 +66,46 @@ ColumnLayout {
     Loader {
         id: fileDialogLoader
         active: false
-        sourceComponent: Platform.FileDialog {
+        sourceComponent: Qt.platform.os === "wasm" ? quickOpenDialogComponent : platformOpenDialogComponent
+        property bool pendingOpen: false
+        onLoaded: {
+            if (pendingOpen) {
+                pendingOpen = false;
+                transferPage.openDialog(fileDialogLoader);
+            }
+        }
+    }
+
+    Connections {
+        target: Emu
+        function onWasmLocalFileImported(requestId, localPath, errorText) {
+            if(requestId !== wasmPendingImportRequestId)
+                return;
+            wasmPendingImportRequestId = "";
+            if(localPath !== "")
+                transferPage.startTransfer([localPath]);
+            else {
+                transferStatus.text = errorText !== "" ? errorText : qsTr("File import cancelled");
+                transferProgress.indeterminate = false;
+            }
+        }
+    }
+
+    Component {
+        id: platformOpenDialogComponent
+        Platform.FileDialog {
             nameFilters: [ qsTr("TNS Documents") +"(*.tns)", qsTr("Operating Systems") + "(*.tno *.tnc *.tco *.tcc *.tlo *.tmo *.tmc *.tco2 *.tcc2 *.tct2)" ]
             fileMode: Platform.FileDialog.OpenFiles
-            onAccepted: {
-                transferStatus.text = qsTr("Starting");
-                transferProgress.indeterminate = true;
-                for(let i = 0; i < currentFiles.length; ++i)
-                    Emu.sendFile(currentFiles[i], Emu.usbdir);
-            }
+            onAccepted: transferPage.startTransfer(currentFiles)
+        }
+    }
+
+    Component {
+        id: quickOpenDialogComponent
+        QuickDialogs.FileDialog {
+            nameFilters: [ qsTr("TNS Documents") +"(*.tns)", qsTr("Operating Systems") + "(*.tno *.tnc *.tco *.tcc *.tlo *.tmo *.tmc *.tco2 *.tcc2 *.tct2)" ]
+            fileMode: QuickDialogs.FileDialog.OpenFiles
+            onAccepted: transferPage.startTransfer(selectedFiles)
         }
     }
 
@@ -61,8 +120,13 @@ ColumnLayout {
             Layout.topMargin: 5
             Layout.bottomMargin: 5
             onClicked: {
+                if(Qt.platform.os === "wasm") {
+                    requestWasmTransferImport();
+                    return;
+                }
+                fileDialogLoader.pendingOpen = true;
                 fileDialogLoader.active = true;
-                fileDialogLoader.item.visible = true;
+                transferPage.openDialog(fileDialogLoader);
             }
         }
 

@@ -3,8 +3,11 @@
 #include <emscripten.h>
 
 #include "core/memory/mmu.h"
+#include "core/memory/mem.h"
 #include "core/debug/debug.h"
 #include "core/emu.h"
+#include "core/peripherals/lcd.h"
+#include "core/timing/schedule.h"
 
 void gui_do_stuff(bool wait)
 {
@@ -27,6 +30,14 @@ void gui_debug_printf(const char *fmt, ...)
 void gui_debug_vprintf(const char *fmt, va_list ap)
 {
     vprintf(fmt, ap);
+}
+
+void gui_nlog_printf(const char *fmt, ...)
+{
+    va_list ap;
+    va_start(ap, fmt);
+    gui_debug_vprintf(fmt, ap);
+    va_end(ap);
 }
 
 void gui_status_printf(const char *fmt, ...)
@@ -59,6 +70,7 @@ int gui_getchar() { return -1; }
 void gui_set_busy(bool busy) {}
 void gui_show_speed(double d) {}
 void gui_usblink_changed(bool state) {}
+void gui_lcd_frame_ready(void) {}
 void throttle_timer_off() {}
 void throttle_timer_on() {}
 void throttle_timer_wait(unsigned int usec) {}

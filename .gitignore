@@ -4,12 +4,16 @@
 *.user.*
 *.bc
 *.qmlc
-build/
-build-kdd/
-android/.gradle
-.DS_Store
-.python-version
-data/
-.deps/
+
+# Build outputs
+/.build/
+/.deps/
+# Local generated data
+/data/
+
+# Local logs and OS cruft
 NSpireLogs.*
 NSpireLogs/
+.DS_Store
+.python-version
+.log

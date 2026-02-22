@@ -1,4 +1,3 @@
-pragma ComponentBehavior: Bound
 
 import QtQuick 6.0
 import Qt.labs.platform 1.1 as Platform

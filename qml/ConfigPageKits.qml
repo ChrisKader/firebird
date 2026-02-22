@@ -5,7 +5,6 @@ import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 import "KitRoles.js" as KitRoles
 
-pragma ComponentBehavior: Bound
 
 ColumnLayout {
     id: kitsPage

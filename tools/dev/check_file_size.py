@@ -24,7 +24,7 @@ def tracked_sources() -> list[str]:
     cmd = ["git", "ls-files", "*.cpp", "*.h", "*.hpp", "*.c"]
     out = subprocess.check_output(cmd, text=True)
     files = [line.strip() for line in out.splitlines() if line.strip()]
-    excluded_prefixes = ("build/", ".deps/", ".git/")
+    excluded_prefixes = (".build/", ".git/")
     return [f for f in files if not f.startswith(excluded_prefixes)]
 
 

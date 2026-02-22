@@ -1,10 +1,10 @@
-pragma ComponentBehavior: Bound
 
 import QtQuick 6.0
 import QtQuick.Layouts 6.0
 import QtQuick.Controls 6.0
 import QtQuick.Window 6.0
 import Qt.labs.platform 1.1 as Platform
+import QtQuick.Dialogs 6.2 as QuickDialogs
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
 
@@ -29,14 +29,20 @@ Window {
 
     signal flashCreated(string filePath)
 
+    function openDialog(loader) {
+        if (!loader.item)
+            return;
+        if (loader.item.open)
+            loader.item.open();
+        else
+            loader.item.visible = true;
+    }
+
     function acceptDialog() {
         if (!layout.validationText) {
+            fileDialogLoader.pendingOpen = true;
             fileDialogLoader.active = true;
-            // qmllint disable missing-property
-            var dlg = fileDialogLoader.item;
-            if (dlg && typeof dlg["open"] === "function")
-                dlg["open"]();
-            // qmllint enable missing-property
+            openDialog(fileDialogLoader);
         } else {
             // Reopen if validation failed
             flashDialog.visible = true;
@@ -187,24 +193,49 @@ Window {
     Loader {
         id: fileDialogLoader
         active: false
-        sourceComponent: Platform.FileDialog {
-            fileMode: Platform.FileDialog.SaveFile
-            onAccepted: {
-                var filePath = Emu.toLocalFile(currentFile);
-                var success = false;
-                if (!modelCombo.cx2Selected)
-                    success = Emu.createFlash(filePath, modelCombo.productId, subtypeCombo.featureValue, manufSelect.filePath, boot2Select.filePath, osSelect.filePath, diagsSelect.filePath);
-                else
-                    success = Emu.createFlash(filePath, modelCombo.productId, subtypeCombo.featureValue, manufSelect.filePath, bootloaderSelect.filePath, installerSelect.filePath, diagsSelect.filePath);
-
-                if (success) {
-                    flashDialog.flashCreated(filePath);
-                    flashDialog.visible = false;
-                }
-                else
-                    failureDialog.visible = true;
+        sourceComponent: Qt.platform.os === "wasm" ? quickSaveDialogComponent : platformSaveDialogComponent
+        property bool pendingOpen: false
+        onLoaded: {
+            if (pendingOpen) {
+                pendingOpen = false;
+                flashDialog.openDialog(fileDialogLoader);
             }
         }
+    }
+
+    Component {
+        id: platformSaveDialogComponent
+        Platform.FileDialog {
+            fileMode: Platform.FileDialog.SaveFile
+            onAccepted: {
+                flashDialog.handleSaveAccepted(currentFile);
+            }
+        }
+    }
+
+    Component {
+        id: quickSaveDialogComponent
+        QuickDialogs.FileDialog {
+            fileMode: QuickDialogs.FileDialog.SaveFile
+            onAccepted: {
+                flashDialog.handleSaveAccepted(selectedFile);
+            }
+        }
+    }
+
+    function handleSaveAccepted(url) {
+        var filePath = Emu.toLocalFile(url);
+        var success = false;
+        if (!modelCombo.cx2Selected)
+            success = Emu.createFlash(filePath, modelCombo.productId, subtypeCombo.featureValue, manufSelect.filePath, boot2Select.filePath, osSelect.filePath, diagsSelect.filePath);
+        else
+            success = Emu.createFlash(filePath, modelCombo.productId, subtypeCombo.featureValue, manufSelect.filePath, bootloaderSelect.filePath, installerSelect.filePath, diagsSelect.filePath);
+
+        if (success) {
+            flashDialog.flashCreated(filePath);
+            flashDialog.visible = false;
+        } else
+            failureDialog.visible = true;
     }
 
     DialogButtonBox {

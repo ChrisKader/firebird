@@ -1,4 +1,3 @@
-pragma ComponentBehavior: Bound
 
 import Firebird.Emu 1.0
 import Firebird.UIComponents 1.0
