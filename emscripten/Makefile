@@ -1,6 +1,6 @@
 CC := emcc
 CXX := em++
-FLAGS := -O3 -Wall -I.. -I../core -I../core/debug
+FLAGS := -O3 -Wall -I.. -I../core -I../core/debug -s USE_ZLIB=1
 CFLAGS := -std=c11 $(FLAGS)
 CXXFLAGS := -std=c++17 $(FLAGS)
 LFLAGS := -s USE_ZLIB=1 -s DISABLE_EXCEPTION_CATCHING=1 -s INVOKE_RUN=0 -s NO_EXIT_RUNTIME=1 -s ASSERTIONS=0 -s EXPORTED_RUNTIME_METHODS='["callMain","cwrap"]' --closure 0 --pre-js firebird-utils.js -s INITIAL_MEMORY=536870912
