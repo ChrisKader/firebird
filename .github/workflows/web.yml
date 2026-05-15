@@ -22,6 +22,9 @@ jobs:
         with:
           version: 3.1.64
 
+      - name: Pre-build Emscripten zlib port
+        run: embuilder build zlib
+
       - name: Build web target
         run: |
           make -C emscripten BUILD_DIR=../.build/web -j"$(nproc)"
